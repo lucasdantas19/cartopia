@@ -12,7 +12,7 @@ class CreateDelivery
      */
     public function handle(array $attributes): array
     {
-        $startsAt = CarbonImmutable::now();
+        $startsAt = CarbonImmutable::now('UTC');
         $accessToken = bin2hex(random_bytes(32));
         $durationMinutes = $attributes['duration_minutes'];
         unset($attributes['duration_minutes']);

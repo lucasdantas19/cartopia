@@ -2,7 +2,9 @@
 
 As entregas usam um `public_id` UUID e um token secreto independente. O token é retornado somente na criação, armazenado apenas como hash SHA-256 e enviado nos endpoints de leitura pelo header `Authorization: Bearer <token>`.
 
-O frontend pode guardar o token no fragmento do link de acompanhamento, por exemplo `/deliveries/{public_id}#token={token}`. Fragmentos não são enviados ao servidor como URL nem aparecem nos logs de requisição.
+O frontend pode guardar o token no fragmento do link de acompanhamento, por exemplo `/d/{public_id}#token={token}`. Fragmentos não são enviados ao servidor como URL nem aparecem nos logs de requisição.
+
+Na interface, o token é extraído do fragmento, armazenado no `sessionStorage` associado ao `public_id` e removido da barra de endereço com `history.replaceState`. Assim, atualizar a página mantém o acesso durante a sessão; abrir uma entrega sem token disponível exige usar novamente o link original. O token nunca é enviado como query parameter.
 
 ## Opções disponíveis
 

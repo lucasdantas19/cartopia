@@ -45,6 +45,28 @@ it('creates a delivery with a public UUID and a secure access token', function (
         ->not->toBe($token);
 });
 
+it('keeps a five-minute delivery five minutes apart in UTC', function () {
+    $now = CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC');
+    CarbonImmutable::setTestNow($now);
+
+    [$data] = createDelivery(['duration_minutes' => 5]);
+
+    expect($data['starts_at'])->toBe('2026-10-21T15:00:00.000000Z')
+        ->and($data['arrives_at'])->toBe('2026-10-21T15:05:00.000000Z')
+        ->and(Delivery::first()->starts_at->diffInSeconds(Delivery::first()->arrives_at))->toEqual(300);
+});
+
+it('serializes delivery instants with an explicit UTC timezone', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
+    [$data, $token] = createDelivery(['duration_minutes' => 5]);
+
+    $this->withToken($token)
+        ->getJson('/api/deliveries/'.$data['public_id'])
+        ->assertOk()
+        ->assertJsonPath('data.starts_at', '2026-10-21T15:00:00.000000Z')
+        ->assertJsonPath('data.arrives_at', '2026-10-21T15:05:00.000000Z');
+});
+
 it('requires the delivery fields', function () {
     $this->postJson('/api/deliveries', [])->assertUnprocessable()
         ->assertJsonValidationErrors([
@@ -107,7 +129,8 @@ it('reveals the message after arrival', function () {
     $this->withToken($token)
         ->getJson('/api/deliveries/'.$data['public_id'].'/message')
         ->assertOk()
-        ->assertJsonPath('data.message', 'Uma surpresa chegou até você.');
+        ->assertJsonPath('data.message', 'Uma surpresa chegou até você.')
+        ->assertJsonPath('data.delivered_at', '2026-10-21T12:10:00.000000Z');
 });
 
 it('calculates progress and state from time', function () {

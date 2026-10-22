@@ -24,8 +24,8 @@ class Delivery extends Model
     protected function casts(): array
     {
         return [
-            'starts_at' => 'immutable_datetime',
-            'arrives_at' => 'immutable_datetime',
+            'starts_at' => 'immutable_datetime:UTC',
+            'arrives_at' => 'immutable_datetime:UTC',
         ];
     }
 
@@ -38,7 +38,7 @@ class Delivery extends Model
 
     public function status(): string
     {
-        $now = CarbonImmutable::now();
+        $now = CarbonImmutable::now('UTC');
 
         if ($now->lt($this->starts_at)) {
             return 'SCHEDULED';
@@ -53,7 +53,7 @@ class Delivery extends Model
 
     public function progress(): int
     {
-        $now = CarbonImmutable::now();
+        $now = CarbonImmutable::now('UTC');
 
         if ($now->lte($this->starts_at)) {
             return 0;
