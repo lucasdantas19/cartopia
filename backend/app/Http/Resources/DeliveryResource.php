@@ -13,12 +13,12 @@ class DeliveryResource extends JsonResource
             'public_id' => $this->public_id,
             'sender_name' => $this->sender_name,
             'recipient_name' => $this->recipient_name,
-            'origin_code' => $this->origin_code,
-            'destination_code' => $this->destination_code,
-            'courier_code' => $this->courier_code,
-            'departure_at' => $this->departure_at?->toISOString(),
-            'arrival_at' => $this->arrival_at?->toISOString(),
-            'state' => $this->state(),
+            'origin' => $this->origin,
+            'destination' => $this->destination,
+            'courier' => $this->courier,
+            'starts_at' => $this->starts_at?->toISOString(),
+            'arrives_at' => $this->arrives_at?->toISOString(),
+            'status' => $this->status(),
             'progress' => $this->progress(),
         ];
     }

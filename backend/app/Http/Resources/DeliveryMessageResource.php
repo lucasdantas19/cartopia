@@ -12,7 +12,7 @@ class DeliveryMessageResource extends JsonResource
         return [
             'public_id' => $this->public_id,
             'message' => $this->message,
-            'delivered_at' => $this->arrival_at?->toISOString(),
+            'delivered_at' => $this->arrives_at?->toISOString(),
         ];
     }
 }

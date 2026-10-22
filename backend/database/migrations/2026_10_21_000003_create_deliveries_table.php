@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -14,16 +15,21 @@ return new class extends Migration
             $table->text('message');
             $table->string('sender_name')->nullable();
             $table->string('recipient_name');
-            $table->string('origin_code');
-            $table->string('destination_code');
-            $table->string('courier_code');
-            $table->timestampTz('departure_at');
-            $table->timestampTz('arrival_at');
+            $table->string('origin');
+            $table->string('destination');
+            $table->string('courier');
+            $table->timestampTz('starts_at');
+            $table->timestampTz('arrives_at');
             $table->string('access_token_hash', 64);
             $table->timestampsTz();
 
             $table->index('access_token_hash');
         });
+
+        if (Schema::getConnection()->getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE deliveries ADD CONSTRAINT deliveries_origin_destination_different CHECK (origin <> destination)');
+            DB::statement('ALTER TABLE deliveries ADD CONSTRAINT deliveries_arrival_after_start CHECK (arrives_at >= starts_at)');
+        }
     }
 
     public function down(): void

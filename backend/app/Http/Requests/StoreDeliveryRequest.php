@@ -18,12 +18,12 @@ class StoreDeliveryRequest extends FormRequest
             'message' => ['required', 'string', 'max:10000'],
             'sender_name' => ['nullable', 'string', 'max:120'],
             'recipient_name' => ['required', 'string', 'max:120'],
-            'origin_code' => ['required', 'string', Rule::in(config('deliveries.origins'))],
-            'destination_code' => [
+            'origin' => ['required', 'string', Rule::in(config('deliveries.origins'))],
+            'destination' => [
                 'required',
                 'string',
                 Rule::in(config('deliveries.destinations')),
-                'different:origin_code',
+                'different:origin',
             ],
             'duration_minutes' => [
                 'required',

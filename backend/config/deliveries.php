@@ -15,6 +15,6 @@ return [
         'paper-swallow',
     ],
 
-    // Seven days is the maximum journey duration in this first MVP.
-    'max_duration_minutes' => 7 * 24 * 60,
+    // One day is the maximum journey duration in this first MVP.
+    'max_duration_minutes' => 24 * 60,
 ];

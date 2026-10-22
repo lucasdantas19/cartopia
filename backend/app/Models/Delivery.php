@@ -13,19 +13,19 @@ class Delivery extends Model
         'message',
         'sender_name',
         'recipient_name',
-        'origin_code',
-        'destination_code',
-        'courier_code',
-        'departure_at',
-        'arrival_at',
+        'origin',
+        'destination',
+        'courier',
+        'starts_at',
+        'arrives_at',
         'access_token_hash',
     ];
 
     protected function casts(): array
     {
         return [
-            'departure_at' => 'immutable_datetime',
-            'arrival_at' => 'immutable_datetime',
+            'starts_at' => 'immutable_datetime',
+            'arrives_at' => 'immutable_datetime',
         ];
     }
 
@@ -36,15 +36,15 @@ class Delivery extends Model
         });
     }
 
-    public function state(): string
+    public function status(): string
     {
         $now = CarbonImmutable::now();
 
-        if ($now->lt($this->departure_at)) {
+        if ($now->lt($this->starts_at)) {
             return 'SCHEDULED';
         }
 
-        if ($now->gte($this->arrival_at)) {
+        if ($now->gte($this->arrives_at)) {
             return 'DELIVERED';
         }
 
@@ -55,22 +55,22 @@ class Delivery extends Model
     {
         $now = CarbonImmutable::now();
 
-        if ($now->lte($this->departure_at)) {
+        if ($now->lte($this->starts_at)) {
             return 0;
         }
 
-        if ($now->gte($this->arrival_at)) {
+        if ($now->gte($this->arrives_at)) {
             return 100;
         }
 
-        $duration = $this->departure_at->diffInSeconds($this->arrival_at);
-        $elapsed = $this->departure_at->diffInSeconds($now);
+        $duration = $this->starts_at->diffInSeconds($this->arrives_at);
+        $elapsed = $this->starts_at->diffInSeconds($now);
 
         return max(0, min(100, (int) round(($elapsed / $duration) * 100)));
     }
 
     public function hasArrived(): bool
     {
-        return $this->state() === 'DELIVERED';
+        return $this->status() === 'DELIVERED';
     }
 }

@@ -28,11 +28,18 @@ class DeliveryController extends Controller
         return DeliveryResource::make($this->authorizedDelivery($request, $publicId));
     }
 
-    public function message(Request $request, string $publicId): DeliveryMessageResource
+    public function message(Request $request, string $publicId): DeliveryMessageResource|JsonResponse
     {
         $delivery = $this->authorizedDelivery($request, $publicId);
 
-        abort_unless($delivery->hasArrived(), 403, 'The message is not available until the delivery arrives.');
+        if (! $delivery->hasArrived()) {
+            return response()->json([
+                'error' => [
+                    'code' => 'DELIVERY_NOT_ARRIVED',
+                    'message' => 'The delivery has not arrived yet.',
+                ],
+            ], 403);
+        }
 
         return DeliveryMessageResource::make($delivery);
     }

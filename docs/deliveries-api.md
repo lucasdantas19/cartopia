@@ -12,7 +12,7 @@ Origens e destinos aceitos inicialmente:
 - `garden-of-ideas`
 - `library-of-memories`
 
-O entregador inicial é `paper-swallow`. A duração deve ser positiva e pode ter no máximo sete dias (`10080` minutos). Os horários são definidos pelo backend no momento da criação.
+O entregador inicial é `paper-swallow`. A duração deve estar entre 1 e 1440 minutos. Os horários são definidos pelo backend no momento da criação; a viagem começa imediatamente.
 
 ## Criar entrega
 
@@ -23,8 +23,8 @@ O entregador inicial é `paper-swallow`. A duração deve ser positiva e pode te
   "message": "Uma surpresa chegou até você.",
   "sender_name": "Aventureiro",
   "recipient_name": "Pessoa querida",
-  "origin_code": "port-of-dreams",
-  "destination_code": "garden-of-ideas",
+  "origin": "port-of-dreams",
+  "destination": "garden-of-ideas",
   "duration_minutes": 60
 }
 ```
@@ -37,12 +37,12 @@ Resposta `201 Created`:
     "public_id": "01234567-89ab-cdef-0123-456789abcdef",
     "sender_name": "Aventureiro",
     "recipient_name": "Pessoa querida",
-    "origin_code": "port-of-dreams",
-    "destination_code": "garden-of-ideas",
-    "courier_code": "paper-swallow",
-    "departure_at": "2026-10-21T12:00:00.000000Z",
-    "arrival_at": "2026-10-21T13:00:00.000000Z",
-    "state": "IN_TRANSIT",
+    "origin": "port-of-dreams",
+    "destination": "garden-of-ideas",
+    "courier": "paper-swallow",
+    "starts_at": "2026-10-21T12:00:00.000000Z",
+    "arrives_at": "2026-10-21T13:00:00.000000Z",
+    "status": "IN_TRANSIT",
     "progress": 0
   },
   "access_token": "token-retornado-apenas-na-criacao",
@@ -60,7 +60,7 @@ curl \
   http://localhost:8000/api/deliveries/{public_id}
 ```
 
-O retorno contém `state` (`SCHEDULED`, `IN_TRANSIT` ou `DELIVERED`) e `progress` entre `0` e `100`, mas nunca contém a mensagem.
+O retorno contém `status` (`SCHEDULED`, `IN_TRANSIT` ou `DELIVERED`) e `progress` entre `0` e `100`, mas nunca contém a mensagem.
 
 ## Abrir mensagem
 
@@ -72,4 +72,4 @@ curl \
   http://localhost:8000/api/deliveries/{public_id}/message
 ```
 
-Antes da chegada, a API retorna `403 Forbidden`. Após a chegada, retorna `200 OK` com a mensagem. Token ausente, inválido ou usado com outro UUID retorna `404 Not Found` sem revelar dados privados.
+Antes da chegada, a API retorna `403 Forbidden` com `error.code` igual a `DELIVERY_NOT_ARRIVED`. Após a chegada, retorna `200 OK` com a mensagem. Token ausente, inválido ou usado com outro UUID retorna `404 Not Found` sem revelar dados privados.
