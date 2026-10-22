@@ -29,6 +29,7 @@ input::placeholder, textarea::placeholder { color: #a99e91; }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .route-fields { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 1rem; }
 .route-arrow { padding-bottom: .72rem; color: var(--coral); font-size: 1.5rem; }
+.location-preview { min-height: 5.2rem; margin-top: .7rem; padding: .75rem .85rem; border-left: 3px solid var(--coral); border-radius: 0 .65rem .65rem 0; background: rgba(255,255,255,.45); }.location-preview.destination { border-left-color: var(--peach); background: #fff5df; }.location-preview span, .location-preview strong, .location-preview p { display: block; }.location-preview span { margin-bottom: .2rem; color: var(--muted); font-size: .67rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }.location-preview strong { color: var(--ink); font: 700 1rem var(--display); }.location-preview p { margin: .2rem 0 0; color: var(--muted); font-size: .75rem; line-height: 1.35; }
 .duration-field { max-width: 280px; margin-top: 1.5rem; }
 .duration-input { position: relative; }
 .duration-input span { position: absolute; top: .85rem; right: .9rem; color: var(--muted); font-size: .8rem; }

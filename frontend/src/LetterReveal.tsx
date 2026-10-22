@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { getCourier } from './couriers'
 
 type VisualState = 'closed' | 'opening' | 'opened'
 
 interface LetterRevealProps {
+  courier: string
   canOpen: boolean
   opening: boolean
   message: string | null
@@ -32,7 +34,7 @@ function initialVisualState(message: string | null): VisualState {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'opened' : 'opening'
 }
 
-export function LetterReveal({ canOpen, opening, message, error, onOpen }: LetterRevealProps) {
+export function LetterReveal({ courier, canOpen, opening, message, error, onOpen }: LetterRevealProps) {
   const [visualState, setVisualState] = useState<VisualState>(() => initialVisualState(message))
 
   if (message !== null) {
@@ -43,7 +45,7 @@ export function LetterReveal({ canOpen, opening, message, error, onOpen }: Lette
 
   if (canOpen) {
     return <section className="arrival-card" aria-live="polite">
-      <img className="arrival-mascot" src="/couriers/paper-swallow.svg" alt="Andorinha de papel" />
+      <img className="arrival-mascot" src={getCourier(courier).cardAsset} alt={getCourier(courier).label} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = '/couriers/paper-swallow.svg' }} />
       <p className="arrival-kicker">A aventura terminou</p>
       <h2>Sua surpresa chegou!</h2>
       <p>A mensagem está pronta para ser aberta.</p>

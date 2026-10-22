@@ -28,8 +28,25 @@ function navigate(path: string) {
 
 function locationLabel(value: string) { return getLocation(value)?.label ?? value }
 
+function LocationPreview({ code, kind }: { code: string; kind: 'origin' | 'destination' }) {
+  const location = getLocation(code)
+  if (!location) return null
+
+  return <div className={`location-preview ${kind}`} aria-live="polite">
+    <span>{kind === 'origin' ? 'Ponto de partida' : 'Destino da aventura'}</span>
+    <strong>{location.label}</strong>
+    <p>{location.description}</p>
+  </div>
+}
+
 function statusLabel(status: DeliveryStatus) {
   return { SCHEDULED: 'Preparando a partida', IN_TRANSIT: 'A caminho', DELIVERED: 'Chegou ao destino' }[status]
+}
+
+function useCourierFallback(event: React.SyntheticEvent<HTMLImageElement>) {
+  const image = event.currentTarget
+  image.onerror = null
+  image.src = '/couriers/paper-swallow.svg'
 }
 
 function App() {
@@ -122,11 +139,11 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
         <div className="field-grid"><div><label htmlFor="sender_name">Seu nome <small>(opcional)</small></label><input id="sender_name" maxLength={120} value={form.sender_name} onChange={(event) => updateField('sender_name', event.target.value)} placeholder="Como devemos assinar?" />{fieldErrors.sender_name && <FieldError messages={fieldErrors.sender_name} />}</div><div><label htmlFor="recipient_name">Nome do destinatário <span className="required">*</span></label><input id="recipient_name" required maxLength={120} value={form.recipient_name} onChange={(event) => updateField('recipient_name', event.target.value)} placeholder="Quem receberá?" />{fieldErrors.recipient_name && <FieldError messages={fieldErrors.recipient_name} />}</div></div>
       </div>
       <div className="form-section"><div className="section-heading"><span>03</span><div><h2>Trace a rota</h2><p>Escolha onde a jornada começa e termina.</p></div></div>
-        <div className="route-fields"><div><label htmlFor="origin">De</label><select id="origin" value={form.origin} onChange={(event) => updateField('origin', event.target.value)}>{locations.map((location) => <option key={location.code} value={location.code}>{location.label}</option>)}</select></div><span className="route-arrow" aria-hidden="true">→</span><div><label htmlFor="destination">Para</label><select id="destination" value={form.destination} onChange={(event) => updateField('destination', event.target.value)}>{locations.map((location) => <option key={location.code} value={location.code}>{location.label}</option>)}</select></div></div>
+        <div className="route-fields"><div><label htmlFor="origin">De</label><select id="origin" value={form.origin} onChange={(event) => updateField('origin', event.target.value)}>{locations.map((location) => <option key={location.code} value={location.code}>{location.label}</option>)}</select><LocationPreview code={form.origin} kind="origin" /></div><span className="route-arrow" aria-hidden="true">→</span><div><label htmlFor="destination">Para</label><select id="destination" value={form.destination} onChange={(event) => updateField('destination', event.target.value)}>{locations.map((location) => <option key={location.code} value={location.code}>{location.label}</option>)}</select><LocationPreview code={form.destination} kind="destination" /></div></div>
         {error && <p className="error-message" role="alert">{error}</p>}{fieldErrors.origin && <FieldError messages={fieldErrors.origin} />}{fieldErrors.destination && <FieldError messages={fieldErrors.destination} />}
         <div className="duration-field"><label htmlFor="duration_minutes">Duração da viagem <small>(1 a 1440 minutos)</small></label><div className="duration-input"><input id="duration_minutes" type="number" required min={1} max={1440} value={form.duration_minutes} onChange={(event) => updateField('duration_minutes', Number(event.target.value))} /><span>minutos</span></div>{fieldErrors.duration_minutes && <FieldError messages={fieldErrors.duration_minutes} />}</div>
       </div>
-      <fieldset className="form-section courier-section"><legend><span>04</span><span><strong>Escolha seu entregador</strong><small>Quem levará a mensagem?</small></span></legend><div className="courier-options">{couriers.map((courier) => <label className={`courier-option ${form.courier === courier.code ? 'selected' : ''}`} key={courier.code}><input type="radio" name="courier" value={courier.code} checked={form.courier === courier.code} onChange={() => updateField('courier', courier.code)} /><img src={courier.asset} alt="" /><span><strong>{courier.label}</strong><small>{courier.description}</small></span></label>)}</div>{fieldErrors.courier && <FieldError messages={fieldErrors.courier} />}</fieldset>
+      <fieldset className="form-section courier-section"><legend><span>04</span><span><strong>Escolha seu entregador</strong><small>Quem levará a mensagem?</small></span></legend><div className="courier-options">{couriers.map((courier) => <label className={`courier-option ${form.courier === courier.code ? 'selected' : ''}`} key={courier.code}><input type="radio" name="courier" value={courier.code} checked={form.courier === courier.code} onChange={() => updateField('courier', courier.code)} /><img src={courier.cardAsset} alt="" aria-hidden="true" onError={useCourierFallback} /><span><strong>{courier.label}</strong><small>{courier.description}</small></span></label>)}</div>{fieldErrors.courier && <FieldError messages={fieldErrors.courier} />}</fieldset>
       <button className="button primary submit-button" type="submit" disabled={submitting}>{submitting ? 'Preparando a entrega…' : 'Enviar pela Cartopia ✦'}</button>
     </form>
   </Shell>
@@ -228,13 +245,13 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
 
   return <Shell eyebrow="Acompanhamento da aventura">
     <section className="tracking-header"><div><p className="tracking-kicker">Uma entrega para</p><h1>{delivery.recipient_name}</h1><p className="lead">{delivery.sender_name ? `${delivery.sender_name} preparou uma surpresa para você.` : 'Alguém preparou uma surpresa para você.'}</p></div><div className={`status-pill ${visualStatus.toLowerCase()}`}><span className="status-dot" />{statusLabel(visualStatus)}</div></section>
-    <section className="journey-card"><div className="journey-meta"><span>{locationLabel(delivery.origin)}</span><span>{visualProgress}% da jornada</span><span>{locationLabel(delivery.destination)}</span></div><div className="journey-line" aria-label={`Progresso da viagem: ${visualProgress}%`}><span className="journey-fill" style={{ width: `${visualProgress}%` }} /><span className="courier-icon" style={{ left: `${visualProgress}%`, transform: progressMarkerTransform(visualProgress) }}><img src={getCourier(delivery.courier).asset} alt="" aria-hidden="true" /></span><span className="journey-node start" /><span className="journey-node end" /></div><div className="journey-footer"><span>✦ {getCourier(delivery.courier).label}</span><strong>{formatRemaining(delivery.arrives_at, now)}</strong></div></section>
+    <section className="journey-card"><div className="journey-meta"><span>{locationLabel(delivery.origin)}</span><span>{visualProgress}% da jornada</span><span>{locationLabel(delivery.destination)}</span></div><div className="journey-line" aria-label={`Progresso da viagem: ${visualProgress}%`}><span className="journey-fill" style={{ width: `${visualProgress}%` }} /><span className="courier-icon" style={{ left: `${visualProgress}%`, transform: progressMarkerTransform(visualProgress) }}><img src={getCourier(delivery.courier).iconAsset} alt="" aria-hidden="true" onError={useCourierFallback} /></span><span className="journey-node start" /><span className="journey-node end" /></div><div className="journey-footer"><span>✦ {getCourier(delivery.courier).label}</span><strong>{formatRemaining(delivery.arrives_at, now)}</strong></div></section>
     {realtimeStatus === 'received' && <p className="realtime-indicator" role="status">Sinal em tempo real recebido.</p>}
     {getLocation(delivery.origin) && getLocation(delivery.destination) && <DeliveryMap origin={getLocation(delivery.origin)!} destination={getLocation(delivery.destination)!} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />}
     <section className="details-grid"><div><span>Partida</span><strong>{formatLocalDate(delivery.starts_at)}</strong></div><div><span>Chegada prevista</span><strong>{formatLocalDate(delivery.arrives_at)}</strong></div></section>
     {delivery.access_role === 'sender'
       ? <SenderOpeningStatus openedAt={delivery.opened_at} />
-      : <LetterReveal key={message ?? 'closed'} canOpen={canOpen} opening={opening} message={message} error={messageError} onOpen={() => { void revealMessage() }} />}
+      : <LetterReveal key={message ?? 'closed'} courier={delivery.courier} canOpen={canOpen} opening={opening} message={message} error={messageError} onOpen={() => { void revealMessage() }} />}
   </Shell>
 }
 

@@ -12,6 +12,8 @@ test('all supported delivery locations have coordinates', () => {
   for (const location of locations) {
     assert.equal(location.coordinates.length, 2)
     assert.ok(location.coordinates.every(Number.isFinite))
+    assert.ok(location.label.length > 0)
+    assert.ok(location.description.length > 0)
   }
 })
 

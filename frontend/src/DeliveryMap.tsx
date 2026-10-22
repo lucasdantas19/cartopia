@@ -38,7 +38,7 @@ function createCourierElement(courier: string): HTMLDivElement {
   element.setAttribute('role', 'img')
 
   const image = document.createElement('img')
-  image.src = courierOption.asset
+  image.src = courierOption.iconAsset
   image.alt = ''
   image.draggable = false
   image.addEventListener('error', () => {
@@ -75,7 +75,7 @@ export function DeliveryMap({ origin, destination, courier, startsAt, arrivesAt 
     const element = marker.getElement()
     const image = element.querySelector('img')
     element.setAttribute('aria-label', `Entregador ${option.label}`)
-    if (image) image.setAttribute('src', option.asset)
+    if (image) image.setAttribute('src', option.iconAsset)
   }, [courier])
 
   const fitRoute = useCallback((map: Map) => {
