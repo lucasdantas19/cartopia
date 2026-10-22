@@ -12,13 +12,15 @@ export class ApiError extends Error {
   status: number
   code?: string
   fields?: Record<string, string[]>
+  retryAfter?: number
 
-  constructor(status: number, payload: ApiErrorPayload) {
+  constructor(status: number, payload: ApiErrorPayload, retryAfter?: number) {
     super(payload.error?.message ?? payload.message ?? 'Não foi possível concluir a operação.')
     this.name = 'ApiError'
     this.status = status
     this.code = payload.error?.code
     this.fields = payload.errors
+    this.retryAfter = retryAfter
   }
 }
 
@@ -35,7 +37,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload & T
 
   if (!response.ok) {
-    throw new ApiError(response.status, payload)
+    const retryAfter = Number(response.headers.get('Retry-After'))
+    throw new ApiError(response.status, payload, Number.isFinite(retryAfter) ? retryAfter : undefined)
   }
 
   return payload as T

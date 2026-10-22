@@ -14,6 +14,8 @@ Origens e destinos aceitos inicialmente:
 - `garden-of-ideas`
 - `library-of-memories`
 
+Entregadores disponíveis: `paper-swallow`, `postal-cat` e `little-dragon`. O campo `courier` é opcional e usa `paper-swallow` por padrão.
+
 O entregador inicial é `paper-swallow`. A duração deve estar entre 1 e 1440 minutos. Os horários são definidos pelo backend no momento da criação; a viagem começa imediatamente.
 
 ## Criar entrega
@@ -27,6 +29,7 @@ O entregador inicial é `paper-swallow`. A duração deve estar entre 1 e 1440 m
   "recipient_name": "Pessoa querida",
   "origin": "port-of-dreams",
   "destination": "garden-of-ideas",
+  "courier": "paper-swallow",
   "duration_minutes": 60
 }
 ```

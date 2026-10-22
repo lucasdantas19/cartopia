@@ -16,5 +16,11 @@ After creating a delivery, use its public_id to send the development event:
 
 The frontend authorizes private-deliveries.{publicId} through
 /api/broadcasting/auth with the delivery bearer token. If Reverb variables are
-not configured, the tracking page continues to use the REST API and temporal
+not configured, the tracking page continues to use the REST API and temporalgit status
+git add backend/phpunit.xml \
+  backend/.env.testing.example \
+  backend/tests
+
+git diff --cached --stat
+git commit -m "test: use PostgreSQL and validate concurrent delivery opening"
 progress without opening a WebSocket connection.

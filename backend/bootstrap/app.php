@@ -4,6 +4,8 @@ use App\Http\Middleware\AuthenticateDeliveryBroadcast;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,11 +16,22 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withBroadcasting(__DIR__.'/../routes/channels.php', [
         'prefix' => 'api',
-        'middleware' => ['api', AuthenticateDeliveryBroadcast::class],
+        'middleware' => ['api', 'throttle:broadcasting-auth', AuthenticateDeliveryBroadcast::class],
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (ThrottleRequestsException $exception, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'error' => [
+                    'code' => 'RATE_LIMIT_EXCEEDED',
+                    'message' => 'Muitas tentativas. Aguarde um pouco e tente novamente.',
+                ],
+            ], 429, $exception->getHeaders());
+        });
     })->create();

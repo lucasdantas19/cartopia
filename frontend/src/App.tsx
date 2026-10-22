@@ -102,7 +102,10 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
         recipientToken,
       })
     } catch (caught) {
-      if (caught instanceof ApiError) { setError(caught.message); setFieldErrors(caught.fields ?? {}) }
+      if (caught instanceof ApiError) {
+        setError(caught.status === 429 ? 'Muitas tentativas. Aguarde um pouco e tente criar a entrega novamente.' : caught.message)
+        setFieldErrors(caught.fields ?? {})
+      }
       else setError('Não foi possível criar a entrega. Verifique sua conexão e tente novamente.')
     } finally { setSubmitting(false) }
   }
@@ -210,7 +213,9 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
         }
 
         setRequestFailed(true)
-        setError('Não foi possível carregar a viagem.')
+        setError(caught instanceof ApiError && caught.status === 429
+          ? 'Muitas consultas em pouco tempo. Aguarde um pouco e tente novamente.'
+          : 'Não foi possível carregar a viagem.')
       }
       finally { /* delivery/error state represents the request lifecycle. */ }
     }
@@ -244,7 +249,11 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
         return
       }
 
-      setMessageError(caught instanceof ApiError && caught.code === 'DELIVERY_NOT_ARRIVED' ? 'A viagem ainda está a caminho. Tente novamente quando ela chegar.' : 'Não foi possível abrir esta mensagem com este link.')
+      setMessageError(caught instanceof ApiError && caught.status === 429
+        ? 'Muitas tentativas em pouco tempo. Aguarde um pouco e tente novamente.'
+        : caught instanceof ApiError && caught.code === 'DELIVERY_NOT_ARRIVED'
+          ? 'A viagem ainda está a caminho. Tente novamente quando ela chegar.'
+          : 'Não foi possível abrir esta mensagem com este link.')
     }
     finally { setOpening(false) }
   }
