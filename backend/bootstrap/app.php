@@ -19,7 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         'middleware' => ['api', 'throttle:broadcasting-auth', AuthenticateDeliveryBroadcast::class],
     ])
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->replace(
+            \Illuminate\Http\Middleware\TrustProxies::class,
+            \App\Http\Middleware\TrustProxies::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (ThrottleRequestsException $exception, Request $request) {
