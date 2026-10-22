@@ -122,8 +122,8 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
 
   if (created) return <Shell eyebrow="A aventura está pronta">
     <section className="success-card"><span className="success-icon">✉</span><h1>Uma carta partiu!</h1><p className="lead">Guarde os dois links: cada um possui uma permissão diferente.</p>
-      <div className="share-box"><div><label htmlFor="recipient-share-link"><strong>Link do destinatário</strong></label><input id="recipient-share-link" className="share-link" readOnly value={created.recipientUrl} onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.currentTarget.select()} /></div><button className="button secondary" type="button" onClick={() => copyLink(created.recipientUrl, 'recipient')}>{copied === 'recipient' ? 'Copiado!' : 'Copiar link'}</button></div>
-      <div className="share-box"><div><label htmlFor="sender-share-link"><strong>Link do remetente</strong></label><input id="sender-share-link" className="share-link" readOnly value={created.senderUrl} onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.currentTarget.select()} /></div><button className="button secondary" type="button" onClick={() => copyLink(created.senderUrl, 'sender')}>{copied === 'sender' ? 'Copiado!' : 'Copiar link'}</button></div>
+      <div className="share-box"><div><label htmlFor="recipient-share-link"><strong>Link do destinatário</strong></label><small className="share-hint">Envie este link para quem receberá a carta.</small><input id="recipient-share-link" className="share-link" readOnly value={created.recipientUrl} onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.currentTarget.select()} /></div><button className="button secondary" type="button" onClick={() => copyLink(created.recipientUrl, 'recipient')}>{copied === 'recipient' ? 'Copiado!' : 'Copiar link'}</button></div>
+      <div className="share-box"><div><label htmlFor="sender-share-link"><strong>Link do remetente</strong></label><small className="share-hint">Guarde para acompanhar e saber quando a carta for aberta.</small><input id="sender-share-link" className="share-link" readOnly value={created.senderUrl} onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.currentTarget.select()} /></div><button className="button secondary" type="button" onClick={() => copyLink(created.senderUrl, 'sender')}>{copied === 'sender' ? 'Copiado!' : 'Copiar link'}</button></div>
       {copyError && <p className="error-message" role="alert">Não foi possível copiar automaticamente. Selecione o link acima e copie manualmente.</p>}
       <div className="success-actions"><button className="button primary" type="button" onClick={() => onTrack(created.publicId, created.recipientToken)}>Acompanhar como destinatário</button><button className="text-button" type="button" onClick={() => setCreated(null)}>Criar outra carta</button></div>
     </section>
@@ -132,24 +132,39 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
   return <Shell>
     <section className="intro"><h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1><p className="lead">Escreva uma mensagem, escolha uma rota e deixe a Cartopia fazer a entrega.</p></section>
     <form className="delivery-form" onSubmit={submit}>
-      <div className="form-section"><div className="section-heading"><span>01</span><div><h2>A mensagem</h2><p>O que você quer enviar?</p></div></div>
-        <label htmlFor="message">Sua mensagem <span className="required">*</span></label><textarea id="message" required maxLength={10000} value={form.message} onChange={(event) => updateField('message', event.target.value)} placeholder="Era uma vez uma mensagem..." rows={5} />{fieldErrors.message && <FieldError messages={fieldErrors.message} />}
-      </div>
-      <div className="form-section"><div className="section-heading"><span>02</span><div><h2>Para quem?</h2><p>Conte-nos quem vai receber.</p></div></div>
+      <div className="form-section"><div className="section-heading"><span>01</span><div><h2>Sua mensagem</h2><p>Escreva a carta e conte-nos quem vai recebê-la.</p></div></div>
         <div className="field-grid"><div><label htmlFor="sender_name">Seu nome <small>(opcional)</small></label><input id="sender_name" maxLength={120} value={form.sender_name} onChange={(event) => updateField('sender_name', event.target.value)} placeholder="Como devemos assinar?" />{fieldErrors.sender_name && <FieldError messages={fieldErrors.sender_name} />}</div><div><label htmlFor="recipient_name">Nome do destinatário <span className="required">*</span></label><input id="recipient_name" required maxLength={120} value={form.recipient_name} onChange={(event) => updateField('recipient_name', event.target.value)} placeholder="Quem receberá?" />{fieldErrors.recipient_name && <FieldError messages={fieldErrors.recipient_name} />}</div></div>
+        <label htmlFor="message" className="message-label">Sua mensagem <span className="required">*</span></label><textarea id="message" required maxLength={10000} value={form.message} onChange={(event) => updateField('message', event.target.value)} placeholder="Era uma vez uma mensagem..." rows={5} />{fieldErrors.message && <FieldError messages={fieldErrors.message} />}
       </div>
-      <div className="form-section"><div className="section-heading"><span>03</span><div><h2>Trace a rota</h2><p>Escolha onde a jornada começa e termina.</p></div></div>
+      <fieldset className="form-section courier-section"><legend><span>02</span><span><strong>Seu entregador</strong><small>Escolha quem levará a mensagem.</small></span></legend><div className="courier-options">{couriers.map((courier) => <label className={`courier-option ${form.courier === courier.code ? 'selected' : ''}`} key={courier.code}><input type="radio" name="courier" value={courier.code} checked={form.courier === courier.code} onChange={() => updateField('courier', courier.code)} /><img src={courier.cardAsset} alt="" aria-hidden="true" onError={useCourierFallback} /><span><strong>{courier.label}</strong><small>{courier.description}</small></span></label>)}</div>{fieldErrors.courier && <FieldError messages={fieldErrors.courier} />}</fieldset>
+      <div className="form-section"><div className="section-heading"><span>03</span><div><h2>Sua aventura</h2><p>Escolha onde a jornada começa, termina e quanto tempo leva.</p></div></div>
         <div className="route-fields"><div><label htmlFor="origin">De</label><select id="origin" value={form.origin} onChange={(event) => updateField('origin', event.target.value)}>{locations.map((location) => <option key={location.code} value={location.code}>{location.label}</option>)}</select><LocationPreview code={form.origin} kind="origin" /></div><span className="route-arrow" aria-hidden="true">→</span><div><label htmlFor="destination">Para</label><select id="destination" value={form.destination} onChange={(event) => updateField('destination', event.target.value)}>{locations.map((location) => <option key={location.code} value={location.code}>{location.label}</option>)}</select><LocationPreview code={form.destination} kind="destination" /></div></div>
         {error && <p className="error-message" role="alert">{error}</p>}{fieldErrors.origin && <FieldError messages={fieldErrors.origin} />}{fieldErrors.destination && <FieldError messages={fieldErrors.destination} />}
         <div className="duration-field"><label htmlFor="duration_minutes">Duração da viagem <small>(1 a 1440 minutos)</small></label><div className="duration-input"><input id="duration_minutes" type="number" required min={1} max={1440} value={form.duration_minutes} onChange={(event) => updateField('duration_minutes', Number(event.target.value))} /><span>minutos</span></div>{fieldErrors.duration_minutes && <FieldError messages={fieldErrors.duration_minutes} />}</div>
+        <DeliverySummary form={form} />
       </div>
-      <fieldset className="form-section courier-section"><legend><span>04</span><span><strong>Escolha seu entregador</strong><small>Quem levará a mensagem?</small></span></legend><div className="courier-options">{couriers.map((courier) => <label className={`courier-option ${form.courier === courier.code ? 'selected' : ''}`} key={courier.code}><input type="radio" name="courier" value={courier.code} checked={form.courier === courier.code} onChange={() => updateField('courier', courier.code)} /><img src={courier.cardAsset} alt="" aria-hidden="true" onError={useCourierFallback} /><span><strong>{courier.label}</strong><small>{courier.description}</small></span></label>)}</div>{fieldErrors.courier && <FieldError messages={fieldErrors.courier} />}</fieldset>
       <button className="button primary submit-button" type="submit" disabled={submitting}>{submitting ? 'Preparando a entrega…' : 'Enviar pela Cartopia ✦'}</button>
     </form>
   </Shell>
 }
 
 function FieldError({ messages }: { messages: string[] }) { return <p className="field-error" role="alert">{messages[0]}</p> }
+
+function DeliverySummary({ form }: { form: CreateDeliveryInput }) {
+  const courier = getCourier(form.courier)
+  const origin = getLocation(form.origin)
+  const destination = getLocation(form.destination)
+
+  return <aside className="delivery-summary" aria-label="Resumo da entrega">
+    <div className="summary-heading"><strong>Resumo da entrega</strong><span>Confira antes de enviar.</span></div>
+    <div className="summary-grid">
+      <div><span>Para</span><strong>{form.recipient_name.trim() || 'Seu destinatário'}</strong></div>
+      <div className="summary-courier"><span>Entregador</span><img src={courier.cardAsset} alt={courier.label} onError={useCourierFallback} /><strong>{courier.label}</strong></div>
+      <div><span>Rota</span><strong>{origin?.label ?? form.origin} → {destination?.label ?? form.destination}</strong></div>
+      <div><span>Duração</span><strong>{form.duration_minutes || '—'} {form.duration_minutes ? 'minutos' : ''}</strong></div>
+    </div>
+  </aside>
+}
 
 function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => void }) {
   const [auth, setAuth] = useState<{ ready: boolean; token: string | null; role: AccessRole }>({ ready: false, token: null, role: 'recipient' })
