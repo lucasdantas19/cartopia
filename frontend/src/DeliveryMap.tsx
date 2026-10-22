@@ -33,7 +33,18 @@ function createCourierElement(): HTMLDivElement {
   element.className = 'delivery-map-marker courier'
   element.setAttribute('aria-label', 'Entregador Andorinha de Papel')
   element.setAttribute('role', 'img')
-  element.textContent = '✉'
+
+  const image = document.createElement('img')
+  image.src = '/couriers/paper-swallow.svg'
+  image.alt = ''
+  image.draggable = false
+  image.addEventListener('error', () => {
+    image.remove()
+    element.classList.add('fallback')
+    element.textContent = '✉'
+  }, { once: true })
+  element.appendChild(image)
+
   return element
 }
 

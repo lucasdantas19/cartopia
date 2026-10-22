@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Andorinha de papel</title>
+  <desc id="desc">Uma andorinha formada por dobras de papel em voo.</desc>
+  <path d="M5 31.5 28 27 43 9l-4 18 20-8-15 14 12 10-20-5-9 17-2-17-20-6Z" fill="#fffaf0" stroke="#2f3836" stroke-linejoin="round" stroke-width="2.5"/>
+  <path d="m28 27 11-9-4 14 9 1-12 3-4 18-2-17-20-6 22-4Z" fill="#f1b47f" stroke="#2f3836" stroke-linejoin="round" stroke-width="2"/>
+  <path d="m39 32 20-13-15 14 12 10-18-7Z" fill="#be5b43" stroke="#2f3836" stroke-linejoin="round" stroke-width="2"/>
+  <path d="m27 29 7 3-8 3" fill="none" stroke="#2f3836" stroke-linecap="round" stroke-width="2"/>
+</svg>
