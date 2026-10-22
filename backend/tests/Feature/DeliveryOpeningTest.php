@@ -4,6 +4,7 @@ use App\Events\DeliveryMessageOpened;
 use App\Models\Delivery;
 use App\Services\OpenDeliveryMessage;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 
 it('allows the sender to see opening state but not the message', function () {
@@ -66,6 +67,61 @@ it('uses a conditional database update when opening concurrently', function () {
     $service->handle($delivery->fresh());
 
     Event::assertDispatchedTimes(DeliveryMessageOpened::class, 1);
+});
+
+it('records one opening and one event across truly concurrent PostgreSQL connections', function () {
+    config()->set('database.connections.concurrent', config('database.connections.pgsql'));
+    $database = DB::connection('concurrent');
+    $database->statement('CREATE TABLE test_delivery_open_events (id bigserial primary key, public_id uuid not null, opened_at timestamptz not null)');
+
+    $now = CarbonImmutable::now('UTC');
+    $delivery = Delivery::on('concurrent')->create([
+        ...deliveryPayload(),
+        'courier' => 'paper-swallow',
+        'starts_at' => $now->subHour(),
+        'arrives_at' => $now->subMinutes(30),
+        'access_token_hash' => hash('sha256', 'recipient-token'),
+        'sender_access_token_hash' => hash('sha256', 'sender-token'),
+    ]);
+
+    $startPipes = [];
+    $processes = [];
+    for ($index = 0; $index < 2; $index++) {
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $processes[] = proc_open([
+            PHP_BINARY,
+            __DIR__.'/../Support/open_delivery.php',
+            (string) $delivery->getKey(),
+        ], $descriptors, $pipes, base_path());
+        $startPipes[] = $pipes;
+    }
+
+    try {
+        foreach ($startPipes as $pipes) {
+            fwrite($pipes[0], "go\n");
+            fclose($pipes[0]);
+        }
+
+        $exitCodes = array_map(function ($pipes, $process): int {
+            stream_get_contents($pipes[1]);
+            stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+
+            return proc_close($process);
+        }, $startPipes, $processes);
+
+        expect($exitCodes)->toBe([0, 0])
+            ->and(Delivery::on('concurrent')->findOrFail($delivery->getKey())->opened_at)->not->toBeNull()
+            ->and($database->table('test_delivery_open_events')->count())->toBe(1);
+    } finally {
+        $database->table('deliveries')->where('id', $delivery->getKey())->delete();
+        $database->statement('DROP TABLE test_delivery_open_events');
+    }
 });
 
 it('keeps old deliveries compatible when no sender token exists', function () {

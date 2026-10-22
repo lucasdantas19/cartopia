@@ -4,34 +4,6 @@ use App\Models\Delivery;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
-function deliveryPayload(array $overrides = []): array
-{
-    return array_merge([
-        'message' => 'Uma surpresa chegou até você.',
-        'sender_name' => 'Aventureiro',
-        'recipient_name' => 'Pessoa querida',
-        'origin' => 'port-of-dreams',
-        'destination' => 'garden-of-ideas',
-        'duration_minutes' => 60,
-    ], $overrides);
-}
-
-function createDelivery(array $overrides = []): array
-{
-    $response = test()->postJson('/api/deliveries', deliveryPayload($overrides));
-
-    $response->assertCreated();
-
-    return [
-        $response->json('data'),
-        $response->json('access_token'),
-    ];
-}
-
-afterEach(function () {
-    CarbonImmutable::setTestNow();
-});
-
 it('creates a delivery with a public UUID and a secure access token', function () {
     $response = $this->postJson('/api/deliveries', deliveryPayload());
     $response->assertCreated();
