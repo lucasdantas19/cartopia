@@ -1,5 +1,6 @@
 export type DeliveryStatus = 'SCHEDULED' | 'IN_TRANSIT' | 'DELIVERED'
 export type AccessRole = 'sender' | 'recipient'
+export type CourierCode = 'paper-swallow' | 'postal-cat' | 'little-dragon'
 
 export interface Delivery {
   public_id: string
@@ -23,6 +24,7 @@ export interface CreateDeliveryInput {
   origin: string
   destination: string
   duration_minutes: number
+  courier: CourierCode
 }
 
 export interface CreateDeliveryResponse {

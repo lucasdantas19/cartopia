@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Dragão mensageiro</title>
+  <desc id="desc">Um pequeno dragão amigável levando uma carta.</desc>
+  <path d="M18 25 13 10l13 8c2-1 4-2 7-2s5 1 7 2l11-8-3 17c4 4 5 9 5 15 0 8-8 14-20 14S12 48 12 40c0-6 2-11 6-15Z" fill="#b9d8c2" stroke="#2f3836" stroke-linejoin="round" stroke-width="2.5"/>
+  <path d="M18 25 7 19l7 13m32-7 11-6-7 13" fill="#f1b47f" stroke="#2f3836" stroke-linejoin="round" stroke-width="2"/>
+  <path d="M22 38h20v13H22z" fill="#fffaf0" stroke="#be5b43" stroke-linejoin="round" stroke-width="2"/><path d="m22 38 10 7 10-7" fill="none" stroke="#be5b43" stroke-width="2"/>
+  <circle cx="25" cy="31" r="2" fill="#2f3836"/><circle cx="39" cy="31" r="2" fill="#2f3836"/><path d="M29 37q3 3 6 0" fill="none" stroke="#2f3836" stroke-linecap="round" stroke-width="2"/>
+</svg>

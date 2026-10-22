@@ -16,11 +16,12 @@ class CreateDelivery
         $recipientAccessToken = bin2hex(random_bytes(32));
         $senderAccessToken = bin2hex(random_bytes(32));
         $durationMinutes = $attributes['duration_minutes'];
+        $courier = $attributes['courier'] ?? config('deliveries.couriers.0');
         unset($attributes['duration_minutes']);
 
         $delivery = Delivery::create([
             ...$attributes,
-            'courier' => config('deliveries.couriers.0'),
+            'courier' => $courier,
             'starts_at' => $startsAt,
             'arrives_at' => $startsAt->addMinutes($durationMinutes),
             'access_token_hash' => hash('sha256', $recipientAccessToken),

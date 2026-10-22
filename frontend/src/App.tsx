@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { ApiError, createDelivery, fetchDelivery, openDeliveryMessage } from './api'
 import { createShareUrl, removeAccessToken, resolveAccessToken } from './accessToken'
 import { copyText } from './clipboard'
+import { couriers, getCourier } from './couriers'
 import { formatLocalDate, formatRemaining, progressFromTime, statusFromTime } from './dateTime'
 import { DeliveryMap } from './DeliveryMap'
 import { getLocation, locations } from './locations'
@@ -12,7 +13,6 @@ import { connectToDeliveryChannel } from './realtime'
 import type { AccessRole, CreateDeliveryInput, Delivery, DeliveryStatus } from './types'
 import './App.css'
 
-const courierLabels: Record<string, string> = { 'paper-swallow': 'Andorinha de Papel' }
 const initialNow = Date.now()
 type Route = { page: 'create' } | { page: 'tracking'; publicId: string }
 
@@ -58,7 +58,7 @@ function Shell({ children, eyebrow = 'Cartas que atravessam mundos' }: { childre
 }
 
 function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) => void }) {
-  const [form, setForm] = useState<CreateDeliveryInput>({ message: '', sender_name: '', recipient_name: '', origin: locations[0].code, destination: locations[1].code, duration_minutes: 60 })
+  const [form, setForm] = useState<CreateDeliveryInput>({ message: '', sender_name: '', recipient_name: '', origin: locations[0].code, destination: locations[1].code, duration_minutes: 60, courier: 'paper-swallow' })
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -126,6 +126,7 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
         {error && <p className="error-message" role="alert">{error}</p>}{fieldErrors.origin && <FieldError messages={fieldErrors.origin} />}{fieldErrors.destination && <FieldError messages={fieldErrors.destination} />}
         <div className="duration-field"><label htmlFor="duration_minutes">Duração da viagem <small>(1 a 1440 minutos)</small></label><div className="duration-input"><input id="duration_minutes" type="number" required min={1} max={1440} value={form.duration_minutes} onChange={(event) => updateField('duration_minutes', Number(event.target.value))} /><span>minutos</span></div>{fieldErrors.duration_minutes && <FieldError messages={fieldErrors.duration_minutes} />}</div>
       </div>
+      <fieldset className="form-section courier-section"><legend><span>04</span><span><strong>Escolha seu entregador</strong><small>Quem levará a mensagem?</small></span></legend><div className="courier-options">{couriers.map((courier) => <label className={`courier-option ${form.courier === courier.code ? 'selected' : ''}`} key={courier.code}><input type="radio" name="courier" value={courier.code} checked={form.courier === courier.code} onChange={() => updateField('courier', courier.code)} /><img src={courier.asset} alt="" /><span><strong>{courier.label}</strong><small>{courier.description}</small></span></label>)}</div>{fieldErrors.courier && <FieldError messages={fieldErrors.courier} />}</fieldset>
       <button className="button primary submit-button" type="submit" disabled={submitting}>{submitting ? 'Preparando a entrega…' : 'Enviar pela Cartopia ✦'}</button>
     </form>
   </Shell>
@@ -227,9 +228,9 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
 
   return <Shell eyebrow="Acompanhamento da aventura">
     <section className="tracking-header"><div><p className="tracking-kicker">Uma entrega para</p><h1>{delivery.recipient_name}</h1><p className="lead">{delivery.sender_name ? `${delivery.sender_name} preparou uma surpresa para você.` : 'Alguém preparou uma surpresa para você.'}</p></div><div className={`status-pill ${visualStatus.toLowerCase()}`}><span className="status-dot" />{statusLabel(visualStatus)}</div></section>
-    <section className="journey-card"><div className="journey-meta"><span>{locationLabel(delivery.origin)}</span><span>{visualProgress}% da jornada</span><span>{locationLabel(delivery.destination)}</span></div><div className="journey-line" aria-label={`Progresso da viagem: ${visualProgress}%`}><span className="journey-fill" style={{ width: `${visualProgress}%` }} /><span className="courier-icon" style={{ left: `${visualProgress}%`, transform: progressMarkerTransform(visualProgress) }}><img src="/couriers/paper-swallow.svg" alt="" aria-hidden="true" /></span><span className="journey-node start" /><span className="journey-node end" /></div><div className="journey-footer"><span>✦ {courierLabels[delivery.courier] ?? delivery.courier}</span><strong>{formatRemaining(delivery.arrives_at, now)}</strong></div></section>
+    <section className="journey-card"><div className="journey-meta"><span>{locationLabel(delivery.origin)}</span><span>{visualProgress}% da jornada</span><span>{locationLabel(delivery.destination)}</span></div><div className="journey-line" aria-label={`Progresso da viagem: ${visualProgress}%`}><span className="journey-fill" style={{ width: `${visualProgress}%` }} /><span className="courier-icon" style={{ left: `${visualProgress}%`, transform: progressMarkerTransform(visualProgress) }}><img src={getCourier(delivery.courier).asset} alt="" aria-hidden="true" /></span><span className="journey-node start" /><span className="journey-node end" /></div><div className="journey-footer"><span>✦ {getCourier(delivery.courier).label}</span><strong>{formatRemaining(delivery.arrives_at, now)}</strong></div></section>
     {realtimeStatus === 'received' && <p className="realtime-indicator" role="status">Sinal em tempo real recebido.</p>}
-    {getLocation(delivery.origin) && getLocation(delivery.destination) && <DeliveryMap origin={getLocation(delivery.origin)!} destination={getLocation(delivery.destination)!} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />}
+    {getLocation(delivery.origin) && getLocation(delivery.destination) && <DeliveryMap origin={getLocation(delivery.origin)!} destination={getLocation(delivery.destination)!} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />}
     <section className="details-grid"><div><span>Partida</span><strong>{formatLocalDate(delivery.starts_at)}</strong></div><div><span>Chegada prevista</span><strong>{formatLocalDate(delivery.arrives_at)}</strong></div></section>
     {delivery.access_role === 'sender'
       ? <SenderOpeningStatus openedAt={delivery.opened_at} />

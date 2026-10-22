@@ -25,6 +25,7 @@ class StoreDeliveryRequest extends FormRequest
                 Rule::in(config('deliveries.destinations')),
                 'different:origin',
             ],
+            'courier' => ['sometimes', 'string', Rule::in(config('deliveries.couriers'))],
             'duration_minutes' => [
                 'required',
                 'integer',

@@ -3,6 +3,7 @@ import { AttributionControl, LngLatBounds, Map, Marker, NavigationControl, setWo
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import type { GeoJSONSource } from 'maplibre-gl'
 import { createCourierAnimation } from './courierAnimation'
+import { getCourier } from './couriers'
 import { getMapPadding, getRouteBounds, hasMapDimensions } from './mapViewport'
 import type { DeliveryLocation } from './locations'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -16,6 +17,7 @@ const routeLayerId = 'cartopia-delivery-route-line'
 interface DeliveryMapProps {
   origin: DeliveryLocation
   destination: DeliveryLocation
+  courier: string
   startsAt: string
   arrivesAt: string
 }
@@ -28,14 +30,15 @@ function createMarkerElement(kind: 'origin' | 'destination', label: string): HTM
   return element
 }
 
-function createCourierElement(): HTMLDivElement {
+function createCourierElement(courier: string): HTMLDivElement {
   const element = document.createElement('div')
   element.className = 'delivery-map-marker courier'
-  element.setAttribute('aria-label', 'Entregador Andorinha de Papel')
+  const courierOption = getCourier(courier)
+  element.setAttribute('aria-label', `Entregador ${courierOption.label}`)
   element.setAttribute('role', 'img')
 
   const image = document.createElement('img')
-  image.src = '/couriers/paper-swallow.svg'
+  image.src = courierOption.asset
   image.alt = ''
   image.draggable = false
   image.addEventListener('error', () => {
@@ -48,11 +51,12 @@ function createCourierElement(): HTMLDivElement {
   return element
 }
 
-export function DeliveryMap({ origin, destination, startsAt, arrivesAt }: DeliveryMapProps) {
+export function DeliveryMap({ origin, destination, courier, startsAt, arrivesAt }: DeliveryMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const markersRef = useRef<Marker[]>([])
   const courierMarkerRef = useRef<Marker | null>(null)
+  const courierRef = useRef(courier)
   const animationRef = useRef<ReturnType<typeof createCourierAnimation> | null>(null)
   const hasFittedRouteRef = useRef(false)
   const routeRef = useRef({ origin, destination, startsAt, arrivesAt })
@@ -61,6 +65,18 @@ export function DeliveryMap({ origin, destination, startsAt, arrivesAt }: Delive
   useEffect(() => {
     routeRef.current = { origin, destination, startsAt, arrivesAt }
   }, [origin, destination, startsAt, arrivesAt])
+
+  useEffect(() => {
+    courierRef.current = courier
+    const marker = courierMarkerRef.current
+    if (!marker) return
+
+    const option = getCourier(courier)
+    const element = marker.getElement()
+    const image = element.querySelector('img')
+    element.setAttribute('aria-label', `Entregador ${option.label}`)
+    if (image) image.setAttribute('src', option.asset)
+  }, [courier])
 
   const fitRoute = useCallback((map: Map) => {
     const container = containerRef.current
@@ -107,7 +123,7 @@ export function DeliveryMap({ origin, destination, startsAt, arrivesAt }: Delive
     ]
 
     if (!courierMarkerRef.current) {
-      courierMarkerRef.current = new Marker({ element: createCourierElement() }).setLngLat(currentOrigin.coordinates).addTo(map)
+      courierMarkerRef.current = new Marker({ element: createCourierElement(courierRef.current) }).setLngLat(currentOrigin.coordinates).addTo(map)
     }
 
     animationRef.current?.stop()

@@ -13,6 +13,8 @@ return [
     ],
     'couriers' => [
         'paper-swallow',
+        'postal-cat',
+        'little-dragon',
     ],
 
     // One day is the maximum journey duration in this first MVP.

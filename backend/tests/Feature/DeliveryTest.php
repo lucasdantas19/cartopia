@@ -59,6 +59,24 @@ it('creates a delivery with a public UUID and a secure access token', function (
         ->not->toBe($senderToken);
 });
 
+it('creates deliveries with each supported courier', function (string $courier) {
+    $response = $this->postJson('/api/deliveries', deliveryPayload(['courier' => $courier]));
+
+    $response->assertCreated()->assertJsonPath('data.courier', $courier);
+    expect(Delivery::first()->courier)->toBe($courier);
+
+    $this->withToken($response->json('recipient_access_token'))
+        ->getJson('/api/deliveries/'.$response->json('data.public_id'))
+        ->assertOk()
+        ->assertJsonPath('data.courier', $courier);
+})->with(['paper-swallow', 'postal-cat', 'little-dragon']);
+
+it('rejects an unsupported courier', function () {
+    $this->postJson('/api/deliveries', deliveryPayload(['courier' => 'unknown-courier']))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('courier');
+});
+
 it('keeps a five-minute delivery five minutes apart in UTC', function () {
     $now = CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC');
     CarbonImmutable::setTestNow($now);
