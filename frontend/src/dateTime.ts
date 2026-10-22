@@ -21,13 +21,21 @@ export function statusFromTime(delivery: Delivery, now: number): DeliveryStatus 
 }
 
 export function progressFromTime(delivery: Delivery, now: number): number {
-  const startsAt = instant(delivery.starts_at)
-  const arrivesAt = instant(delivery.arrives_at)
+  return Math.round(progressRatioFromTime(delivery, now) * 100)
+}
+
+export function progressRatioFromTime(delivery: Delivery, now: number): number {
+  return progressRatioFromInstants(delivery.starts_at, delivery.arrives_at, now)
+}
+
+export function progressRatioFromInstants(startsAtValue: string, arrivesAtValue: string, now: number): number {
+  const startsAt = instant(startsAtValue)
+  const arrivesAt = instant(arrivesAtValue)
 
   if (now <= startsAt) return 0
-  if (now >= arrivesAt) return 100
+  if (now >= arrivesAt) return 1
 
-  return Math.round(((now - startsAt) / (arrivesAt - startsAt)) * 100)
+  return (now - startsAt) / (arrivesAt - startsAt)
 }
 
 export function formatLocalDate(value: string, timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone): string {

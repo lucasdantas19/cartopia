@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createShareUrl, extractTokenFromFragment, removeAccessToken, resolveAccessToken, tokenStorageKey } from '../src/accessToken.ts'
-import { formatLocalDate, progressFromTime, statusFromTime } from '../src/dateTime.ts'
+import { formatLocalDate, progressFromTime, progressRatioFromInstants, statusFromTime } from '../src/dateTime.ts'
 import type { Delivery } from '../src/types.ts'
 
 const delivery: Delivery = {
@@ -21,6 +21,15 @@ test('calculates progress from UTC instants without a manual offset', () => {
   assert.equal(progressFromTime(delivery, Date.parse('2026-10-21T15:02:30Z')), 50)
   assert.equal(statusFromTime(delivery, Date.parse('2026-10-21T15:04:59Z')), 'IN_TRANSIT')
   assert.equal(statusFromTime(delivery, Date.parse('2026-10-21T15:05:00Z')), 'DELIVERED')
+})
+
+test('returns a normalized temporal progress ratio', () => {
+  const startsAt = '2026-10-21T15:00:00Z'
+  const arrivesAt = '2026-10-21T15:05:00Z'
+
+  assert.equal(progressRatioFromInstants(startsAt, arrivesAt, Date.parse(startsAt)), 0)
+  assert.equal(progressRatioFromInstants(startsAt, arrivesAt, Date.parse('2026-10-21T15:02:30Z')), 0.5)
+  assert.equal(progressRatioFromInstants(startsAt, arrivesAt, Date.parse(arrivesAt)), 1)
 })
 
 test('formats a UTC instant in UTC-3 local time', () => {

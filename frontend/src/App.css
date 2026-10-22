@@ -66,6 +66,13 @@ input::placeholder, textarea::placeholder { color: #a99e91; }
 .journey-node.start { left: 0; }.journey-node.end { right: 0; background: var(--coral); box-shadow: 0 0 0 2px var(--coral); }
 .courier-icon { position: absolute; z-index: 2; top: .25rem; display: grid; place-items: center; width: 2.8rem; height: 2.8rem; border-radius: 50%; color: var(--ink); background: var(--peach); font-size: 1.2rem; transform: translateX(-50%); transition: left .5s linear; }
 .journey-footer { align-items: center; color: #b9c5bb; }.journey-footer strong { color: var(--peach); font-size: .82rem; }
+.delivery-map-wrapper { position: relative; min-height: 18rem; margin: 1rem 0 2.2rem; overflow: hidden; border: 1px solid var(--line); border-radius: 1.2rem; background: #dce6e2; box-shadow: 0 12px 30px rgba(47, 56, 54, .08); }
+.delivery-map { min-height: 18rem; }
+.delivery-map-fallback { position: absolute; inset: 1rem auto auto 1rem; max-width: 20rem; margin: 0; padding: .7rem .9rem; border-radius: .6rem; color: var(--ink); background: rgba(255, 250, 240, .92); font-size: .82rem; box-shadow: 0 4px 16px rgba(47, 56, 54, .12); }
+.delivery-map-marker { width: 1.15rem; height: 1.15rem; border: 3px solid var(--cream); border-radius: 50% 50% 50% 0; box-shadow: 0 2px 8px rgba(47, 56, 54, .35); transform: rotate(-45deg); }
+.delivery-map-marker.origin { background: var(--peach); }
+.delivery-map-marker.destination { background: var(--coral); }
+.delivery-map-marker.courier { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border: 2px solid var(--ink); border-radius: 50%; color: var(--ink); background: var(--peach); font-size: 1.05rem; transform: none; box-shadow: 0 3px 10px rgba(47, 56, 54, .3); }
 .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0 2.2rem; }
 .details-grid div { padding: 1rem; border: 1px solid var(--line); border-radius: .8rem; background: rgba(255,255,255,.4); }.details-grid span, .details-grid strong { display: block; }.details-grid span { margin-bottom: .3rem; color: var(--muted); font-size: .75rem; }.details-grid strong { color: var(--ink); font-size: .9rem; }
 .message-card { padding: clamp(2rem, 6vw, 3.5rem); border: 1px dashed #d8cdbd; border-radius: 1.2rem; background: rgba(255,255,255,.42); text-align: center; }.message-card h2 { font-size: 1.5rem; }.message-card > p { color: var(--muted); }.lock-icon { display: block; margin-bottom: 1rem; color: var(--coral); font-size: 2rem; }.message-card .error-message { margin-top: 1rem; }

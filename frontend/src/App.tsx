@@ -3,14 +3,10 @@ import type { FormEvent } from 'react'
 import { ApiError, createDelivery, fetchDelivery, openDeliveryMessage } from './api'
 import { createShareUrl, removeAccessToken, resolveAccessToken } from './accessToken'
 import { formatLocalDate, formatRemaining, progressFromTime, statusFromTime } from './dateTime'
+import { DeliveryMap } from './DeliveryMap'
+import { getLocation, locations } from './locations'
 import type { CreateDeliveryInput, Delivery, DeliveryStatus } from './types'
 import './App.css'
-
-const locations = [
-  { value: 'port-of-dreams', label: 'Porto dos Sonhos' },
-  { value: 'garden-of-ideas', label: 'Jardim das Ideias' },
-  { value: 'library-of-memories', label: 'Biblioteca das Memórias' },
-]
 
 const courierLabels: Record<string, string> = { 'paper-swallow': 'Andorinha de Papel' }
 const initialNow = Date.now()
@@ -26,7 +22,7 @@ function navigate(path: string) {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
-function locationLabel(value: string) { return locations.find((location) => location.value === value)?.label ?? value }
+function locationLabel(value: string) { return getLocation(value)?.label ?? value }
 
 function statusLabel(status: DeliveryStatus) {
   return { SCHEDULED: 'Preparando a partida', IN_TRANSIT: 'A caminho', DELIVERED: 'Chegou ao destino' }[status]
@@ -58,7 +54,7 @@ function Shell({ children, eyebrow = 'Cartas que atravessam mundos' }: { childre
 }
 
 function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) => void }) {
-  const [form, setForm] = useState<CreateDeliveryInput>({ message: '', sender_name: '', recipient_name: '', origin: locations[0].value, destination: locations[1].value, duration_minutes: 60 })
+  const [form, setForm] = useState<CreateDeliveryInput>({ message: '', sender_name: '', recipient_name: '', origin: locations[0].code, destination: locations[1].code, duration_minutes: 60 })
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -107,7 +103,7 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
         <div className="field-grid"><div><label htmlFor="sender_name">Seu nome <small>(opcional)</small></label><input id="sender_name" maxLength={120} value={form.sender_name} onChange={(event) => updateField('sender_name', event.target.value)} placeholder="Como devemos assinar?" />{fieldErrors.sender_name && <FieldError messages={fieldErrors.sender_name} />}</div><div><label htmlFor="recipient_name">Nome do destinatário <span className="required">*</span></label><input id="recipient_name" required maxLength={120} value={form.recipient_name} onChange={(event) => updateField('recipient_name', event.target.value)} placeholder="Quem receberá?" />{fieldErrors.recipient_name && <FieldError messages={fieldErrors.recipient_name} />}</div></div>
       </div>
       <div className="form-section"><div className="section-heading"><span>03</span><div><h2>Trace a rota</h2><p>Escolha onde a jornada começa e termina.</p></div></div>
-        <div className="route-fields"><div><label htmlFor="origin">De</label><select id="origin" value={form.origin} onChange={(event) => updateField('origin', event.target.value)}>{locations.map((location) => <option key={location.value} value={location.value}>{location.label}</option>)}</select></div><span className="route-arrow" aria-hidden="true">→</span><div><label htmlFor="destination">Para</label><select id="destination" value={form.destination} onChange={(event) => updateField('destination', event.target.value)}>{locations.map((location) => <option key={location.value} value={location.value}>{location.label}</option>)}</select></div></div>
+        <div className="route-fields"><div><label htmlFor="origin">De</label><select id="origin" value={form.origin} onChange={(event) => updateField('origin', event.target.value)}>{locations.map((location) => <option key={location.code} value={location.code}>{location.label}</option>)}</select></div><span className="route-arrow" aria-hidden="true">→</span><div><label htmlFor="destination">Para</label><select id="destination" value={form.destination} onChange={(event) => updateField('destination', event.target.value)}>{locations.map((location) => <option key={location.code} value={location.code}>{location.label}</option>)}</select></div></div>
         {error && <p className="error-message" role="alert">{error}</p>}{fieldErrors.origin && <FieldError messages={fieldErrors.origin} />}{fieldErrors.destination && <FieldError messages={fieldErrors.destination} />}
         <div className="duration-field"><label htmlFor="duration_minutes">Duração da viagem <small>(1 a 1440 minutos)</small></label><div className="duration-input"><input id="duration_minutes" type="number" required min={1} max={1440} value={form.duration_minutes} onChange={(event) => updateField('duration_minutes', Number(event.target.value))} /><span>minutos</span></div>{fieldErrors.duration_minutes && <FieldError messages={fieldErrors.duration_minutes} />}</div>
       </div>
@@ -196,6 +192,7 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
   return <Shell eyebrow="Acompanhamento da aventura">
     <section className="tracking-header"><div><p className="tracking-kicker">Uma entrega para</p><h1>{delivery.recipient_name}</h1><p className="lead">{delivery.sender_name ? `${delivery.sender_name} preparou uma surpresa para você.` : 'Alguém preparou uma surpresa para você.'}</p></div><div className={`status-pill ${visualStatus.toLowerCase()}`}><span className="status-dot" />{statusLabel(visualStatus)}</div></section>
     <section className="journey-card"><div className="journey-meta"><span>{locationLabel(delivery.origin)}</span><span>{visualProgress}% da jornada</span><span>{locationLabel(delivery.destination)}</span></div><div className="journey-line" aria-label={`Progresso da viagem: ${visualProgress}%`}><span className="journey-fill" style={{ width: `${visualProgress}%` }} /><span className="courier-icon" style={{ left: `${visualProgress}%` }}>✉</span><span className="journey-node start" /><span className="journey-node end" /></div><div className="journey-footer"><span>✦ {courierLabels[delivery.courier] ?? delivery.courier}</span><strong>{formatRemaining(delivery.arrives_at, now)}</strong></div></section>
+    {getLocation(delivery.origin) && getLocation(delivery.destination) && <DeliveryMap origin={getLocation(delivery.origin)!} destination={getLocation(delivery.destination)!} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />}
     <section className="details-grid"><div><span>Partida</span><strong>{formatLocalDate(delivery.starts_at)}</strong></div><div><span>Chegada prevista</span><strong>{formatLocalDate(delivery.arrives_at)}</strong></div></section>
     <section className={`message-card ${canOpen ? 'unlocked' : ''}`}>{message ? <div className="letter"><p className="letter-label">Uma carta para você</p><p className="letter-message">{message}</p><span className="letter-signature">Com carinho, Cartopia ✦</span></div> : <><span className="lock-icon">{canOpen ? '✉' : '⌛'}</span><h2>{canOpen ? 'A mensagem chegou.' : 'A mensagem está viajando.'}</h2><p>{canOpen ? 'A surpresa está pronta para ser aberta.' : 'Quando a entrega chegar, você poderá abrir a carta.'}</p><button className="button primary" type="button" disabled={!canOpen || opening} onClick={revealMessage}>{opening ? 'Abrindo…' : canOpen ? 'Abrir mensagem' : 'Aguardando chegada'}</button>{messageError && <p className="error-message" role="alert">{messageError}</p>}</>}</section>
   </Shell>
