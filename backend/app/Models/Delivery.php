@@ -19,6 +19,8 @@ class Delivery extends Model
         'starts_at',
         'arrives_at',
         'access_token_hash',
+        'sender_access_token_hash',
+        'opened_at',
     ];
 
     protected function casts(): array
@@ -26,6 +28,7 @@ class Delivery extends Model
         return [
             'starts_at' => 'immutable_datetime:UTC',
             'arrives_at' => 'immutable_datetime:UTC',
+            'opened_at' => 'immutable_datetime:UTC',
         ];
     }
 

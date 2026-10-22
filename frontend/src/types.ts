@@ -1,4 +1,5 @@
 export type DeliveryStatus = 'SCHEDULED' | 'IN_TRANSIT' | 'DELIVERED'
+export type AccessRole = 'sender' | 'recipient'
 
 export interface Delivery {
   public_id: string
@@ -11,6 +12,8 @@ export interface Delivery {
   arrives_at: string
   status: DeliveryStatus
   progress: number
+  opened_at: string | null
+  access_role: AccessRole
 }
 
 export interface CreateDeliveryInput {
@@ -25,13 +28,18 @@ export interface CreateDeliveryInput {
 export interface CreateDeliveryResponse {
   data: Delivery
   access_token: string
+  recipient_access_token: string
+  sender_access_token: string
   tracking_path: string
+  recipient_tracking_path: string
+  sender_tracking_path: string
 }
 
 export interface DeliveryMessage {
   public_id: string
   message: string
   delivered_at: string
+  opened_at: string | null
 }
 
 export interface ApiErrorPayload {

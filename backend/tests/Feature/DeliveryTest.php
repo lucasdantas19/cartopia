@@ -33,16 +33,30 @@ afterEach(function () {
 });
 
 it('creates a delivery with a public UUID and a secure access token', function () {
-    [$data, $token] = createDelivery();
+    $response = $this->postJson('/api/deliveries', deliveryPayload());
+    $response->assertCreated();
+    $data = $response->json('data');
+    $token = $response->json('recipient_access_token');
+    $senderToken = $response->json('sender_access_token');
 
     expect($data['public_id'])->toMatch('/^[0-9a-f-]{36}$/')
         ->and($token)->toMatch('/^[0-9a-f]{64}$/')
+        ->and($senderToken)->toMatch('/^[0-9a-f]{64}$/')
+        ->and($senderToken)->not->toBe($token)
         ->and($data['courier'])->toBe('paper-swallow')
         ->and($data)->not->toHaveKey('message');
 
+    expect($response->json('recipient_tracking_path'))->toContain($token)
+        ->and($response->json('recipient_tracking_path'))->not->toContain($senderToken)
+        ->and($response->json('sender_tracking_path'))->toContain($senderToken)
+        ->and($response->json('sender_tracking_path'))->not->toContain($token);
+
     expect(Delivery::first()->access_token_hash)
         ->toBe(hash('sha256', $token))
-        ->not->toBe($token);
+        ->not->toBe($token)
+        ->and(Delivery::first()->sender_access_token_hash)
+        ->toBe(hash('sha256', $senderToken))
+        ->not->toBe($senderToken);
 });
 
 it('keeps a five-minute delivery five minutes apart in UTC', function () {

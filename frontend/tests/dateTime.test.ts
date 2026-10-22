@@ -15,6 +15,8 @@ const delivery: Delivery = {
   arrives_at: '2026-10-21T15:05:00.000000Z',
   status: 'IN_TRANSIT',
   progress: 0,
+  opened_at: null,
+  access_role: 'recipient',
 }
 
 test('calculates progress from UTC instants without a manual offset', () => {
@@ -48,7 +50,7 @@ test('extracts and persists a token from the fragment', () => {
   const storage = new MemoryStorage()
 
   assert.equal(extractTokenFromFragment('#token=first-token'), 'first-token')
-  assert.deepEqual(resolveAccessToken('delivery-a', '#token=first-token', storage), { token: 'first-token', fromFragment: true })
+  assert.deepEqual(resolveAccessToken('delivery-a', '#token=first-token', storage), { token: 'first-token', role: 'recipient', fromFragment: true })
   assert.equal(storage.getItem(tokenStorageKey('delivery-a')), 'first-token')
 })
 
@@ -57,8 +59,8 @@ test('recovers tokens after reload and isolates them by delivery', () => {
   resolveAccessToken('delivery-a', '#token=token-a', storage)
   resolveAccessToken('delivery-b', '#token=token-b', storage)
 
-  assert.deepEqual(resolveAccessToken('delivery-a', '', storage), { token: 'token-a', fromFragment: false })
-  assert.deepEqual(resolveAccessToken('delivery-b', '', storage), { token: 'token-b', fromFragment: false })
+  assert.deepEqual(resolveAccessToken('delivery-a', '', storage), { token: 'token-a', role: 'recipient', fromFragment: false })
+  assert.deepEqual(resolveAccessToken('delivery-b', '', storage), { token: 'token-b', role: 'recipient', fromFragment: false })
 })
 
 test('replaces an existing token when a new link is opened', () => {
@@ -73,7 +75,7 @@ test('replaces an existing token when a new link is opened', () => {
 test('reports missing tokens and removes invalid credentials', () => {
   const storage = new MemoryStorage()
 
-  assert.deepEqual(resolveAccessToken('delivery-a', '', storage), { token: null, fromFragment: false })
+  assert.deepEqual(resolveAccessToken('delivery-a', '', storage), { token: null, role: 'recipient', fromFragment: false })
   resolveAccessToken('delivery-a', '#token=invalid-token', storage)
   removeAccessToken('delivery-a', storage)
   assert.equal(storage.getItem(tokenStorageKey('delivery-a')), null)
@@ -85,4 +87,17 @@ test('preserves the complete shareable link with the token in the fragment', () 
   assert.equal(url, 'https://cartopia.example/d/delivery%2Fa#token=token-value')
   assert.equal(new URL(url).search, '')
   assert.equal(new URL(url).hash, '#token=token-value')
+})
+
+test('isolates sender credentials and marks sender links', () => {
+  const storage = new MemoryStorage()
+
+  assert.deepEqual(resolveAccessToken('delivery-a', '#token=sender-token&role=sender', storage), {
+    token: 'sender-token',
+    role: 'sender',
+    fromFragment: true,
+  })
+  assert.equal(storage.getItem(tokenStorageKey('delivery-a', 'sender')), 'sender-token')
+  assert.equal(storage.getItem(tokenStorageKey('delivery-a', 'recipient')), null)
+  assert.match(createShareUrl('https://cartopia.example', 'delivery-a', 'sender-token', 'sender'), /#token=sender-token&role=sender$/)
 })

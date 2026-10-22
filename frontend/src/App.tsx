@@ -7,7 +7,8 @@ import { DeliveryMap } from './DeliveryMap'
 import { getLocation, locations } from './locations'
 import { LetterReveal } from './LetterReveal'
 import { progressMarkerTransform } from './progressVisual'
-import type { CreateDeliveryInput, Delivery, DeliveryStatus } from './types'
+import { connectToDeliveryChannel } from './realtime'
+import type { AccessRole, CreateDeliveryInput, Delivery, DeliveryStatus } from './types'
 import './App.css'
 
 const courierLabels: Record<string, string> = { 'paper-swallow': 'Andorinha de Papel' }
@@ -60,8 +61,8 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [created, setCreated] = useState<{ publicId: string; token: string; url: string } | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [created, setCreated] = useState<{ publicId: string; recipientUrl: string; senderUrl: string; recipientToken: string } | null>(null)
+  const [copied, setCopied] = useState<AccessRole | null>(null)
 
   function updateField(field: keyof CreateDeliveryInput, value: string | number) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -74,24 +75,29 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
     setSubmitting(true)
     try {
       const response = await createDelivery({ ...form, sender_name: form.sender_name?.trim() || undefined, duration_minutes: Number(form.duration_minutes) })
-      const url = createShareUrl(window.location.origin, response.data.public_id, response.access_token)
-      setCreated({ publicId: response.data.public_id, token: response.access_token, url })
+      const recipientToken = response.recipient_access_token ?? response.access_token
+      setCreated({
+        publicId: response.data.public_id,
+        recipientUrl: createShareUrl(window.location.origin, response.data.public_id, recipientToken),
+        senderUrl: createShareUrl(window.location.origin, response.data.public_id, response.sender_access_token, 'sender'),
+        recipientToken,
+      })
     } catch (caught) {
       if (caught instanceof ApiError) { setError(caught.message); setFieldErrors(caught.fields ?? {}) }
       else setError('Não foi possível criar a entrega. Verifique sua conexão e tente novamente.')
     } finally { setSubmitting(false) }
   }
 
-  async function copyLink() {
-    if (!created) return
-    await navigator.clipboard.writeText(created.url)
-    setCopied(true); window.setTimeout(() => setCopied(false), 2000)
+  async function copyLink(url: string, role: AccessRole) {
+    await navigator.clipboard.writeText(url)
+    setCopied(role); window.setTimeout(() => setCopied(null), 2000)
   }
 
   if (created) return <Shell eyebrow="A aventura está pronta">
-    <section className="success-card"><span className="success-icon">✉</span><h1>Uma carta partiu!</h1><p className="lead">Compartilhe este link para que alguém especial acompanhe a viagem.</p>
-      <div className="share-box"><span>{created.url}</span><button className="button secondary" type="button" onClick={copyLink}>{copied ? 'Copiado!' : 'Copiar link'}</button></div>
-      <div className="success-actions"><button className="button primary" type="button" onClick={() => onTrack(created.publicId, created.token)}>Acompanhar agora</button><button className="text-button" type="button" onClick={() => setCreated(null)}>Criar outra carta</button></div>
+    <section className="success-card"><span className="success-icon">✉</span><h1>Uma carta partiu!</h1><p className="lead">Guarde os dois links: cada um possui uma permissão diferente.</p>
+      <div className="share-box"><div><strong>Link do destinatário</strong><span>{created.recipientUrl}</span></div><button className="button secondary" type="button" onClick={() => copyLink(created.recipientUrl, 'recipient')}>{copied === 'recipient' ? 'Copiado!' : 'Copiar link'}</button></div>
+      <div className="share-box"><div><strong>Link do remetente</strong><span>{created.senderUrl}</span></div><button className="button secondary" type="button" onClick={() => copyLink(created.senderUrl, 'sender')}>{copied === 'sender' ? 'Copiado!' : 'Copiar link'}</button></div>
+      <div className="success-actions"><button className="button primary" type="button" onClick={() => onTrack(created.publicId, created.recipientToken)}>Acompanhar como destinatário</button><button className="text-button" type="button" onClick={() => setCreated(null)}>Criar outra carta</button></div>
     </section>
   </Shell>
 
@@ -117,12 +123,13 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
 function FieldError({ messages }: { messages: string[] }) { return <p className="field-error" role="alert">{messages[0]}</p> }
 
 function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => void }) {
-  const [auth, setAuth] = useState<{ ready: boolean; token: string | null }>({ ready: false, token: null })
+  const [auth, setAuth] = useState<{ ready: boolean; token: string | null; role: AccessRole }>({ ready: false, token: null, role: 'recipient' })
   const [delivery, setDelivery] = useState<Delivery | null>(null)
   const [error, setError] = useState('')
   const [opening, setOpening] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [messageError, setMessageError] = useState('')
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'received' | 'unavailable' | null>(null)
   const [now, setNow] = useState(initialNow)
 
   useEffect(() => {
@@ -133,7 +140,7 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
         window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`)
       }
 
-      setAuth({ ready: true, token: access.token })
+      setAuth({ ready: true, token: access.token, role: access.role })
     }, 0)
 
     return () => window.clearTimeout(resolve)
@@ -149,8 +156,8 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
         if (cancelled) return
 
         if (caught instanceof ApiError && caught.status === 404) {
-          removeAccessToken(publicId, window.sessionStorage)
-          setAuth({ ready: true, token: null })
+          removeAccessToken(publicId, window.sessionStorage, auth.role)
+          setAuth({ ready: true, token: null, role: auth.role })
           setError('Este link não é válido ou não temos acesso a esta entrega. Abra novamente o link original.')
           return
         }
@@ -165,14 +172,26 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
 
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer) }, [])
 
+  const broadcastRole = delivery?.access_role
+  useEffect(() => {
+    if (!auth.ready || !auth.token || !broadcastRole) {
+      setRealtimeStatus(null)
+      return
+    }
+
+    return connectToDeliveryChannel(publicId, auth.token, broadcastRole, setRealtimeStatus, (openedAt) => {
+      setDelivery((current) => current ? { ...current, opened_at: openedAt } : current)
+    }) ?? undefined
+  }, [auth.ready, auth.token, broadcastRole, publicId])
+
   async function revealMessage() {
     if (!delivery || !auth.token) return
     setOpening(true); setMessageError('')
     try { const response = await openDeliveryMessage(publicId, auth.token); setMessage(response.data.message) }
     catch (caught) {
       if (caught instanceof ApiError && caught.status === 404) {
-        removeAccessToken(publicId, window.sessionStorage)
-        setAuth({ ready: true, token: null })
+        removeAccessToken(publicId, window.sessionStorage, auth.role)
+        setAuth({ ready: true, token: null, role: auth.role })
         setError('Este link não é válido ou não temos acesso a esta entrega. Abra novamente o link original.')
         return
       }
@@ -194,10 +213,21 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
   return <Shell eyebrow="Acompanhamento da aventura">
     <section className="tracking-header"><div><p className="tracking-kicker">Uma entrega para</p><h1>{delivery.recipient_name}</h1><p className="lead">{delivery.sender_name ? `${delivery.sender_name} preparou uma surpresa para você.` : 'Alguém preparou uma surpresa para você.'}</p></div><div className={`status-pill ${visualStatus.toLowerCase()}`}><span className="status-dot" />{statusLabel(visualStatus)}</div></section>
     <section className="journey-card"><div className="journey-meta"><span>{locationLabel(delivery.origin)}</span><span>{visualProgress}% da jornada</span><span>{locationLabel(delivery.destination)}</span></div><div className="journey-line" aria-label={`Progresso da viagem: ${visualProgress}%`}><span className="journey-fill" style={{ width: `${visualProgress}%` }} /><span className="courier-icon" style={{ left: `${visualProgress}%`, transform: progressMarkerTransform(visualProgress) }}><img src="/couriers/paper-swallow.svg" alt="" aria-hidden="true" /></span><span className="journey-node start" /><span className="journey-node end" /></div><div className="journey-footer"><span>✦ {courierLabels[delivery.courier] ?? delivery.courier}</span><strong>{formatRemaining(delivery.arrives_at, now)}</strong></div></section>
+    {realtimeStatus === 'received' && <p className="realtime-indicator" role="status">Sinal em tempo real recebido.</p>}
     {getLocation(delivery.origin) && getLocation(delivery.destination) && <DeliveryMap origin={getLocation(delivery.origin)!} destination={getLocation(delivery.destination)!} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />}
     <section className="details-grid"><div><span>Partida</span><strong>{formatLocalDate(delivery.starts_at)}</strong></div><div><span>Chegada prevista</span><strong>{formatLocalDate(delivery.arrives_at)}</strong></div></section>
-    <LetterReveal key={message ?? 'closed'} canOpen={canOpen} opening={opening} message={message} error={messageError} onOpen={() => { void revealMessage() }} />
+    {delivery.access_role === 'sender'
+      ? <SenderOpeningStatus openedAt={delivery.opened_at} />
+      : <LetterReveal key={message ?? 'closed'} canOpen={canOpen} opening={opening} message={message} error={messageError} onOpen={() => { void revealMessage() }} />}
   </Shell>
+}
+
+function SenderOpeningStatus({ openedAt }: { openedAt: string | null }) {
+  return <section className="message-card sender-opening-card" aria-live="polite">
+    <span className="lock-icon" aria-hidden="true">{openedAt ? '✓' : '✦'}</span>
+    <h2>{openedAt ? 'Sua carta foi aberta!' : 'Aguardando a abertura'}</h2>
+    <p>{openedAt ? 'O destinatário abriu sua carta em ' + formatLocalDate(openedAt) + '.' : 'Avisaremos aqui assim que o destinatário abrir a carta.'}</p>
+  </section>
 }
 
 function Loading() { return <div className="state-card"><span className="loader" /><h1>Seguindo a trilha…</h1><p className="lead">Estamos procurando sua entrega.</p></div> }

@@ -20,6 +20,8 @@ class DeliveryResource extends JsonResource
             'arrives_at' => $this->arrives_at?->toISOString(),
             'status' => $this->status(),
             'progress' => $this->progress(),
+            'opened_at' => $this->opened_at?->toISOString(),
+            'access_role' => $this->access_role ?? null,
         ];
     }
 }

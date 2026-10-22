@@ -5,8 +5,9 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreDeliveryRequest;
 use App\Http\Resources\DeliveryMessageResource;
 use App\Http\Resources\DeliveryResource;
-use App\Models\Delivery;
+use App\Services\AuthorizeDelivery;
 use App\Services\CreateDelivery;
+use App\Services\OpenDeliveryMessage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,23 +15,37 @@ class DeliveryController extends Controller
 {
     public function store(StoreDeliveryRequest $request, CreateDelivery $createDelivery): JsonResponse
     {
-        ['delivery' => $delivery, 'access_token' => $accessToken] = $createDelivery->handle($request->validated());
+        [
+            'delivery' => $delivery,
+            'recipient_access_token' => $recipientAccessToken,
+            'sender_access_token' => $senderAccessToken,
+        ] = $createDelivery->handle($request->validated());
+
+        $recipientPath = '/d/'.$delivery->public_id.'#token='.$recipientAccessToken;
+        $senderPath = '/d/'.$delivery->public_id.'#token='.$senderAccessToken.'&role=sender';
 
         return response()->json([
             'data' => DeliveryResource::make($delivery),
-            'access_token' => $accessToken,
-            'tracking_path' => '/deliveries/'.$delivery->public_id.'#token='.$accessToken,
+            'access_token' => $recipientAccessToken,
+            'recipient_access_token' => $recipientAccessToken,
+            'sender_access_token' => $senderAccessToken,
+            'tracking_path' => $recipientPath,
+            'recipient_tracking_path' => $recipientPath,
+            'sender_tracking_path' => $senderPath,
         ], 201);
     }
 
-    public function show(Request $request, string $publicId): DeliveryResource
+    public function show(Request $request, string $publicId, AuthorizeDelivery $authorizeDelivery): DeliveryResource
     {
-        return DeliveryResource::make($this->authorizedDelivery($request, $publicId));
+        ['delivery' => $delivery, 'role' => $role] = $authorizeDelivery->handle($request, $publicId);
+        $delivery->setAttribute('access_role', $role);
+
+        return DeliveryResource::make($delivery);
     }
 
-    public function message(Request $request, string $publicId): DeliveryMessageResource|JsonResponse
+    public function message(Request $request, string $publicId, AuthorizeDelivery $authorizeDelivery, OpenDeliveryMessage $openDeliveryMessage): DeliveryMessageResource|JsonResponse
     {
-        $delivery = $this->authorizedDelivery($request, $publicId);
+        $delivery = $authorizeDelivery->handle($request, $publicId, 'recipient')['delivery'];
 
         if (! $delivery->hasArrived()) {
             return response()->json([
@@ -41,18 +56,8 @@ class DeliveryController extends Controller
             ], 403);
         }
 
+        $delivery = $openDeliveryMessage->handle($delivery);
+
         return DeliveryMessageResource::make($delivery);
-    }
-
-    private function authorizedDelivery(Request $request, string $publicId): Delivery
-    {
-        $delivery = Delivery::where('public_id', $publicId)->first();
-        $token = $request->bearerToken();
-
-        if ($delivery === null || $token === null || ! hash_equals($delivery->access_token_hash, hash('sha256', $token))) {
-            abort(404);
-        }
-
-        return $delivery;
     }
 }
