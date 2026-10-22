@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ApiError, createDelivery, fetchDelivery, openDeliveryMessage } from './api'
 import { createShareUrl, removeAccessToken, resolveAccessToken } from './accessToken'
+import { copyText } from './clipboard'
 import { formatLocalDate, formatRemaining, progressFromTime, statusFromTime } from './dateTime'
 import { DeliveryMap } from './DeliveryMap'
 import { getLocation, locations } from './locations'
@@ -63,6 +64,7 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
   const [submitting, setSubmitting] = useState(false)
   const [created, setCreated] = useState<{ publicId: string; recipientUrl: string; senderUrl: string; recipientToken: string } | null>(null)
   const [copied, setCopied] = useState<AccessRole | null>(null)
+  const [copyError, setCopyError] = useState<AccessRole | null>(null)
 
   function updateField(field: keyof CreateDeliveryInput, value: string | number) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -89,14 +91,23 @@ function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) =>
   }
 
   async function copyLink(url: string, role: AccessRole) {
-    await navigator.clipboard.writeText(url)
-    setCopied(role); window.setTimeout(() => setCopied(null), 2000)
+    setCopied(null)
+    setCopyError(null)
+
+    if (await copyText(url, navigator.clipboard)) {
+      setCopied(role)
+      window.setTimeout(() => setCopied(null), 2000)
+      return
+    }
+
+    setCopyError(role)
   }
 
   if (created) return <Shell eyebrow="A aventura está pronta">
     <section className="success-card"><span className="success-icon">✉</span><h1>Uma carta partiu!</h1><p className="lead">Guarde os dois links: cada um possui uma permissão diferente.</p>
-      <div className="share-box"><div><strong>Link do destinatário</strong><span>{created.recipientUrl}</span></div><button className="button secondary" type="button" onClick={() => copyLink(created.recipientUrl, 'recipient')}>{copied === 'recipient' ? 'Copiado!' : 'Copiar link'}</button></div>
-      <div className="share-box"><div><strong>Link do remetente</strong><span>{created.senderUrl}</span></div><button className="button secondary" type="button" onClick={() => copyLink(created.senderUrl, 'sender')}>{copied === 'sender' ? 'Copiado!' : 'Copiar link'}</button></div>
+      <div className="share-box"><div><label htmlFor="recipient-share-link"><strong>Link do destinatário</strong></label><input id="recipient-share-link" className="share-link" readOnly value={created.recipientUrl} onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.currentTarget.select()} /></div><button className="button secondary" type="button" onClick={() => copyLink(created.recipientUrl, 'recipient')}>{copied === 'recipient' ? 'Copiado!' : 'Copiar link'}</button></div>
+      <div className="share-box"><div><label htmlFor="sender-share-link"><strong>Link do remetente</strong></label><input id="sender-share-link" className="share-link" readOnly value={created.senderUrl} onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.currentTarget.select()} /></div><button className="button secondary" type="button" onClick={() => copyLink(created.senderUrl, 'sender')}>{copied === 'sender' ? 'Copiado!' : 'Copiar link'}</button></div>
+      {copyError && <p className="error-message" role="alert">Não foi possível copiar automaticamente. Selecione o link acima e copie manualmente.</p>}
       <div className="success-actions"><button className="button primary" type="button" onClick={() => onTrack(created.publicId, created.recipientToken)}>Acompanhar como destinatário</button><button className="text-button" type="button" onClick={() => setCreated(null)}>Criar outra carta</button></div>
     </section>
   </Shell>
@@ -130,6 +141,8 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
   const [message, setMessage] = useState<string | null>(null)
   const [messageError, setMessageError] = useState('')
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'received' | 'unavailable' | null>(null)
+  const [requestFailed, setRequestFailed] = useState(false)
+  const [retryNonce, setRetryNonce] = useState(0)
   const [now, setNow] = useState(initialNow)
 
   useEffect(() => {
@@ -151,24 +164,26 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
     if (!auth.ready || !token) return
     let cancelled = false
     const load = async () => {
-      try { const response = await fetchDelivery(publicId, token); if (!cancelled) { setDelivery(response.data); setError('') } }
+      try { const response = await fetchDelivery(publicId, token); if (!cancelled) { setDelivery(response.data); setError(''); setRequestFailed(false) } }
       catch (caught) {
         if (cancelled) return
 
         if (caught instanceof ApiError && caught.status === 404) {
           removeAccessToken(publicId, window.sessionStorage, auth.role)
           setAuth({ ready: true, token: null, role: auth.role })
+          setRequestFailed(false)
           setError('Este link não é válido ou não temos acesso a esta entrega. Abra novamente o link original.')
           return
         }
 
+        setRequestFailed(true)
         setError('Não foi possível carregar a viagem.')
       }
       finally { /* delivery/error state represents the request lifecycle. */ }
     }
     void load(); const refresh = window.setInterval(load, 30000)
     return () => { cancelled = true; window.clearInterval(refresh) }
-  }, [auth, publicId])
+  }, [auth, publicId, retryNonce])
 
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer) }, [])
 
@@ -203,7 +218,7 @@ function TrackingPage({ publicId, onHome }: { publicId: string; onHome: () => vo
 
   const isLoading = !auth.ready || (!!auth.token && !delivery && !error)
   if (isLoading) return <Shell eyebrow="Abrindo seu mapa de viagem"><Loading /></Shell>
-  if (!auth.token || error) return <Shell eyebrow="A viagem não foi encontrada"><ErrorState message={error || 'Este link precisa do token original para abrir a entrega.'} onHome={onHome} /></Shell>
+  if (!auth.token || error) return <Shell eyebrow={requestFailed ? 'Problema de conexão' : 'A viagem não foi encontrada'}><ErrorState message={error || 'Este link precisa do token original para abrir a entrega.'} onHome={onHome} onRetry={requestFailed ? () => { setError(''); setRetryNonce((current) => current + 1) } : undefined} /></Shell>
   if (!delivery) return null
 
   const visualStatus = statusFromTime(delivery, now)
@@ -231,6 +246,6 @@ function SenderOpeningStatus({ openedAt }: { openedAt: string | null }) {
 }
 
 function Loading() { return <div className="state-card"><span className="loader" /><h1>Seguindo a trilha…</h1><p className="lead">Estamos procurando sua entrega.</p></div> }
-function ErrorState({ message, onHome }: { message: string; onHome: () => void }) { return <div className="state-card"><span className="state-icon">?</span><h1>Ops, não encontramos.</h1><p className="lead">{message}</p><button className="button secondary" type="button" onClick={onHome}>Voltar ao início</button></div> }
+function ErrorState({ message, onHome, onRetry }: { message: string; onHome: () => void; onRetry?: () => void }) { return <div className="state-card"><span className="state-icon">?</span><h1>{onRetry ? 'A conexão falhou.' : 'Ops, não encontramos.'}</h1><p className="lead">{message}</p>{onRetry && <button className="button primary" type="button" onClick={onRetry}>Tentar novamente</button>}<button className="button secondary" type="button" onClick={onHome}>Voltar ao início</button></div> }
 
 export default App

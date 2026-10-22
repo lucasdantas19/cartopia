@@ -46,7 +46,7 @@ input::placeholder, textarea::placeholder { color: #a99e91; }
 .success-icon, .state-icon { display: inline-grid; place-items: center; width: 3.5rem; height: 3.5rem; margin-bottom: 1.5rem; border-radius: 50%; color: var(--cream); background: var(--coral); font-size: 1.5rem; }
 .success-card h1, .state-card h1 { font-size: clamp(2.5rem, 7vw, 4.2rem); }
 .share-box { display: flex; align-items: center; gap: .8rem; margin: 2rem 0; padding: .7rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--cream); text-align: left; }
-.share-box > div { min-width: 0; flex: 1; }.share-box strong, .share-box span { display: block; }.share-box strong { margin-bottom: .25rem; color: var(--ink); font-size: .78rem; }.share-box span { overflow: hidden; color: var(--muted); font: .72rem var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.share-box > div { min-width: 0; flex: 1; }.share-box strong { display: block; margin-bottom: .25rem; color: var(--ink); font-size: .78rem; }.share-link { height: 2.2rem; padding: 0 .55rem; overflow: hidden; color: var(--muted); font: .72rem var(--mono); text-overflow: ellipsis; white-space: nowrap; cursor: text; }
 .success-actions { display: flex; justify-content: center; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
 .arrival-card { position: relative; max-width: 680px; margin-bottom: 1rem; padding: clamp(2rem, 6vw, 3.5rem); overflow: hidden; border: 1px solid #e8cfb0; border-radius: 1.2rem; background: linear-gradient(135deg, #fff5df, #f7e4c8); text-align: center; box-shadow: 0 18px 45px rgba(105, 77, 43, .1); }
 .arrival-card::after { position: absolute; right: -4rem; bottom: -5rem; width: 14rem; height: 14rem; border-radius: 50%; background: rgba(241, 180, 127, .2); content: ''; }
@@ -65,7 +65,10 @@ input::placeholder, textarea::placeholder { color: #a99e91; }
 .letter-stage .envelope-flap::after { position: absolute; inset: 2px; z-index: 1; background: #f7bd8d; clip-path: polygon(0 0, 100% 0, 50% 65%); content: ''; }
 .letter-stage .envelope-seal { position: absolute; top: 2rem; left: 50%; z-index: 2; display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border: 2px solid #fff5df; border-radius: 50%; color: #fff5df; background: #be5b43; font-size: .75rem; transform: translateX(-50%); }
 .letter-stage .letter-paper { position: absolute; right: 10%; bottom: 4.8rem; left: 10%; z-index: 4; min-height: 11rem; padding: 1.5rem; border: 1px solid #e8cfb0; background: #fffaf0; box-shadow: 0 9px 20px rgba(105, 77, 43, .14); text-align: left; opacity: 0; transform: translateY(58%) scale(.96); }
-.letter-stage.opening .envelope-flap { animation: envelope-flap-open .65s ease-out forwards; }.letter-stage.opening .letter-paper { animation: paper-emerge 1.2s .12s cubic-bezier(.22, .8, .25, 1) forwards; }.letter-stage.opened .envelope-flap { transform: rotateX(180deg); }.letter-stage.opened .letter-paper { opacity: 1; transform: translateY(-1.1rem) scale(1); }
+.letter-stage.opened { width: min(100%, 40rem); height: auto; min-height: 17rem; padding-bottom: 1rem; }
+.letter-stage.opened .letter-paper { position: relative; right: auto; bottom: auto; left: auto; width: 100%; max-width: 40rem; margin: 0 auto; }
+.letter-stage.opened .envelope-body { right: auto; left: 50%; width: min(88%, 18.8rem); transform: translateX(-50%); }
+.letter-stage.opening .envelope-flap { animation: envelope-flap-open .65s ease-out forwards; }.letter-stage.opening .letter-paper { animation: paper-emerge 1.2s .12s cubic-bezier(.22, .8, .25, 1) forwards; }.letter-stage.opened .envelope-flap { left: 50%; width: min(86%, 18.8rem); transform: translateX(-50%) rotateX(180deg); }.letter-stage.opened .letter-paper { opacity: 1; transform: translateY(-1.1rem) scale(1); }
 .letter-stage .letter-label { color: var(--coral); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }.letter-stage .letter-message { margin: 2rem 0; color: var(--ink); font: 1.35rem/1.6 var(--display); white-space: pre-wrap; }.letter-stage .letter-signature { color: var(--muted); font-size: .8rem; }
 
 .tracking-header { display: flex; align-items: end; justify-content: space-between; gap: 2rem; margin-bottom: 2.3rem; }
@@ -106,6 +109,8 @@ input::placeholder, textarea::placeholder { color: #a99e91; }
 @media (prefers-reduced-motion: reduce) {
   .courier-icon { transition: none; }.letter-stage.opening .envelope-flap { animation: none; transform: rotateX(180deg); }.letter-stage.opening .letter-paper { animation: none; opacity: 1; transform: translateY(-1.1rem) scale(1); }
 }
+
+.button:focus-visible, .text-button:focus-visible, .share-link:focus-visible { outline: 3px solid rgba(190, 91, 67, .45); outline-offset: 3px; }
 
 @media (max-width: 650px) {
   .topbar, .page-content { width: min(100% - 2rem, 900px); }.topbar-note { display: none; }.page-content { padding-top: 2.5rem; }

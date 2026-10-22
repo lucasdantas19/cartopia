@@ -11,7 +11,7 @@ interface LetterRevealProps {
 }
 
 function EnvelopeScene({ message, state, onOpened }: { message: string | null; state: VisualState; onOpened: () => void }) {
-  return <div className={`letter-stage ${state}`} aria-label={message === null ? 'Envelope fechado' : 'Carta aberta'} role="img">
+  return <div className={`letter-stage ${state}`}>
     {message !== null && <div className="letter-paper" onAnimationEnd={(event) => { if (event.animationName === 'paper-emerge') onOpened() }}>
       <p className="letter-label">Uma carta para você</p>
       <p className="letter-message">{message}</p>
