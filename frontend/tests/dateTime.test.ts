@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createShareUrl, extractTokenFromFragment, removeAccessToken, resolveAccessToken, tokenStorageKey } from '../src/accessToken.ts'
+import { activeRoleStorageKey, createShareUrl, extractTokenFromFragment, removeAccessToken, resolveAccessToken, tokenStorageKey } from '../src/accessToken.ts'
 import { formatLocalDate, progressFromTime, progressRatioFromInstants, statusFromTime } from '../src/dateTime.ts'
 import type { Delivery } from '../src/types.ts'
 
@@ -52,6 +52,7 @@ test('extracts and persists a token from the fragment', () => {
   assert.equal(extractTokenFromFragment('#token=first-token'), 'first-token')
   assert.deepEqual(resolveAccessToken('delivery-a', '#token=first-token', storage), { token: 'first-token', role: 'recipient', fromFragment: true })
   assert.equal(storage.getItem(tokenStorageKey('delivery-a')), 'first-token')
+  assert.equal(storage.getItem(activeRoleStorageKey('delivery-a')), 'recipient')
 })
 
 test('recovers tokens after reload and isolates them by delivery', () => {
@@ -100,4 +101,48 @@ test('isolates sender credentials and marks sender links', () => {
   assert.equal(storage.getItem(tokenStorageKey('delivery-a', 'sender')), 'sender-token')
   assert.equal(storage.getItem(tokenStorageKey('delivery-a', 'recipient')), null)
   assert.match(createShareUrl('https://cartopia.example', 'delivery-a', 'sender-token', 'sender'), /#token=sender-token&role=sender$/)
+})
+
+test('recovers the sender token after the fragment is removed', () => {
+  const storage = new MemoryStorage()
+
+  resolveAccessToken('delivery-a', '#token=sender-token&role=sender', storage)
+
+  assert.deepEqual(resolveAccessToken('delivery-a', '', storage), {
+    token: 'sender-token',
+    role: 'sender',
+    fromFragment: false,
+  })
+})
+
+test('keeps sender and recipient tokens isolated when switching links', () => {
+  const storage = new MemoryStorage()
+
+  resolveAccessToken('delivery-a', '#token=sender-token&role=sender', storage)
+  assert.deepEqual(resolveAccessToken('delivery-a', '', storage), { token: 'sender-token', role: 'sender', fromFragment: false })
+
+  resolveAccessToken('delivery-a', '#token=recipient-token', storage)
+  assert.deepEqual(resolveAccessToken('delivery-a', '', storage), { token: 'recipient-token', role: 'recipient', fromFragment: false })
+  assert.equal(storage.getItem(tokenStorageKey('delivery-a', 'sender')), 'sender-token')
+  assert.equal(storage.getItem(tokenStorageKey('delivery-a', 'recipient')), 'recipient-token')
+})
+
+test('a new fragment replaces only the credential for its role', () => {
+  const storage = new MemoryStorage()
+
+  resolveAccessToken('delivery-a', '#token=sender-old&role=sender', storage)
+  resolveAccessToken('delivery-a', '#token=sender-new&role=sender', storage)
+
+  assert.equal(resolveAccessToken('delivery-a', '', storage).token, 'sender-new')
+  assert.equal(storage.getItem(tokenStorageKey('delivery-a', 'recipient')), null)
+})
+
+test('removing an invalid sender credential also removes its active role', () => {
+  const storage = new MemoryStorage()
+  resolveAccessToken('delivery-a', '#token=expired&role=sender', storage)
+
+  removeAccessToken('delivery-a', storage, 'sender')
+
+  assert.equal(resolveAccessToken('delivery-a', '', storage).token, null)
+  assert.equal(storage.getItem(activeRoleStorageKey('delivery-a')), null)
 })

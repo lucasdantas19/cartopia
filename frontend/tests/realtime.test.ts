@@ -27,4 +27,5 @@ test('disables the optional connection when explicitly disabled', () => {
 
 test('keeps the delivery identifier separate from the access token', () => {
   assert.equal(deliveryChannelName('delivery-uuid'), 'deliveries.delivery-uuid')
+  assert.equal(deliveryChannelName('delivery-uuid', 'sender'), 'deliveries.delivery-uuid.sender')
 })
