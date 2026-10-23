@@ -80,7 +80,50 @@ DELIVERY_CREATION_RATE_LIMIT=5
 DELIVERY_TRACKING_RATE_LIMIT=60
 MESSAGE_OPENING_RATE_LIMIT=20
 BROADCASTING_AUTH_RATE_LIMIT=30
+DELIVERY_RETENTION_DAYS=90
+DELIVERY_RETENTION_BATCH_SIZE=100
 ```
+
+## Retenção de entregas
+
+O comando `cartopia:prune-deliveries` considera elegíveis as entregas cujo
+`arrives_at` ocorreu há pelo menos `DELIVERY_RETENTION_DAYS` dias. O padrão é
+90 dias, calculado em UTC. Ele exclui em lotes e nunca seleciona entregas ainda
+em trânsito ou futuras.
+
+O agendamento não está ativado nesta etapa. Antes da implantação, validar a
+prévia no banco de produção:
+
+```bash
+/usr/bin/php8.4 artisan cartopia:prune-deliveries --dry-run
+```
+
+Para a VPS atual, a opção mais simples é o timer systemd diário em
+[`deploy/systemd`](../deploy/systemd), executando como o usuário `cartopia` e
+usando PHP 8.4. Os templates usam
+`ExecStart=/usr/bin/php8.4 artisan cartopia:prune-deliveries`, o diretório do
+backend e o `.env` compartilhado, com `OnCalendar=*-*-* 03:30:00` e
+`Persistent=true`. Os arquivos não estão instalados nem habilitados nesta
+etapa.
+
+Para ativar futuramente, depois de revisar a prévia, o banco-alvo e o backup,
+copiar os dois templates para `/etc/systemd/system/`, executar
+`systemctl daemon-reload` e então `systemctl enable --now
+cartopia-prune-deliveries.timer`. A ativação deve ocorrer somente em janela
+autorizada e após confirmar que o `.env` aponta para o banco de produção do
+Cartopia.
+
+Após a ativação, verificar falhas com:
+
+```bash
+systemctl status cartopia-prune-deliveries.timer
+systemctl status cartopia-prune-deliveries.service
+journalctl -u cartopia-prune-deliveries.service --since today
+```
+
+Não executar `--dry-run` ou a limpeza apontando para o banco de desenvolvimento
+ou para o banco do OurHistory. A execução real não deve ser feita durante esta
+tarefa.
 
 ## Variáveis do frontend
 

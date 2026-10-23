@@ -8,16 +8,18 @@ import { formatLocalDate, formatRemaining, progressFromTime, statusFromTime } fr
 import { DeliveryMap } from './DeliveryMap'
 import { getLocation, locations } from './locations'
 import { LetterReveal } from './LetterReveal'
+import { PrivacyPage } from './PrivacyPage'
 import { progressMarkerTransform } from './progressVisual'
 import { connectToDeliveryChannel } from './realtime'
 import type { AccessRole, CreateDeliveryInput, Delivery, DeliveryStatus } from './types'
 import './App.css'
 
 const initialNow = Date.now()
-type Route = { page: 'create' } | { page: 'tracking'; publicId: string }
+type Route = { page: 'create' } | { page: 'tracking'; publicId: string } | { page: 'privacy' }
 
 function routeFromLocation(): Route {
   const match = window.location.pathname.match(/^\/d\/([^/]+)$/)
+  if (window.location.pathname === '/privacidade') return { page: 'privacy' }
   return match ? { page: 'tracking', publicId: decodeURIComponent(match[1]) } : { page: 'create' }
 }
 
@@ -60,6 +62,8 @@ function App() {
 
   return route.page === 'tracking'
     ? <TrackingPage key={route.publicId} publicId={route.publicId} onHome={() => navigate('/')} />
+    : route.page === 'privacy'
+      ? <PrivacyPageShell onHome={() => navigate('/')} />
     : <CreatePage onTrack={(publicId, token) => navigate(`/d/${publicId}#token=${encodeURIComponent(token)}`)} />
 }
 
@@ -70,8 +74,15 @@ function Shell({ children, eyebrow = 'Cartas que atravessam mundos' }: { childre
       <span className="topbar-note">Cada mensagem, uma aventura.</span>
     </header>
     <main className="page-content"><p className="eyebrow">{eyebrow}</p>{children}</main>
-    <footer>Feito para transformar carinho em caminho.</footer>
+    <footer>Feito para transformar carinho em caminho. <a className="footer-link" href="/privacidade" onClick={(event) => { event.preventDefault(); navigate('/privacidade') }}>Política de Privacidade</a></footer>
   </div>
+}
+
+function PrivacyPageShell({ onHome }: { onHome: () => void }) {
+  return <Shell eyebrow="Transparência do Cartopia">
+    <PrivacyPage />
+    <button className="text-button privacy-home-link" type="button" onClick={onHome}>Voltar ao início</button>
+  </Shell>
 }
 
 function CreatePage({ onTrack }: { onTrack: (publicId: string, token: string) => void }) {
