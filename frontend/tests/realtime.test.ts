@@ -25,6 +25,25 @@ test('disables the optional connection when explicitly disabled', () => {
   assert.equal(realtimeConfiguration({ VITE_REVERB_ENABLED: 'false', VITE_REVERB_APP_KEY: 'public-key' }), null)
 })
 
+test('rejects incomplete Reverb configuration in production', () => {
+  assert.throws(
+    () => realtimeConfiguration({ PROD: true, VITE_REVERB_ENABLED: 'true' }),
+    /VITE_REVERB_APP_KEY/,
+  )
+  assert.throws(
+    () => realtimeConfiguration({
+      PROD: true,
+      VITE_REVERB_ENABLED: 'true',
+      VITE_REVERB_APP_KEY: 'public-key',
+      VITE_REVERB_HOST: 'localhost',
+      VITE_REVERB_PORT: '443',
+      VITE_REVERB_SCHEME: 'https',
+      VITE_API_URL: 'https://api.example.com/api',
+    }),
+    /VITE_REVERB_HOST/,
+  )
+})
+
 test('keeps the delivery identifier separate from the access token', () => {
   assert.equal(deliveryChannelName('delivery-uuid'), 'deliveries.delivery-uuid')
   assert.equal(deliveryChannelName('delivery-uuid', 'sender'), 'deliveries.delivery-uuid.sender')

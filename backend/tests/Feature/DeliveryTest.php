@@ -79,7 +79,9 @@ it('requires the delivery fields', function () {
             'origin',
             'destination',
             'duration_minutes',
-        ]);
+        ])
+        ->assertJsonPath('errors.message.0', 'O campo mensagem é obrigatório.')
+        ->assertJsonPath('errors.recipient_name.0', 'O campo nome do destinatário é obrigatório.');
 });
 
 it('rejects equal locations', function () {

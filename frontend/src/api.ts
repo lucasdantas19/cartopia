@@ -5,8 +5,9 @@ import type {
   DeliveryMessage,
   ApiErrorPayload,
 } from './types'
+import { resolveApiBaseUrl } from './runtimeConfig.ts'
 
-const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api').replace(/\/$/, '')
+const apiBaseUrl = resolveApiBaseUrl(import.meta.env)
 
 export class ApiError extends Error {
   status: number

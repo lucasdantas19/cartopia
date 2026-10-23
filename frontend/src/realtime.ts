@@ -1,10 +1,12 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
 import type { AccessRole } from './types'
+import { FrontendConfigurationError, isProductionEnvironment, resolveApiBaseUrl, validatePublicUrl } from './runtimeConfig.ts'
 
 export type RealtimeStatus = 'connecting' | 'connected' | 'received' | 'unavailable'
 
 type RealtimeEnvironment = {
+  PROD?: boolean
   VITE_REVERB_ENABLED?: string
   VITE_REVERB_APP_KEY?: string
   VITE_REVERB_HOST?: string
@@ -15,19 +17,35 @@ type RealtimeEnvironment = {
 }
 
 export function realtimeConfiguration(env: RealtimeEnvironment = import.meta.env as RealtimeEnvironment) {
-  if (env.VITE_REVERB_ENABLED === 'false' || !env.VITE_REVERB_APP_KEY) return null
+  const production = isProductionEnvironment(env)
+  if (env.VITE_REVERB_ENABLED === 'false') return null
+  if (!env.VITE_REVERB_APP_KEY) {
+    if (production) throw new FrontendConfigurationError('VITE_REVERB_APP_KEY', 'é obrigatória quando o Reverb está habilitado')
+    return null
+  }
 
-  const scheme = env.VITE_REVERB_SCHEME ?? 'http'
-  const host = env.VITE_REVERB_HOST ?? (typeof window === 'undefined' ? 'localhost' : window.location.hostname)
+  const scheme = env.VITE_REVERB_SCHEME?.trim() ?? 'http'
+  const host = env.VITE_REVERB_HOST?.trim() ?? (typeof window === 'undefined' ? 'localhost' : window.location.hostname)
   const port = Number(env.VITE_REVERB_PORT ?? 8080)
-  const apiUrl = (env.VITE_API_URL ?? 'http://localhost:8000/api').replace(/\/$/, '')
+  const apiUrl = resolveApiBaseUrl(env)
+  const authEndpoint = env.VITE_BROADCAST_AUTH_URL?.trim() ?? apiUrl + '/broadcasting/auth'
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    if (production) throw new FrontendConfigurationError('VITE_REVERB_PORT', 'deve ser uma porta válida')
+  }
+
+  if (production) {
+    if (scheme !== 'https') throw new FrontendConfigurationError('VITE_REVERB_SCHEME', 'deve ser https')
+    if (!host || ['localhost', '127.0.0.1', '::1'].includes(host)) throw new FrontendConfigurationError('VITE_REVERB_HOST', 'deve ser um host público')
+    validatePublicUrl(authEndpoint, 'VITE_BROADCAST_AUTH_URL', true)
+  }
 
   return {
     key: env.VITE_REVERB_APP_KEY,
     host,
     port,
     scheme,
-    authEndpoint: env.VITE_BROADCAST_AUTH_URL ?? apiUrl + '/broadcasting/auth',
+    authEndpoint,
   }
 }
 

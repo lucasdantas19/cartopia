@@ -98,6 +98,16 @@ prévia no banco de produção:
 /usr/bin/php8.4 artisan cartopia:prune-deliveries --dry-run
 ```
 
+Para conferir o valor efetivo carregado pelo ambiente, sem criar endpoint
+público nem executar exclusões:
+
+```bash
+/usr/bin/php8.4 artisan config:show deliveries
+```
+
+Verifique `retention_days` na saída. O valor vem de
+`DELIVERY_RETENTION_DAYS`, com padrão 90 quando a variável não está definida.
+
 Para a VPS atual, a opção mais simples é o timer systemd diário em
 [`deploy/systemd`](../deploy/systemd), executando como o usuário `cartopia` e
 usando PHP 8.4. Os templates usam
@@ -137,10 +147,13 @@ VITE_REVERB_HOST=ws.example.com
 VITE_REVERB_PORT=443
 VITE_REVERB_SCHEME=https
 VITE_BROADCAST_AUTH_URL=https://api.example.com/api/broadcasting/auth
+# Opcional até o contato oficial ser confirmado.
+VITE_PRIVACY_CONTACT_EMAIL=<email-real-configurado-antes-da-publicacao>
 ```
 
 Somente a chave pública do Reverb pode aparecer no frontend. Não inclua
 `REVERB_APP_SECRET`, senha do banco ou `APP_KEY` em variáveis `VITE_*`.
+Não preencha `VITE_PRIVACY_CONTACT_EMAIL` com um endereço fictício.
 
 ## Diferenças do ambiente local
 

@@ -1,5 +1,7 @@
 import './App.css'
 
+const privacyContactEmail = import.meta.env.VITE_PRIVACY_CONTACT_EMAIL?.trim()
+
 export function PrivacyPage() {
   return <>
     <section className="privacy-page">
@@ -40,7 +42,7 @@ export function PrivacyPage() {
         <section>
           <h2>Retenção e exclusão</h2>
           <p>O backend está preparado com um prazo padrão de 90 dias após a chegada da entrega. A exclusão automática depende da ativação de um agendamento no ambiente de produção e ainda não está ativa na VPS. O prazo pode ser ajustado por configuração e deve ser confirmado como política definitiva antes da publicação.</p>
-          <p>Não há uma tela de autoatendimento para apagar entregas. Pedidos de esclarecimento ou exclusão devem ser encaminhados pelo canal de contato oficial informado pelo responsável pelo Cartopia; esse canal ainda precisa ser confirmado antes da publicação definitiva desta política.</p>
+          <p>Não há uma tela de autoatendimento para apagar entregas. {privacyContactEmail ? <>Pedidos de esclarecimento ou exclusão podem ser encaminhados para <a href={`mailto:${privacyContactEmail}`}>{privacyContactEmail}</a>.</> : 'O canal de contato oficial para pedidos de esclarecimento ou exclusão ainda precisa ser configurado pelo responsável pelo Cartopia.'}</p>
         </section>
 
         <section>
