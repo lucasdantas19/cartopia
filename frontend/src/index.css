@@ -1,11 +1,18 @@
 :root {
-  --ink: #2f3836;
-  --muted: #778079;
-  --cream: #fffaf0;
-  --sand: #f1e7d5;
-  --line: #e4dacc;
-  --coral: #be5b43;
-  --peach: #f1b47f;
+  color-scheme: light;
+  --ink: #203844;
+  --muted: #6b7184;
+  --cream: #f8f6fc;
+  --sand: #e9e4f2;
+  --line: #ddd6e9;
+  --coral: #7668b5;
+  --peach: #e3b65d;
+  --leaf: #39727b;
+  --success: #397966;
+  --danger: #b55369;
+  --surface: rgba(255, 255, 255, .55);
+  --shadow-soft: 0 18px 55px rgba(32, 56, 68, .1);
+  --radius-card: 1.2rem;
   --body: Inter, ui-sans-serif, system-ui, sans-serif;
   --display: Georgia, 'Times New Roman', serif;
   --mono: 'SFMono-Regular', Consolas, monospace;
@@ -18,5 +25,5 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: radial-gradient(circle at 10% 5%, #f6e9d7 0, transparent 28rem), var(--cream); }
+body { margin: 0; min-width: 320px; background: radial-gradient(circle at 10% 5%, #e8eef1 0, transparent 28rem), radial-gradient(circle at 92% 88%, #eee8f7 0, transparent 24rem), var(--cream); }
 button, input, select, textarea { font-family: inherit; }

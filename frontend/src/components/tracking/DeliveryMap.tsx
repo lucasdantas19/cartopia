@@ -112,7 +112,7 @@ export function DeliveryMap({ origin, destination, courier, startsAt, arrivesAt 
         id: routeLayerId,
         type: 'line',
         source: routeSourceId,
-        paint: { 'line-color': '#f1b47f', 'line-width': 4, 'line-opacity': 0.9 },
+        paint: { 'line-color': '#e3b65d', 'line-width': 4, 'line-opacity': 0.9 },
       })
     }
 
