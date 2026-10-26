@@ -15,9 +15,12 @@ class Delivery extends Model
         'recipient_name',
         'origin',
         'destination',
+        'route_legs',
+        'route_steps',
         'courier',
         'starts_at',
         'arrives_at',
+        'final_duration_minutes',
         'access_token_hash',
         'sender_access_token_hash',
         'opened_at',
@@ -28,7 +31,10 @@ class Delivery extends Model
         return [
             'starts_at' => 'immutable_datetime:UTC',
             'arrives_at' => 'immutable_datetime:UTC',
+            'final_duration_minutes' => 'integer',
             'opened_at' => 'immutable_datetime:UTC',
+            'route_legs' => 'array',
+            'route_steps' => 'array',
         ];
     }
 
@@ -75,5 +81,41 @@ class Delivery extends Model
     public function hasArrived(): bool
     {
         return $this->status() === 'DELIVERED';
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function routeSteps(): array
+    {
+        if ($this->route_steps !== null) {
+            return $this->route_steps;
+        }
+
+        return array_map(fn (array $leg): array => [
+            'title' => 'A caminho de '.$leg['destination'],
+            'description' => null,
+            'location' => null,
+            'starts_at' => $leg['starts_at'],
+            'arrives_at' => $leg['arrives_at'],
+        ], $this->route_legs ?: [[
+            'destination' => $this->destination,
+            'starts_at' => $this->starts_at,
+            'arrives_at' => $this->arrives_at,
+        ]]);
+    }
+
+    public function currentStepIndex(): ?int
+    {
+        $now = CarbonImmutable::now('UTC');
+
+        foreach ($this->routeSteps() as $index => $step) {
+            $startsAt = $step['starts_at'] instanceof CarbonImmutable ? $step['starts_at'] : CarbonImmutable::parse($step['starts_at']);
+            $arrivesAt = $step['arrives_at'] instanceof CarbonImmutable ? $step['arrives_at'] : CarbonImmutable::parse($step['arrives_at']);
+
+            if ($now->lt($arrivesAt)) {
+                return $index;
+            }
+        }
+
+        return null;
     }
 }

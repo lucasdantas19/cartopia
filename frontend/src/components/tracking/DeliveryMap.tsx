@@ -4,8 +4,9 @@ import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import type { GeoJSONSource } from 'maplibre-gl'
 import { createCourierAnimation } from './map/courierAnimation'
 import { getCourier } from '../../domain/delivery/couriers'
-import { getMapPadding, getRouteBounds, hasMapDimensions } from './map/mapViewport'
+import { getMapPadding, hasMapDimensions } from './map/mapViewport'
 import type { DeliveryLocation } from '../../domain/delivery/locations'
+import type { DeliveryRouteLeg } from '../../domain/delivery/types'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 setWorkerUrl(mapWorkerUrl)
@@ -17,6 +18,8 @@ const routeLayerId = 'cartopia-delivery-route-line'
 interface DeliveryMapProps {
   origin: DeliveryLocation
   destination: DeliveryLocation
+  stops?: Array<Omit<DeliveryLocation, 'code'> & { code: string }>
+  routeLegs?: DeliveryRouteLeg[]
   courier: string
   startsAt: string
   arrivesAt: string
@@ -51,7 +54,7 @@ function createCourierElement(courier: string): HTMLDivElement {
   return element
 }
 
-export function DeliveryMap({ origin, destination, courier, startsAt, arrivesAt }: DeliveryMapProps) {
+export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], courier, startsAt, arrivesAt }: DeliveryMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const markersRef = useRef<Marker[]>([])
@@ -59,12 +62,12 @@ export function DeliveryMap({ origin, destination, courier, startsAt, arrivesAt 
   const courierRef = useRef(courier)
   const animationRef = useRef<ReturnType<typeof createCourierAnimation> | null>(null)
   const hasFittedRouteRef = useRef(false)
-  const routeRef = useRef({ origin, destination, startsAt, arrivesAt })
+  const routeRef = useRef({ origin, destination, stops, startsAt, arrivesAt })
   const [mapError, setMapError] = useState(false)
 
   useEffect(() => {
-    routeRef.current = { origin, destination, startsAt, arrivesAt }
-  }, [origin, destination, startsAt, arrivesAt])
+    routeRef.current = { origin, destination, stops, startsAt, arrivesAt }
+  }, [origin, destination, stops, startsAt, arrivesAt])
 
   useEffect(() => {
     courierRef.current = courier
@@ -83,7 +86,11 @@ export function DeliveryMap({ origin, destination, courier, startsAt, arrivesAt 
     if (!container || !hasMapDimensions(container.clientWidth, container.clientHeight)) return false
 
     map.resize()
-    map.fitBounds(new LngLatBounds(getRouteBounds(routeRef.current.origin.coordinates, routeRef.current.destination.coordinates)), {
+    const routeLocations = [routeRef.current.origin, ...routeRef.current.stops, routeRef.current.destination]
+    const coordinates = routeLocations.map((location) => location.coordinates)
+    const longitudes = coordinates.map(([longitude]) => longitude)
+    const latitudes = coordinates.map(([, latitude]) => latitude)
+    map.fitBounds(new LngLatBounds([[Math.min(...longitudes), Math.min(...latitudes)], [Math.max(...longitudes), Math.max(...latitudes)]]), {
       padding: getMapPadding(container.clientWidth, container.clientHeight),
       maxZoom: 12,
       duration: 0,
@@ -93,13 +100,14 @@ export function DeliveryMap({ origin, destination, courier, startsAt, arrivesAt 
   }, [])
 
   const drawRoute = useCallback((map: Map) => {
-    const { origin: currentOrigin, destination: currentDestination } = routeRef.current
+    const { origin: currentOrigin, destination: currentDestination, stops: currentStops } = routeRef.current
+    const routeLocations = [currentOrigin, ...currentStops, currentDestination]
     const route = {
       type: 'Feature' as const,
       properties: {},
       geometry: {
         type: 'LineString' as const,
-        coordinates: [currentOrigin.coordinates, currentDestination.coordinates],
+        coordinates: routeLocations.map((location) => location.coordinates),
       },
     }
 
@@ -117,10 +125,7 @@ export function DeliveryMap({ origin, destination, courier, startsAt, arrivesAt 
     }
 
     markersRef.current.forEach((marker) => marker.remove())
-    markersRef.current = [
-      new Marker({ element: createMarkerElement('origin', `Origem: ${currentOrigin.label}`) }).setLngLat(currentOrigin.coordinates).addTo(map),
-      new Marker({ element: createMarkerElement('destination', `Destino: ${currentDestination.label}`) }).setLngLat(currentDestination.coordinates).addTo(map),
-    ]
+    markersRef.current = routeLocations.map((location, index) => new Marker({ element: createMarkerElement(index === 0 ? 'origin' : index === routeLocations.length - 1 ? 'destination' : 'origin', `${index === 0 ? 'Origem' : index === routeLocations.length - 1 ? 'Destino' : 'Parada'}: ${location.label}`) }).setLngLat(location.coordinates).addTo(map))
 
     if (!courierMarkerRef.current) {
       courierMarkerRef.current = new Marker({ element: createCourierElement(courierRef.current) }).setLngLat(currentOrigin.coordinates).addTo(map)
@@ -133,6 +138,12 @@ export function DeliveryMap({ origin, destination, courier, startsAt, arrivesAt 
       destination: currentDestination.coordinates,
       startsAt: routeRef.current.startsAt,
       arrivesAt: routeRef.current.arrivesAt,
+      legs: routeLegs.map((leg, index) => ({
+        origin: routeLocations[index].coordinates,
+        destination: routeLocations[index + 1].coordinates,
+        startsAt: leg.starts_at,
+        arrivesAt: leg.arrives_at,
+      })),
       scheduler: {
         requestFrame: (callback) => window.requestAnimationFrame(callback),
         cancelFrame: (frame) => window.cancelAnimationFrame(frame),

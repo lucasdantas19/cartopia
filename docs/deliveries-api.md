@@ -18,6 +18,8 @@ Entregadores disponíveis: `paper-swallow`, `postal-cat` e `little-dragon`. O ca
 
 O entregador inicial é `paper-swallow`. A duração deve estar entre 1 e 1440 minutos. Os horários são definidos pelo backend no momento da criação; a viagem começa imediatamente.
 
+Uma aventura também pode ter vários trechos. Cada trecho informa seu próximo destino e sua duração; os horários de início e chegada são calculados pelo backend em sequência. A duração total continua limitada a 1440 minutos.
+
 ## Criar entrega
 
 `POST /api/deliveries`
@@ -33,6 +35,22 @@ O entregador inicial é `paper-swallow`. A duração deve estar entre 1 e 1440 m
   "duration_minutes": 60
 }
 ```
+
+Para uma rota com paradas, envie `legs` e use como `destination` o destino do último trecho:
+
+```json
+{
+  "origin": "port-of-dreams",
+  "destination": "library-of-memories",
+  "legs": [
+    { "destination": "paris", "duration_minutes": 10 },
+    { "destination": "disney", "duration_minutes": 20 },
+    { "destination": "library-of-memories", "duration_minutes": 30 }
+  ]
+}
+```
+
+O campo `duration_minutes` permanece aceito para manter o formato de rota direta. Em aventuras, `final_duration_minutes` representa o último trecho entre a parada final e o destino. A resposta inclui `data.steps`, com título, descrição, localização e horários de cada capítulo. `route_legs` permanece temporariamente na resposta para compatibilidade com clientes antigos.
 
 Resposta `201 Created`:
 

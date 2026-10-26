@@ -5,11 +5,15 @@ return [
         'port-of-dreams',
         'garden-of-ideas',
         'library-of-memories',
+        'paris',
+        'disney',
     ],
     'destinations' => [
         'port-of-dreams',
         'garden-of-ideas',
         'library-of-memories',
+        'paris',
+        'disney',
     ],
     'couriers' => [
         'paper-swallow',

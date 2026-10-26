@@ -60,6 +60,58 @@ it('keeps a five-minute delivery five minutes apart in UTC', function () {
         ->and(Delivery::first()->starts_at->diffInSeconds(Delivery::first()->arrives_at))->toEqual(300);
 });
 
+it('creates an adventure with sequential route legs', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
+
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'destination' => 'library-of-memories',
+        'legs' => [
+            ['destination' => 'paris', 'duration_minutes' => 10],
+            ['destination' => 'disney', 'duration_minutes' => 20],
+            ['destination' => 'library-of-memories', 'duration_minutes' => 30],
+        ],
+    ]));
+
+    $response->assertCreated()
+        ->assertJsonPath('data.origin', 'port-of-dreams')
+        ->assertJsonPath('data.destination', 'library-of-memories')
+        ->assertJsonPath('data.route_legs.0.origin', 'port-of-dreams')
+        ->assertJsonPath('data.route_legs.0.destination', 'paris')
+        ->assertJsonPath('data.route_legs.1.starts_at', '2026-10-21T15:10:00.000000Z')
+        ->assertJsonPath('data.route_legs.2.arrives_at', '2026-10-21T16:00:00.000000Z')
+        ->assertJsonPath('data.arrives_at', '2026-10-21T16:00:00.000000Z');
+});
+
+it('creates an automatic narrative with timed steps and an optional location', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
+
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'steps' => [
+            [
+                'title' => 'Buscando uma flor em Keukenhof',
+                'description' => 'Uma lembrança especial para a viagem.',
+                'duration_minutes' => 30,
+                'location' => ['label' => 'Keukenhof', 'latitude' => 52.1326, 'longitude' => 4.5331],
+            ],
+            ['title' => 'Pausa para um croissant', 'description' => null, 'duration_minutes' => 15],
+        ],
+        'final_duration_minutes' => 15,
+    ]));
+
+    $response->assertCreated()
+        ->assertJsonPath('data.steps.0.title', 'Buscando uma flor em Keukenhof')
+        ->assertJsonPath('data.steps.0.location.latitude', 52.1326)
+        ->assertJsonPath('data.steps.1.starts_at', '2026-10-21T15:30:00.000000Z')
+        ->assertJsonPath('data.arrives_at', '2026-10-21T16:00:00.000000Z')
+        ->assertJsonPath('data.current_step', 0);
+});
+
+it('rejects route legs whose final stop differs from the delivery destination', function () {
+    $this->postJson('/api/deliveries', deliveryPayload([
+        'legs' => [['destination' => 'paris', 'duration_minutes' => 10]],
+    ]))->assertUnprocessable()->assertJsonValidationErrors('legs');
+});
+
 it('serializes delivery instants with an explicit UTC timezone', function () {
     CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
     [$data, $token] = createDelivery(['duration_minutes' => 5]);

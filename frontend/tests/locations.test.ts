@@ -7,6 +7,8 @@ test('all supported delivery locations have coordinates', () => {
     'port-of-dreams',
     'garden-of-ideas',
     'library-of-memories',
+    'paris',
+    'disney',
   ])
 
   for (const location of locations) {
