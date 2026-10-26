@@ -85,7 +85,9 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 
 .success-card, .state-card { max-width: 680px; padding: clamp(2rem, 7vw, 4rem); border: 1px solid var(--line); border-radius: 1.5rem; background: var(--surface); text-align: center; box-shadow: var(--shadow-soft); }
 .success-icon, .state-icon { display: inline-grid; place-items: center; width: 3.5rem; height: 3.5rem; margin-bottom: 1.5rem; border-radius: 50%; color: var(--cream); background: var(--coral); font-size: 1.5rem; }
+.success-kicker { margin: 0 0 .55rem; color: var(--coral); font-size: .7rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
 .success-card h1, .state-card h1 { font-size: clamp(2.5rem, 7vw, 4.2rem); }
+.dispatch-stamp { display: grid; gap: .22rem; width: min(100%, 18rem); margin: 1.8rem auto 2rem; padding: .85rem 1rem; border: 1px dashed var(--coral); border-radius: .45rem; color: var(--coral); background: rgba(240, 236, 250, .55); transform: rotate(-1.5deg); }.dispatch-stamp span { font-size: .62rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }.dispatch-stamp strong { font: 700 1.4rem var(--mono); letter-spacing: .1em; }.dispatch-stamp small { color: var(--muted); font-size: .66rem; }
 .share-box { display: flex; align-items: center; gap: .8rem; margin: 2rem 0; padding: .7rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--cream); text-align: left; }
 .share-box > div { min-width: 0; flex: 1; }.share-box strong { display: block; margin-bottom: .25rem; color: var(--ink); font-size: .78rem; }.share-hint { display: block; margin-bottom: .4rem; color: var(--muted); font-size: .72rem; }.share-link { height: 2.2rem; padding: 0 .55rem; overflow: hidden; color: var(--muted); font: .72rem var(--mono); text-overflow: ellipsis; white-space: nowrap; cursor: text; }
 .success-actions { display: flex; justify-content: center; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
