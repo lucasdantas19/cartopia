@@ -66,7 +66,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
   </Shell>
 
   return <Shell onHome={onHome} onPrivacy={onPrivacy}>
-    <section className="intro"><h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1><p className="lead">Escreva uma mensagem, escolha uma rota e deixe a Cartopia fazer a entrega.</p></section>
+    <section className="intro create-intro"><div className="intro-copy"><h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1><p className="lead">Escreva uma mensagem, trace uma rota e deixe a Cartopia transformar carinho em aventura.</p></div><div className="hero-route" aria-hidden="true"><div className="hero-route-stamp">CP · 01</div><div className="hero-route-map"><span className="hero-route-start" /><span className="hero-route-path">· · · · · · ·</span><span className="hero-route-end">✦</span></div><div className="hero-route-labels"><span>uma lembrança</span><span>alguém especial</span></div><p>toda carta começa<br />com um destino</p></div><div className="create-steps"><span><b>01</b> escreva</span><span><b>02</b> escolha a rota</span><span><b>03</b> acompanhe</span></div></section>
     <CreateDeliveryForm form={form} error={error} fieldErrors={fieldErrors} submitting={submitting} onSubmit={submit} onFieldChange={updateField} />
   </Shell>
 }
