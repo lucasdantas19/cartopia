@@ -13,7 +13,7 @@ export function DeliverySummary({ form }: DeliverySummaryProps) {
   const destination = getLocation(form.destination)
 
   return <aside className="delivery-summary" aria-label="Resumo da entrega">
-    <div className="summary-heading"><strong>Resumo da entrega</strong><span>Confira antes de enviar.</span></div>
+    <div className="summary-heading"><strong>Bilhete de postagem</strong><span>Confira antes de traçar a rota.</span></div>
     <div className="summary-grid">
       <div><span>Para</span><strong>{form.recipient_name.trim() || 'Seu destinatário'}</strong></div>
       <div className="summary-courier"><span>Entregador</span><img src={courier.cardAsset} alt={courier.label} onError={handleCourierImageError} /><strong>{courier.label}</strong></div>
