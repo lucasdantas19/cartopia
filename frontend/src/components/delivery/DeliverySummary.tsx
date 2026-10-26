@@ -20,5 +20,6 @@ export function DeliverySummary({ form }: DeliverySummaryProps) {
       <div><span>Rota</span><strong>{origin?.label ?? form.origin} → {destination?.label ?? form.destination}</strong></div>
       <div><span>Duração</span><strong>{form.duration_minutes || '—'} {form.duration_minutes ? 'minutos' : ''}</strong></div>
     </div>
+    <p className="summary-note">{form.origin === form.destination ? 'Escolha lugares diferentes para traçar a rota.' : 'Tudo pronto para traçar a rota.'}</p>
   </aside>
 }
