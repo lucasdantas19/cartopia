@@ -16,6 +16,8 @@ it('creates a delivery with a public UUID and a secure access token', function (
         ->and($senderToken)->toMatch('/^[0-9a-f]{64}$/')
         ->and($senderToken)->not->toBe($token)
         ->and($data['courier'])->toBe('paper-swallow')
+        ->and($data['steps'])->toBe([])
+        ->and($data['final_duration_minutes'])->toBe(60)
         ->and($data)->not->toHaveKey('message');
 
     expect($response->json('recipient_tracking_path'))->toContain($token)

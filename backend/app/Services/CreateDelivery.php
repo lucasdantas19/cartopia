@@ -53,8 +53,25 @@ class CreateDelivery
             $legStartsAt = $stepArrivesAt;
         }
 
+        $routeLegs = [];
+        if ($legs !== null) {
+            $legacyOrigin = $attributes['origin'];
+            $legacyStartsAt = $startsAt;
+            foreach ($legs as $leg) {
+                $legacyArrivesAt = $legacyStartsAt->addMinutes($leg['duration_minutes']);
+                $routeLegs[] = [
+                    'origin' => $legacyOrigin,
+                    'destination' => $leg['destination'],
+                    'starts_at' => $legacyStartsAt->toISOString(),
+                    'arrives_at' => $legacyArrivesAt->toISOString(),
+                ];
+                $legacyOrigin = $leg['destination'];
+                $legacyStartsAt = $legacyArrivesAt;
+            }
+        }
+
         $finalDurationMinutes ??= $hasNarrativeSteps ? 0 : $durationMinutes;
-        $arrivesAt = $legStartsAt->addMinutes($finalDurationMinutes);
+        $arrivesAt = $hasNarrativeSteps ? $legStartsAt->addMinutes($finalDurationMinutes) : $legStartsAt;
 
         $delivery = Delivery::create([
             ...$attributes,
@@ -63,6 +80,7 @@ class CreateDelivery
             'arrives_at' => $arrivesAt,
             'final_duration_minutes' => $finalDurationMinutes,
             'route_steps' => $hasNarrativeSteps ? $routeSteps : [],
+            'route_legs' => $routeLegs ?: null,
             'access_token_hash' => hash('sha256', $recipientAccessToken),
             'sender_access_token_hash' => hash('sha256', $senderAccessToken),
         ]);

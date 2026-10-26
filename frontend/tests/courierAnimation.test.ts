@@ -47,3 +47,32 @@ test('uses a static position when reduced motion is preferred', () => {
   assert.equal(state.scheduled, null)
   assert.deepEqual(state.positions[0], [-34.8945, -8.055])
 })
+
+test('continues from a stop to the final destination using each leg time', () => {
+  let position: Coordinates | null = null
+  const intermediate: Coordinates = [-34.895, -8.055]
+  const marker = { setLngLat: (coordinates: Coordinates) => { position = coordinates; return marker } }
+  const scheduler = {
+    requestFrame: () => 1,
+    cancelFrame: () => undefined,
+    now: () => Date.parse('2026-10-21T15:07:30Z'),
+    prefersReducedMotion: () => true,
+  }
+
+  const animation = createCourierAnimation({
+    marker,
+    origin,
+    destination,
+    startsAt: '2026-10-21T15:00:00Z',
+    arrivesAt: '2026-10-21T15:10:00Z',
+    legs: [
+      { origin, destination: intermediate, startsAt: '2026-10-21T15:00:00Z', arrivesAt: '2026-10-21T15:05:00Z' },
+      { origin: intermediate, destination, startsAt: '2026-10-21T15:05:00Z', arrivesAt: '2026-10-21T15:10:00Z' },
+    ],
+    scheduler,
+  })
+
+  animation.start()
+
+  assert.deepEqual(position, [-34.9035, -8.051])
+})

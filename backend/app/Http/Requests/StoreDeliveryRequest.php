@@ -51,7 +51,17 @@ class StoreDeliveryRequest extends FormRequest
     {
         $validator->after(function ($validator): void {
             $steps = $this->input('steps');
-            if (! is_array($steps) || $validator->errors()->isNotEmpty()) {
+            if (! is_array($steps)) {
+                $legs = $this->input('legs');
+                if (is_array($legs) && $legs !== [] && $validator->errors()->isEmpty()) {
+                    $destinations = array_column($legs, 'destination');
+                    if (end($destinations) !== $this->input('destination')) {
+                        $validator->errors()->add('legs', 'O último trecho deve terminar no destino da entrega.');
+                    }
+                }
+                return;
+            }
+            if ($validator->errors()->isNotEmpty()) {
                 return;
             }
 

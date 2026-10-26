@@ -18,7 +18,7 @@ const routeLayerId = 'cartopia-delivery-route-line'
 interface DeliveryMapProps {
   origin: DeliveryLocation
   destination: DeliveryLocation
-  stops?: Array<Omit<DeliveryLocation, 'code'> & { code: string }>
+  stops?: Array<Omit<DeliveryLocation, 'code'> & { code: string; arrivesAt?: string }>
   routeLegs?: DeliveryRouteLeg[]
   courier: string
   startsAt: string
@@ -132,13 +132,25 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], c
     }
 
     animationRef.current?.stop()
+    const animationPoints = [
+      { coordinates: currentOrigin.coordinates, arrivesAt: routeRef.current.startsAt },
+      ...currentStops.map((stop) => ({ coordinates: stop.coordinates, arrivesAt: stop.arrivesAt ?? routeRef.current.arrivesAt })),
+      { coordinates: currentDestination.coordinates, arrivesAt: routeRef.current.arrivesAt },
+    ]
+    const animationLegs = animationPoints.slice(1).map((point, index) => ({
+      origin: animationPoints[index].coordinates,
+      destination: point.coordinates,
+      startsAt: animationPoints[index].arrivesAt,
+      arrivesAt: point.arrivesAt,
+    })).filter((leg) => Date.parse(leg.arrivesAt) > Date.parse(leg.startsAt))
+
     animationRef.current = createCourierAnimation({
       marker: courierMarkerRef.current!,
       origin: currentOrigin.coordinates,
       destination: currentDestination.coordinates,
       startsAt: routeRef.current.startsAt,
       arrivesAt: routeRef.current.arrivesAt,
-      legs: routeLegs.map((leg, index) => ({
+      legs: animationLegs.length === routeLocations.length - 1 ? animationLegs : routeLegs.map((leg, index) => ({
         origin: routeLocations[index].coordinates,
         destination: routeLocations[index + 1].coordinates,
         startsAt: leg.starts_at,
