@@ -12,6 +12,7 @@ import { progressFromTime, statusFromTime } from '../utils/dateTime'
 import { DeliveryMap } from '../components/tracking/DeliveryMap'
 import { getLocation } from '../domain/delivery/locations'
 import { LetterReveal } from '../components/tracking/LetterReveal'
+import { JourneyPassport } from '../components/tracking/JourneyPassport'
 import { connectToDeliveryChannel } from '../services/realtime'
 import type { AccessRole, Delivery, DeliveryStatus } from '../domain/delivery/types'
 
@@ -118,6 +119,7 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
   return <Shell eyebrow="Acompanhamento da aventura" onHome={onHome} onPrivacy={onPrivacy}>
     <TrackingHeader recipientName={delivery.recipient_name} senderName={delivery.sender_name} statusClass={visualStatus.toLowerCase()} statusLabel={statusLabel(visualStatus)} />
     <JourneyProgress originLabel={locationLabel(delivery.origin)} destinationLabel={locationLabel(delivery.destination)} progress={visualProgress} courier={delivery.courier} arrivesAt={delivery.arrives_at} now={now} />
+    <JourneyPassport publicId={delivery.public_id} originLabel={locationLabel(delivery.origin)} destinationLabel={locationLabel(delivery.destination)} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} status={visualStatus} />
     {realtimeStatus === 'received' && <p className="realtime-indicator" role="status">Sinal em tempo real recebido.</p>}
     {getLocation(delivery.origin) && getLocation(delivery.destination) && <DeliveryMap origin={getLocation(delivery.origin)!} destination={getLocation(delivery.destination)!} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />}
     <DeliveryDetails startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />
