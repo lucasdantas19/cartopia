@@ -1,7 +1,7 @@
 export function Loading() {
   return <div className="state-card">
     <span className="loader" />
-    <h1>Seguindo a trilha…</h1>
-    <p className="lead">Estamos procurando sua entrega.</p>
+    <h1>Desenhando a rota…</h1>
+    <p className="lead">Seu passaporte está sendo localizado entre as páginas do mapa.</p>
   </div>
 }

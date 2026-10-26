@@ -48,7 +48,7 @@ export function LetterReveal({ courier, canOpen, opening, message, error, onOpen
       <img className="arrival-mascot" src={getCourier(courier).cardAsset} alt={getCourier(courier).label} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = '/couriers/paper-swallow.svg' }} />
       <p className="arrival-kicker">A aventura terminou</p>
       <h2>Sua surpresa chegou!</h2>
-      <p>A mensagem está pronta para ser aberta.</p>
+      <p>O último carimbo foi registrado. A mensagem está pronta para ser descoberta.</p>
       <EnvelopeScene message={null} state="closed" onOpened={() => undefined} />
       <button className="button primary" type="button" disabled={opening} aria-busy={opening} onClick={onOpen}>{opening ? 'Abrindo minha carta…' : 'Abrir minha carta'}</button>
       {error && <p className="error-message" role="alert">{error}</p>}
@@ -58,7 +58,7 @@ export function LetterReveal({ courier, canOpen, opening, message, error, onOpen
   return <section className="message-card" aria-live="polite">
     <EnvelopeScene message={null} state="closed" onOpened={() => undefined} />
     <h2>A mensagem está viajando.</h2>
-    <p>Quando a entrega chegar, você poderá abrir a carta.</p>
+    <p>O courier ainda está percorrendo a rota. A carta será liberada quando chegar ao destino.</p>
     <button className="button primary" type="button" disabled>Aguardando chegada</button>
     {error && <p className="error-message" role="alert">{error}</p>}
   </section>
