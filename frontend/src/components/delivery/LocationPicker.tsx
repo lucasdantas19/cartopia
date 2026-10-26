@@ -14,6 +14,7 @@ interface LocationPickerProps {
   location?: CreateDeliveryStep['location']
   onChange: (location: NonNullable<CreateDeliveryStep['location']>) => void
   onClear: () => void
+  openByDefault?: boolean
 }
 
 interface MapboxFeature {
@@ -24,8 +25,8 @@ interface MapboxFeature {
   geometry?: { coordinates?: [number, number] }
 }
 
-export function LocationPicker({ center, location, onChange, onClear }: LocationPickerProps) {
-  const [open, setOpen] = useState(Boolean(location))
+export function LocationPicker({ center, location, onChange, onClear, openByDefault = false }: LocationPickerProps) {
+  const [open, setOpen] = useState(Boolean(location) && openByDefault)
   const [mapError, setMapError] = useState(false)
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<MapboxFeature[]>([])
@@ -38,11 +39,11 @@ export function LocationPicker({ center, location, onChange, onClear }: Location
 
   useEffect(() => {
     locationRef.current = location
-    if (location) setOpen(true)
+    if (location && openByDefault) setOpen(true)
     const marker = markerRef.current
     if (!marker || location?.latitude === undefined || location.longitude === undefined) return
     marker.setLngLat([location.longitude, location.latitude])
-  }, [location])
+  }, [location, openByDefault])
 
   useEffect(() => {
     if (!open || !containerRef.current) return
@@ -150,6 +151,5 @@ export function LocationPicker({ center, location, onChange, onClear }: Location
       <input aria-label="Nome da localização" value={location?.label ?? ''} placeholder="Nome do lugar ou momento" onChange={(event) => onChange({ label: event.target.value, latitude: location?.latitude, longitude: location?.longitude })} />
       {location && <button type="button" className="text-button" onClick={() => { setOpen(false); onClear() }}>remover localização</button>}
     </div>
-    {location?.latitude !== undefined && location.longitude !== undefined && <small className="location-picker-coordinates">{location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}</small>}
   </div>
 }

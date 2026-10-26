@@ -2,6 +2,11 @@
 export type DeliveryStatus = 'SCHEDULED' | 'IN_TRANSIT' | 'DELIVERED'
 export type AccessRole = 'sender' | 'recipient'
 export type CourierCode = 'paper-swallow' | 'postal-cat' | 'little-dragon'
+export interface DeliveryLocationValue {
+  label: string
+  latitude: number
+  longitude: number
+}
 
 export interface DeliveryRouteLeg {
   origin: string
@@ -35,7 +40,9 @@ export interface Delivery {
   sender_name: string | null
   recipient_name: string
   origin: string
+  origin_location: DeliveryLocationValue | null
   destination: string
+  destination_location: DeliveryLocationValue | null
   route_legs: DeliveryRouteLeg[]
   steps: DeliveryStep[]
   current_step: number | null
@@ -54,7 +61,9 @@ export interface CreateDeliveryInput {
   sender_name?: string
   recipient_name: string
   origin: string
+  origin_location: DeliveryLocationValue
   destination: string
+  destination_location: DeliveryLocationValue
   duration_minutes: number
   final_duration_minutes: number
   legs?: CreateDeliveryLeg[]

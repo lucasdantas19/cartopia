@@ -18,6 +18,19 @@ Entregadores disponíveis: `paper-swallow`, `postal-cat` e `little-dragon`. O ca
 
 O entregador inicial é `paper-swallow`. A duração deve estar entre 1 e 1440 minutos. Os horários são definidos pelo backend no momento da criação; a viagem começa imediatamente.
 
+Origem e destino podem ser localidades conhecidas ou pontos personalizados. Para um ponto personalizado, envie o nome e suas coordenadas:
+
+```json
+{
+  "origin": "Casa de Lucas",
+  "origin_location": { "label": "Casa de Lucas", "latitude": -8.0472, "longitude": -34.8998 },
+  "destination": "Keukenhof",
+  "destination_location": { "label": "Keukenhof", "latitude": 52.1326, "longitude": 4.5331 }
+}
+```
+
+Os campos antigos `origin` e `destination` continuam aceitando os códigos das localidades pré-configuradas.
+
 Uma aventura também pode ter vários trechos. Cada trecho informa seu próximo destino e sua duração; os horários de início e chegada são calculados pelo backend em sequência. A duração total continua limitada a 1440 minutos.
 
 ## Criar entrega

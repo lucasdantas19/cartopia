@@ -21,6 +21,13 @@ class CreateDelivery
         unset($attributes['duration_minutes']);
         unset($attributes['final_duration_minutes']);
 
+        if (isset($attributes['origin_location'])) {
+            $attributes['origin'] = $attributes['origin_location']['label'];
+        }
+        if (isset($attributes['destination_location'])) {
+            $attributes['destination'] = $attributes['destination_location']['label'];
+        }
+
         $hasNarrativeSteps = array_key_exists('steps', $attributes) || array_key_exists('legs', $attributes);
         $steps = $attributes['steps'] ?? null;
         $legs = $attributes['legs'] ?? null;

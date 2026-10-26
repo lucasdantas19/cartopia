@@ -14,7 +14,9 @@ class DeliveryResource extends JsonResource
             'sender_name' => $this->sender_name,
             'recipient_name' => $this->recipient_name,
             'origin' => $this->origin,
+            'origin_location' => $this->origin_location,
             'destination' => $this->destination,
+            'destination_location' => $this->destination_location,
             'steps' => array_map(fn (array $step): array => [
                 'title' => $step['title'],
                 'description' => $step['description'] ?? null,

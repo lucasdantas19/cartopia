@@ -16,8 +16,8 @@ const routeSourceId = 'cartopia-delivery-route'
 const routeLayerId = 'cartopia-delivery-route-line'
 
 interface DeliveryMapProps {
-  origin: DeliveryLocation
-  destination: DeliveryLocation
+  origin: Omit<DeliveryLocation, 'code'> & { code: string }
+  destination: Omit<DeliveryLocation, 'code'> & { code: string }
   stops?: Array<Omit<DeliveryLocation, 'code'> & { code: string; arrivesAt?: string }>
   routeLegs?: DeliveryRouteLeg[]
   courier: string

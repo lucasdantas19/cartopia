@@ -11,6 +11,7 @@ import { TrackingHeader } from '../components/tracking/TrackingHeader'
 import { progressFromTime, statusFromTime } from '../utils/dateTime'
 import { DeliveryMap } from '../components/tracking/DeliveryMap'
 import { getLocation } from '../domain/delivery/locations'
+import type { DeliveryLocation } from '../domain/delivery/locations'
 import { LetterReveal } from '../components/tracking/LetterReveal'
 import { JourneyPassport } from '../components/tracking/JourneyPassport'
 import { connectToDeliveryChannel } from '../services/realtime'
@@ -24,7 +25,12 @@ interface TrackingPageProps {
   onPrivacy: () => void
 }
 
-function locationLabel(value: string) { return getLocation(value)?.label ?? value }
+function locationLabel(value: string, customLocation: Delivery['origin_location'] = null) { return customLocation?.label ?? getLocation(value)?.label ?? value }
+
+function mapLocation(value: string, customLocation: Delivery['origin_location'], kind: 'origin' | 'destination'): Omit<DeliveryLocation, 'code'> & { code: string } | undefined {
+  if (customLocation) return { code: `endpoint-${kind}`, label: customLocation.label, description: '', coordinates: [customLocation.longitude, customLocation.latitude] }
+  return getLocation(value)
+}
 
 function statusLabel(status: DeliveryStatus) {
   return { SCHEDULED: 'Preparando a partida', IN_TRANSIT: 'A caminho', DELIVERED: 'Chegou ao destino' }[status]
@@ -116,13 +122,15 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
   const visualProgress = progressFromTime(delivery, now)
   const canOpen = visualStatus === 'DELIVERED'
   const visibleRealtimeStatus = auth.ready && auth.token && broadcastRole ? realtimeStatus : null
+  const originMapLocation = mapLocation(delivery.origin, delivery.origin_location, 'origin')
+  const destinationMapLocation = mapLocation(delivery.destination, delivery.destination_location, 'destination')
 
   return <Shell eyebrow="Acompanhamento da aventura" onHome={onHome} onPrivacy={onPrivacy}>
     <TrackingHeader recipientName={delivery.recipient_name} senderName={delivery.sender_name} statusClass={visualStatus.toLowerCase()} statusLabel={statusLabel(visualStatus)} />
-    <JourneyProgress originLabel={locationLabel(delivery.origin)} destinationLabel={locationLabel(delivery.destination)} progress={visualProgress} courier={delivery.courier} arrivesAt={delivery.arrives_at} now={now} />
-    <JourneyPassport publicId={delivery.public_id} originLabel={locationLabel(delivery.origin)} destinationLabel={locationLabel(delivery.destination)} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} status={visualStatus} steps={delivery.steps} finalDurationMinutes={delivery.final_duration_minutes} now={now} />
+    <JourneyProgress originLabel={locationLabel(delivery.origin, delivery.origin_location)} destinationLabel={locationLabel(delivery.destination, delivery.destination_location)} progress={visualProgress} courier={delivery.courier} arrivesAt={delivery.arrives_at} now={now} />
+    <JourneyPassport publicId={delivery.public_id} originLabel={locationLabel(delivery.origin, delivery.origin_location)} destinationLabel={locationLabel(delivery.destination, delivery.destination_location)} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} status={visualStatus} steps={delivery.steps} finalDurationMinutes={delivery.final_duration_minutes} now={now} />
     {visibleRealtimeStatus === 'received' && <p className="realtime-indicator" role="status">Sinal em tempo real recebido.</p>}
-    {getLocation(delivery.origin) && getLocation(delivery.destination) && <DeliveryMap origin={getLocation(delivery.origin)!} destination={getLocation(delivery.destination)!} stops={delivery.steps.flatMap((step, index) => step.location?.latitude !== undefined && step.location.longitude !== undefined ? [{ code: `step-${index}`, label: step.location.label, description: step.description ?? '', coordinates: [step.location.longitude, step.location.latitude] as [number, number], arrivesAt: step.arrives_at }] : [])} routeLegs={delivery.route_legs} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />}
+    {originMapLocation && destinationMapLocation && <DeliveryMap origin={originMapLocation} destination={destinationMapLocation} stops={delivery.steps.flatMap((step, index) => step.location?.latitude !== undefined && step.location.longitude !== undefined ? [{ code: `step-${index}`, label: step.location.label, description: step.description ?? '', coordinates: [step.location.longitude, step.location.latitude] as [number, number], arrivesAt: step.arrives_at }] : [])} routeLegs={delivery.route_legs} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />}
     <DeliveryDetails startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />
     {delivery.access_role === 'sender' ? <SenderOpeningStatus openedAt={delivery.opened_at} /> : <LetterReveal key={message ?? 'closed'} courier={delivery.courier} canOpen={canOpen} opening={opening} message={message} error={messageError} onOpen={() => { void revealMessage() }} />}
   </Shell>

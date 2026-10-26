@@ -108,6 +108,22 @@ it('creates an automatic narrative with timed steps and an optional location', f
         ->assertJsonPath('data.current_step', 0);
 });
 
+it('accepts real custom locations for the origin and destination', function () {
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'origin' => 'Casa de Lucas',
+        'origin_location' => ['label' => 'Casa de Lucas', 'latitude' => -8.0472, 'longitude' => -34.8998],
+        'destination' => 'Keukenhof',
+        'destination_location' => ['label' => 'Keukenhof', 'latitude' => 52.1326, 'longitude' => 4.5331],
+        'duration_minutes' => 90,
+    ]));
+
+    $response->assertCreated()
+        ->assertJsonPath('data.origin', 'Casa de Lucas')
+        ->assertJsonPath('data.origin_location.latitude', -8.0472)
+        ->assertJsonPath('data.destination', 'Keukenhof')
+        ->assertJsonPath('data.destination_location.longitude', 4.5331);
+});
+
 it('rejects route legs whose final stop differs from the delivery destination', function () {
     $this->postJson('/api/deliveries', deliveryPayload([
         'legs' => [['destination' => 'paris', 'duration_minutes' => 10]],

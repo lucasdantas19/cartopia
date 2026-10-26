@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react'
 import { LngLatBounds, Map, Marker, setWorkerUrl } from 'maplibre-gl'
 import type { GeoJSONSource } from 'maplibre-gl'
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import { getLocation, type Coordinates, type DeliveryLocation } from '../../domain/delivery/locations'
-import type { CreateDeliveryStep } from '../../domain/delivery/types'
+import type { Coordinates } from '../../domain/delivery/locations'
+import type { CreateDeliveryStep, DeliveryLocationValue } from '../../domain/delivery/types'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 setWorkerUrl(mapWorkerUrl)
@@ -11,8 +11,8 @@ setWorkerUrl(mapWorkerUrl)
 const mapStyle = 'https://tiles.openfreemap.org/styles/liberty'
 
 interface JourneyPreviewProps {
-  origin: string
-  destination: string
+  origin: DeliveryLocationValue
+  destination: DeliveryLocationValue
   steps: CreateDeliveryStep[]
   finalDurationMinutes: number
 }
@@ -44,14 +44,11 @@ export function JourneyPreview({ origin, destination, steps, finalDurationMinute
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const markersRef = useRef<Marker[]>([])
-  const points = [
-    getLocation(origin),
+  const points: PreviewPoint[] = [
+    { label: origin.label, coordinates: [origin.longitude, origin.latitude] as Coordinates, kind: 'origin' },
     ...steps.map(customPoint).filter((point): point is PreviewPoint => Boolean(point)),
-    getLocation(destination),
-  ].filter((point): point is DeliveryLocation | PreviewPoint => Boolean(point)).map((point, index, all) => {
-    if ('kind' in point) return point
-    return { label: point.label, coordinates: point.coordinates, kind: index === 0 ? 'origin' : index === all.length - 1 ? 'destination' : 'stop' } satisfies PreviewPoint
-  })
+    { label: destination.label, coordinates: [destination.longitude, destination.latitude] as Coordinates, kind: 'destination' },
+  ]
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -73,7 +70,7 @@ export function JourneyPreview({ origin, destination, steps, finalDurationMinute
 
   return <section className="journey-preview" aria-label="Prévia da aventura">
     <div className="journey-preview-heading"><div><h3>Prévia da sua aventura</h3><p>Veja a ordem dos momentos antes de selar a entrega.</p></div><strong>{steps.reduce((total, step) => total + Number(step.duration_minutes || 0), Number(finalDurationMinutes || 0))} min</strong></div>
-    <div className="journey-preview-timeline"><div className="journey-preview-event origin"><span className="journey-preview-dot" /><div><small>Partida</small><strong>{getLocation(origin)?.label ?? origin}</strong></div></div>{steps.map((step, index) => <div className="journey-preview-event" key={index}><span className="journey-preview-dot" /><div><small>{step.duration_minutes || 0} min desde o ponto anterior</small><strong>{step.title || `Parada ${index + 1}`}</strong>{step.location?.label && <em>{step.location.label}</em>}</div></div>)}<div className="journey-preview-event destination"><span className="journey-preview-dot" /><div><small>{finalDurationMinutes || 0} min desde a última parada</small><strong>{getLocation(destination)?.label ?? destination}</strong></div></div></div>
+    <div className="journey-preview-timeline"><div className="journey-preview-event origin"><span className="journey-preview-dot" /><div><small>Partida</small><strong>{origin.label}</strong></div></div>{steps.map((step, index) => <div className="journey-preview-event" key={index}><span className="journey-preview-dot" /><div><small>{step.duration_minutes || 0} min desde o ponto anterior</small><strong>{step.title || `Parada ${index + 1}`}</strong>{step.location?.label && <em>{step.location.label}</em>}</div></div>)}<div className="journey-preview-event destination"><span className="journey-preview-dot" /><div><small>{finalDurationMinutes || 0} min desde a última parada</small><strong>{destination.label}</strong></div></div></div>
     <div ref={containerRef} className="journey-preview-map" aria-label="Mapa da prévia da aventura" />
     {points.length < 2 && <p className="journey-preview-note">Adicione uma localização para visualizar o percurso no mapa.</p>}
   </section>

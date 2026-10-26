@@ -18,13 +18,16 @@ class StoreDeliveryRequest extends FormRequest
             'message' => ['required', 'string', 'max:10000'],
             'sender_name' => ['nullable', 'string', 'max:120'],
             'recipient_name' => ['required', 'string', 'max:120'],
-            'origin' => ['required', 'string', Rule::in(config('deliveries.origins'))],
-            'destination' => [
-                'required',
-                'string',
-                Rule::in(config('deliveries.destinations')),
-                'different:origin',
-            ],
+            'origin' => ['required', 'string', 'max:160'],
+            'origin_location' => ['sometimes', 'array'],
+            'origin_location.label' => ['required_with:origin_location', 'string', 'max:160'],
+            'origin_location.latitude' => ['required_with:origin_location', 'numeric', 'between:-90,90'],
+            'origin_location.longitude' => ['required_with:origin_location', 'numeric', 'between:-180,180'],
+            'destination' => ['required', 'string', 'max:160'],
+            'destination_location' => ['sometimes', 'array'],
+            'destination_location.label' => ['required_with:destination_location', 'string', 'max:160'],
+            'destination_location.latitude' => ['required_with:destination_location', 'numeric', 'between:-90,90'],
+            'destination_location.longitude' => ['required_with:destination_location', 'numeric', 'between:-180,180'],
             'courier' => ['sometimes', 'string', Rule::in(config('deliveries.couriers'))],
             'duration_minutes' => [
                 'required_without_all:legs,steps',
@@ -50,6 +53,9 @@ class StoreDeliveryRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator): void {
+            if ($this->input('origin') === $this->input('destination') && ! $this->has('origin_location') && ! $this->has('destination_location')) {
+                $validator->errors()->add('destination', 'A origem e o destino devem ser diferentes.');
+            }
             $steps = $this->input('steps');
             if (! is_array($steps)) {
                 $legs = $this->input('legs');
