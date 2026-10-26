@@ -1,4 +1,4 @@
-import type { Coordinates } from './locations'
+import type { Coordinates } from '../domain/delivery/locations'
 
 export function clampProgress(progress: number): number {
   return Math.max(0, Math.min(1, progress))

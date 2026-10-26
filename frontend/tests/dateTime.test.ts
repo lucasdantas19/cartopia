@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { activeRoleStorageKey, createShareUrl, extractTokenFromFragment, removeAccessToken, resolveAccessToken, tokenStorageKey } from '../src/accessToken.ts'
-import { formatLocalDate, progressFromTime, progressRatioFromInstants, statusFromTime } from '../src/dateTime.ts'
-import type { Delivery } from '../src/types.ts'
+import { activeRoleStorageKey, createShareUrl, extractTokenFromFragment, removeAccessToken, resolveAccessToken, tokenStorageKey } from '../src/services/accessToken.ts'
+import { formatLocalDate, progressFromTime, progressRatioFromInstants, statusFromTime } from '../src/utils/dateTime.ts'
+import type { Delivery } from '../src/domain/delivery/types.ts'
 
 const delivery: Delivery = {
   public_id: 'test',

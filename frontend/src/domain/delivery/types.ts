@@ -1,3 +1,4 @@
+// Contratos compartilhados do domínio de entregas.
 export type DeliveryStatus = 'SCHEDULED' | 'IN_TRANSIT' | 'DELIVERED'
 export type AccessRole = 'sender' | 'recipient'
 export type CourierCode = 'paper-swallow' | 'postal-cat' | 'little-dragon'

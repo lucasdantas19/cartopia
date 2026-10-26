@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { deliveryChannelName, realtimeConfiguration } from '../src/realtime.ts'
+import { deliveryChannelName, realtimeConfiguration } from '../src/services/realtime.ts'
 
 test('configures Reverb from the frontend environment without exposing the secret', () => {
   const configuration = realtimeConfiguration({

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getMapPadding, getRouteBounds, hasMapDimensions } from '../src/mapViewport.ts'
+import { getMapPadding, getRouteBounds, hasMapDimensions } from '../src/components/tracking/map/mapViewport.ts'
 
 test('calculates bounds for nearby points in longitude-latitude order', () => {
   assert.deepEqual(getRouteBounds([-34.877, -8.063], [-34.912, -8.047]), [

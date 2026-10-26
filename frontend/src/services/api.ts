@@ -4,8 +4,8 @@ import type {
   Delivery,
   DeliveryMessage,
   ApiErrorPayload,
-} from './types'
-import { resolveApiBaseUrl } from './runtimeConfig.ts'
+} from '../domain/delivery/types'
+import { resolveApiBaseUrl } from '../config/runtimeConfig.ts'
 
 const apiBaseUrl = resolveApiBaseUrl(import.meta.env)
 

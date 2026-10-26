@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { clampProgress, interpolateCoordinates } from '../src/geoPosition.ts'
+import { clampProgress, interpolateCoordinates } from '../src/utils/geoPosition.ts'
 
 const origin: [number, number] = [-34.877, -8.063]
 const destination: [number, number] = [-34.912, -8.047]

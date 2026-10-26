@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { copyText } from '../src/clipboard.ts'
+import { copyText } from '../src/utils/clipboard.ts'
 
 test('reports successful clipboard writes', async () => {
   let value = ''

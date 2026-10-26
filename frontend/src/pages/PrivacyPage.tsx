@@ -1,4 +1,4 @@
-import './App.css'
+import '../App.css'
 
 const privacyContactEmail = import.meta.env.VITE_PRIVACY_CONTACT_EMAIL?.trim()
 

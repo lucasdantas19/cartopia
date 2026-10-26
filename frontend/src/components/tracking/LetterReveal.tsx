@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getCourier } from './couriers'
+import { getCourier } from '../../domain/delivery/couriers'
 
 type VisualState = 'closed' | 'opening' | 'opened'
 

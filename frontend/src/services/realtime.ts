@@ -1,7 +1,7 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
-import type { AccessRole } from './types'
-import { FrontendConfigurationError, isProductionEnvironment, resolveApiBaseUrl, validatePublicUrl } from './runtimeConfig.ts'
+import type { AccessRole } from '../domain/delivery/types'
+import { FrontendConfigurationError, isProductionEnvironment, resolveApiBaseUrl, validatePublicUrl } from '../config/runtimeConfig.ts'
 
 export type RealtimeStatus = 'connecting' | 'connected' | 'received' | 'unavailable'
 

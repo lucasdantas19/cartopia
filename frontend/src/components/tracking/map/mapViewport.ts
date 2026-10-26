@@ -1,4 +1,4 @@
-import type { Coordinates } from './locations'
+import type { Coordinates } from '../../../domain/delivery/locations'
 
 export type RouteBounds = [Coordinates, Coordinates]
 

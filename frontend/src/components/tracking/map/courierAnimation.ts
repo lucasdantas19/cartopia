@@ -1,6 +1,6 @@
-import { progressRatioFromInstants } from './dateTime.ts'
-import type { Coordinates } from './locations.ts'
-import { interpolateCoordinates } from './geoPosition.ts'
+import { progressRatioFromInstants } from '../../../utils/dateTime.ts'
+import type { Coordinates } from '../../../domain/delivery/locations.ts'
+import { interpolateCoordinates } from '../../../utils/geoPosition.ts'
 
 export interface PositionMarker {
   setLngLat(coordinates: Coordinates): PositionMarker

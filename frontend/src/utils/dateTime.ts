@@ -1,4 +1,4 @@
-import type { Delivery, DeliveryStatus } from './types'
+import type { Delivery, DeliveryStatus } from '../domain/delivery/types'
 
 export function instant(value: string): number {
   const timestamp = Date.parse(value)

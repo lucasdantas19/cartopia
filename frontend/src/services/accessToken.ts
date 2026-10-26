@@ -7,7 +7,7 @@ export interface TokenStorage {
 export type AccessRole = 'sender' | 'recipient'
 
 export function tokenStorageKey(publicId: string, role: AccessRole = 'recipient'): string {
-  return 'cartopia.delivery_token.' + publicId + '.' + role
+  return `cartopia.delivery_token.${publicId}.${role}`
 }
 
 export function activeRoleStorageKey(publicId: string): string {

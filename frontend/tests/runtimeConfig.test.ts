@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { FrontendConfigurationError, resolveApiBaseUrl } from '../src/runtimeConfig.ts'
+import { FrontendConfigurationError, resolveApiBaseUrl } from '../src/config/runtimeConfig.ts'
 
 test('keeps the localhost API fallback for development', () => {
   assert.equal(resolveApiBaseUrl({}), 'http://localhost:8000/api')

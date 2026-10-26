@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { progressMarkerTransform } from '../src/progressVisual.ts'
+import { progressMarkerTransform } from '../src/utils/progressVisual.ts'
 
 test('keeps the mascot inside the progress bar at its boundaries', () => {
   assert.equal(progressMarkerTransform(0), 'translateX(0)')

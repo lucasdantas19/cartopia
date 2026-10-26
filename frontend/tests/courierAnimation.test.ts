@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createCourierAnimation } from '../src/courierAnimation.ts'
-import type { Coordinates } from '../src/locations.ts'
+import { createCourierAnimation } from '../src/components/tracking/map/courierAnimation.ts'
+import type { Coordinates } from '../src/domain/delivery/locations.ts'
 
 const origin: Coordinates = [-34.877, -8.063]
 const destination: Coordinates = [-34.912, -8.047]

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { getLocation, locations } from '../src/locations.ts'
+import { getLocation, locations } from '../src/domain/delivery/locations.ts'
 
 test('all supported delivery locations have coordinates', () => {
   assert.deepEqual(locations.map((location) => location.code), [
