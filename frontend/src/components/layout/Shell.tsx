@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { InstallAppPrompt } from './InstallAppPrompt'
 
 interface ShellProps {
   children: ReactNode
@@ -24,6 +25,7 @@ export function Shell({ children, eyebrow = 'Cartas que atravessam mundos', onHo
         <p className="eyebrow">{eyebrow}</p>
         {children}
       </main>
+      <InstallAppPrompt />
       <footer>
         Feito para transformar carinho em caminho.{' '}
         <a className="footer-link" href="/privacidade" onClick={(event) => { event.preventDefault(); onPrivacy() }}>

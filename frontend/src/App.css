@@ -345,3 +345,49 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
   .admin-page { width: min(100% - 2rem, 700px); padding-top: 1.25rem; }.admin-header { align-items: start; flex-direction: column; }.admin-actions { flex-wrap: wrap; }.admin-toolbar { grid-template-columns: 1fr; }.admin-delivery-actions { align-items: start; flex-wrap: wrap; justify-content: start; }.admin-links { align-items: start; flex-direction: column; }
   .admin-pagination { align-items: stretch; flex-direction: column; gap: .65rem; }.admin-pagination .button { width: 100%; }
 }
+
+.install-prompt {
+  position: fixed;
+  z-index: 10;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: max(1rem, env(safe-area-inset-left));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: .75rem;
+  width: min(100% - 2rem, 34rem);
+  margin: 0 auto;
+  padding: .8rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, .95);
+  box-shadow: 0 16px 38px rgba(32, 56, 68, .18);
+  backdrop-filter: blur(14px);
+}
+
+.install-prompt-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: .65rem;
+  color: var(--cream);
+  background: var(--coral);
+}
+
+.install-prompt strong { display: block; font-size: .8rem; }
+.install-prompt p { margin: .2rem 0 0; color: var(--muted); font-size: .7rem; line-height: 1.35; }
+.install-prompt .button { padding: .6rem .8rem; font-size: .75rem; white-space: nowrap; }
+.install-prompt-close { align-self: start; border: 0; padding: 0; color: var(--muted); background: transparent; cursor: pointer; font-size: 1.25rem; line-height: 1; }
+
+@media (max-width: 480px) {
+  .install-prompt { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .install-prompt .button { grid-column: 2 / -1; justify-self: start; }
+  .install-prompt-close { grid-column: 3; grid-row: 1; }
+}
+
+@media (display-mode: standalone) {
+  .topbar { padding-top: max(1.5rem, env(safe-area-inset-top)); }
+  footer { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+}

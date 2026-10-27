@@ -26,4 +26,5 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; background: radial-gradient(circle at 10% 5%, #e8eef1 0, transparent 28rem), radial-gradient(circle at 92% 88%, #eee8f7 0, transparent 24rem), var(--cream); }
+body { min-height: 100dvh; }
 button, input, select, textarea { font-family: inherit; }

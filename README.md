@@ -38,6 +38,10 @@ cd frontend && npm run dev
 
 A API ficará disponível em `http://localhost:8000` e o frontend em `http://localhost:5173`.
 
+## Uso no celular
+
+O frontend também funciona como um app instalável (PWA). Em produção, abra o endereço pelo navegador do celular e use “Adicionar à tela inicial” ou o aviso “Instalar” exibido pela Cartopia. O app mantém o shell visual disponível offline, mas as operações de criação, acompanhamento e abertura da mensagem continuam dependendo da API.
+
 ## Testes e validações
 
 ```bash
