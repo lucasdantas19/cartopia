@@ -28,7 +28,7 @@ interface CreateDeliveryFormProps {
 
 export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors, submitting, onSubmit, onFieldChange, onEndpointChange, onAdventureChange, onStepChange, onStepLocationChange, onAddStep, onRemoveStep, onMoveStep }: CreateDeliveryFormProps) {
   const formRef = useRef<HTMLFormElement>(null)
-  const [openSections, setOpenSections] = useState<FormSectionState>({ message: true, courier: false, adventure: true })
+  const [openSections, setOpenSections] = useState<FormSectionState>({ message: true, courier: false, adventure: false })
   const [courierSelected, setCourierSelected] = useState(false)
 
   useEffect(() => {
@@ -56,6 +56,12 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
       heading?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
       heading?.focus()
     })
+  }
+
+  function selectCourier(code: string) {
+    setCourierSelected(true)
+    onFieldChange('courier', code)
+    openSection('adventure')
   }
 
   function handleSectionKeyDown(event: KeyboardEvent<HTMLDivElement>, section: keyof typeof openSections) {
@@ -139,7 +145,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
         <div id="courier-section-content" className="courier-options" aria-describedby={fieldErrors.courier ? 'courier-error' : undefined}>
           {couriers.map((courier) => (
             <label className={`courier-option ${form.courier === courier.code ? 'selected' : ''}`} key={courier.code}>
-              <input type="radio" name="courier" value={courier.code} checked={form.courier === courier.code} onChange={() => { setCourierSelected(true); onFieldChange('courier', courier.code) }} />
+              <input type="radio" name="courier" value={courier.code} checked={form.courier === courier.code} onChange={() => selectCourier(courier.code)} />
               <img src={courier.cardAsset} alt="" aria-hidden="true" onError={handleCourierImageError} />
               <span>
                 <strong>{courier.label}</strong>
