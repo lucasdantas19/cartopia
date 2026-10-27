@@ -13,6 +13,7 @@ interface JourneyPassportProps {
   status: DeliveryStatus
   steps: DeliveryStep[]
   finalDurationMinutes: number | null
+  hiddenStepsCount: number
   now: number
 }
 
@@ -22,14 +23,15 @@ const stamps: Array<{ status: DeliveryStatus; label: string }> = [
   { status: 'DELIVERED', label: 'Entregue' },
 ]
 
-export function JourneyPassport({ publicId, originLabel, destinationLabel, courier, startsAt, arrivesAt, status, steps, finalDurationMinutes, now }: JourneyPassportProps) {
+export function JourneyPassport({ publicId, originLabel, destinationLabel, courier, startsAt, arrivesAt, status, steps, finalDurationMinutes, hiddenStepsCount, now }: JourneyPassportProps) {
   const courierOption = getCourier(courier)
   const activeStamp = stamps.findIndex((stamp) => stamp.status === status)
 
   return <section className="journey-passport" aria-label="Passaporte da mensagem">
     <div className="passport-heading"><div><p className="passport-kicker">Passaporte da mensagem</p><h2>Uma rota para guardar</h2></div><span className="passport-code">CP-{publicId.slice(0, 6).toUpperCase()}</span></div>
     <div className="passport-route"><div><span>Partida</span><strong>{originLabel}</strong></div><span className="passport-route-line" aria-hidden="true">✦ · · · · ✦</span><div className="passport-destination"><span>Destino</span><strong>{destinationLabel}</strong></div></div>
-    <p className="passport-narrative">{buildJourneyNarrative({ origin: originLabel, destination: destinationLabel, status, steps, currentStep: steps.length ? steps.findIndex((step) => now >= instant(step.starts_at) && now < instant(step.arrives_at)) : null })}</p>
+    <p className="passport-narrative">{buildJourneyNarrative({ origin: originLabel, destination: destinationLabel, status, steps, hiddenSteps: hiddenStepsCount, currentStep: steps.length ? steps.findIndex((step) => now >= instant(step.starts_at) && now < instant(step.arrives_at)) : null })}</p>
+    {hiddenStepsCount > 0 && <p className="passport-surprise" role="status">✦ {hiddenStepsCount === 1 ? 'Uma próxima etapa' : `${hiddenStepsCount} próximas etapas`} serão reveladas conforme a viagem continuar.</p>}
     {steps.length > 0 && <div className="passport-steps" aria-label="Capítulos da aventura">{steps.map((step, index) => {
       const completed = now >= instant(step.arrives_at)
       const current = now >= instant(step.starts_at) && !completed

@@ -28,6 +28,7 @@ class StoreDeliveryRequest extends FormRequest
             'destination_location.label' => ['required_with:destination_location', 'string', 'max:160'],
             'destination_location.latitude' => ['required_with:destination_location', 'numeric', 'between:-90,90'],
             'destination_location.longitude' => ['required_with:destination_location', 'numeric', 'between:-180,180'],
+            'route_visibility' => ['sometimes', 'string', Rule::in(['full', 'progressive'])],
             'courier' => ['sometimes', 'string', Rule::in(config('deliveries.couriers'))],
             'duration_minutes' => [
                 'required_without_all:legs,steps',

@@ -2,6 +2,7 @@
 export type DeliveryStatus = 'SCHEDULED' | 'IN_TRANSIT' | 'DELIVERED'
 export type AccessRole = 'sender' | 'recipient'
 export type CourierCode = 'paper-swallow' | 'postal-cat' | 'little-dragon'
+export type RouteVisibility = 'full' | 'progressive'
 export interface DeliveryLocationValue {
   label: string
   latitude: number
@@ -46,6 +47,8 @@ export interface Delivery {
   destination_location: DeliveryLocationValue | null
   route_legs: DeliveryRouteLeg[]
   steps: DeliveryStep[]
+  route_visibility: RouteVisibility
+  hidden_steps_count: number
   current_step: number | null
   courier: string
   starts_at: string
@@ -69,6 +72,7 @@ export interface CreateDeliveryInput {
   final_duration_minutes: number
   legs?: CreateDeliveryLeg[]
   steps?: CreateDeliveryStep[]
+  route_visibility: RouteVisibility
   courier: CourierCode
 }
 

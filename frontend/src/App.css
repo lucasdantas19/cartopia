@@ -6,6 +6,9 @@
 .route-legs > .text-button { margin-top: .2rem; }
 .passport-stops { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: 1rem; color: var(--muted); font-size: .78rem; }
 .passport-narrative { margin: 1rem 0 0; padding: .9rem 1rem; border-left: 3px solid var(--coral); border-radius: 0 .7rem .7rem 0; color: var(--ink); background: rgba(240,236,250,.58); font: 1rem/1.5 var(--display); }
+.passport-surprise { margin: .6rem 0 0; color: var(--coral); font-size: .78rem; font-weight: 700; }
+.journey-visibility { display: grid; gap: .65rem; margin: 1.2rem 0 0; padding: 0; border: 0; }
+.journey-visibility legend { margin-bottom: .25rem; color: var(--ink); font: 700 1.05rem var(--display); }
 .passport-stops span { margin-right: .25rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .passport-stops strong { padding: .3rem .55rem; border: 1px solid rgba(228, 218, 204, .9); border-radius: 999px; color: var(--ink); font-weight: 600; }
 .passport-steps { display: grid; gap: .7rem; margin-top: 1.25rem; }
@@ -261,6 +264,7 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .delivery-map-wrapper { position: relative; min-height: 18rem; margin: 1rem 0 2.2rem; overflow: hidden; border: 1px solid var(--line); border-radius: 1.2rem; background: #dcebee; box-shadow: 0 12px 30px rgba(32, 56, 68, .1); }
 .delivery-map-recenter { position: absolute; z-index: 2; top: .75rem; left: .75rem; padding: .55rem .75rem; border: 1px solid var(--line); border-radius: .55rem; color: var(--ink); background: rgba(255, 250, 240, .94); box-shadow: 0 3px 10px rgba(47, 56, 54, .14); cursor: pointer; font: 700 .72rem var(--body); }
 .delivery-map-recenter:hover { background: var(--cream); }
+.delivery-map-surprise { position: absolute; z-index: 2; right: .75rem; bottom: .75rem; max-width: 15rem; margin: 0; padding: .55rem .7rem; border-radius: .55rem; color: var(--ink); background: rgba(255, 250, 240, .94); font: 700 .72rem var(--body); box-shadow: 0 3px 10px rgba(47, 56, 54, .14); }
 .delivery-map { min-height: 18rem; }
 .delivery-map-fallback { position: absolute; inset: 1rem auto auto 1rem; max-width: 20rem; margin: 0; padding: .7rem .9rem; border-radius: .6rem; color: var(--ink); background: rgba(255, 250, 240, .92); font-size: .82rem; box-shadow: 0 4px 16px rgba(47, 56, 54, .12); }
 .delivery-map-marker { width: 1.15rem; height: 1.15rem; border: 3px solid var(--cream); border-radius: 50% 50% 50% 0; box-shadow: 0 2px 8px rgba(47, 56, 54, .35); transform: rotate(-45deg); }

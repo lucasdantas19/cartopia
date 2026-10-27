@@ -22,6 +22,7 @@ export function DeliverySummary({ form }: DeliverySummaryProps) {
       <div><span>Rota</span><strong>{origin.label} → {destination.label}</strong></div>
       <div><span>Duração</span><strong>{totalDuration || '—'} {totalDuration ? 'minutos' : ''}</strong></div>
       {form.steps?.length ? <div><span>Paradas</span><strong>{form.steps.length}</strong></div> : null}
+      {form.steps?.length ? <div><span>Visibilidade</span><strong>{form.route_visibility === 'progressive' ? 'Por etapas' : 'Trajeto completo'}</strong></div> : null}
     </div>
     <div className="summary-route" aria-label="Resumo do percurso">
       <div className="summary-route-point start"><span /> <strong>{origin.label}</strong></div>

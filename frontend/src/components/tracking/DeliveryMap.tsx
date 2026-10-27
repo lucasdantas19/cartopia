@@ -20,6 +20,7 @@ interface DeliveryMapProps {
   destination: Omit<DeliveryLocation, 'code'> & { code: string }
   stops?: Array<Omit<DeliveryLocation, 'code'> & { code: string; arrivesAt?: string }>
   routeLegs?: DeliveryRouteLeg[]
+  hiddenStepsCount?: number
   courier: string
   startsAt: string
   arrivesAt: string
@@ -54,7 +55,7 @@ function createCourierElement(courier: string): HTMLDivElement {
   return element
 }
 
-export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], courier, startsAt, arrivesAt }: DeliveryMapProps) {
+export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], hiddenStepsCount = 0, courier, startsAt, arrivesAt }: DeliveryMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const markersRef = useRef<Marker[]>([])
@@ -226,6 +227,7 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], c
   return <div className="delivery-map-wrapper">
     <div ref={containerRef} className="delivery-map" aria-label={`Mapa da rota entre ${origin.label} e ${destination.label}`} />
     <button type="button" className="delivery-map-recenter" onClick={recenterRoute}>Centralizar rota</button>
+    {hiddenStepsCount > 0 && <p className="delivery-map-surprise" role="status">✦ O restante do caminho é surpresa.</p>}
     {mapError && <p className="delivery-map-fallback" role="status">O mapa não pôde ser carregado, mas o acompanhamento continua disponível.</p>}
   </div>
 }

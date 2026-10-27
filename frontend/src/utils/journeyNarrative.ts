@@ -6,6 +6,7 @@ interface JourneyNarrativeInput {
   status: DeliveryStatus
   steps: DeliveryStep[]
   currentStep: number | null
+  hiddenSteps?: number
 }
 
 function joinStops(stops: string[]): string {
@@ -14,7 +15,7 @@ function joinStops(stops: string[]): string {
   return `${stops.slice(0, -1).join(', ')} e ${stops.at(-1)}`
 }
 
-export function buildJourneyNarrative({ origin, destination, status, steps, currentStep }: JourneyNarrativeInput): string {
+export function buildJourneyNarrative({ origin, destination, status, steps, currentStep, hiddenSteps = 0 }: JourneyNarrativeInput): string {
   if (!steps.length) {
     if (status === 'DELIVERED') return `A mensagem partiu de ${origin} e chegou ao seu destino: ${destination}.`
     if (status === 'IN_TRANSIT') return `A mensagem deixou ${origin} e está a caminho de ${destination}.`
@@ -25,6 +26,7 @@ export function buildJourneyNarrative({ origin, destination, status, steps, curr
   if (status === 'DELIVERED') return `A mensagem partiu de ${origin}, passou por ${joinStops(stopLabels)} e chegou a ${destination}.`
 
   const current = currentStep !== null && steps[currentStep]
-  if (current) return `A mensagem partiu de ${origin} e agora vive este capítulo: ${current.title}. Depois, seguirá para ${destination}.`
+  if (current) return `A mensagem partiu de ${origin} e agora vive este capítulo: ${current.title}. Depois, seguirá para ${destination}${hiddenSteps ? `, com ${hiddenSteps} surpresa${hiddenSteps === 1 ? '' : 's'} ainda pelo caminho` : ''}.`
+  if (hiddenSteps) return `A mensagem partirá de ${origin}, fará uma pausa pelo caminho e seguirá até ${destination}. As próximas etapas serão reveladas durante a viagem.`
   return `A mensagem partirá de ${origin}, fará uma pausa em ${joinStops(stopLabels)} e seguirá até ${destination}.`
 }

@@ -108,6 +108,60 @@ it('creates an automatic narrative with timed steps and an optional location', f
         ->assertJsonPath('data.current_step', 0);
 });
 
+it('reveals progressive adventure steps only as the delivery advances to the recipient', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:20:00', 'UTC'));
+
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'steps' => [
+            ['title' => 'Primeira surpresa', 'duration_minutes' => 10],
+            ['title' => 'Segunda surpresa', 'duration_minutes' => 20],
+        ],
+        'final_duration_minutes' => 10,
+        'route_visibility' => 'progressive',
+    ]))->assertCreated();
+
+    $recipientToken = $response->json('recipient_access_token');
+    $senderToken = $response->json('sender_access_token');
+    $publicId = $response->json('data.public_id');
+
+    $this->withToken($recipientToken)
+        ->getJson('/api/deliveries/'.$publicId)
+        ->assertOk()
+        ->assertJsonPath('data.route_visibility', 'progressive')
+        ->assertJsonPath('data.hidden_steps_count', 1)
+        ->assertJsonCount(1, 'data.steps')
+        ->assertJsonCount(1, 'data.route_legs')
+        ->assertJsonPath('data.steps.0.title', 'Primeira surpresa');
+
+    $this->withToken($senderToken)
+        ->getJson('/api/deliveries/'.$publicId)
+        ->assertOk()
+        ->assertJsonPath('data.hidden_steps_count', 0)
+        ->assertJsonCount(2, 'data.steps');
+
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:31:00', 'UTC'));
+    $this->withToken($recipientToken)
+        ->getJson('/api/deliveries/'.$publicId)
+        ->assertOk()
+        ->assertJsonPath('data.hidden_steps_count', 0)
+        ->assertJsonCount(2, 'data.steps');
+});
+
+it('uses the complete route visibility by default', function () {
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'steps' => [['title' => 'Parada aberta', 'duration_minutes' => 10]],
+        'final_duration_minutes' => 10,
+    ]))->assertCreated();
+
+    expect($response->json('data.route_visibility'))->toBe('full');
+});
+
+it('rejects an unknown route visibility mode', function () {
+    $this->postJson('/api/deliveries', deliveryPayload(['route_visibility' => 'hidden']))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('route_visibility');
+});
+
 it('accepts real custom locations for the origin and destination', function () {
     $response = $this->postJson('/api/deliveries', deliveryPayload([
         'origin' => 'Casa de Lucas',

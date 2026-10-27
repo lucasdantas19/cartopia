@@ -18,8 +18,10 @@ class CreateDelivery
         $durationMinutes = $attributes['duration_minutes'] ?? null;
         $finalDurationMinutes = $attributes['final_duration_minutes'] ?? null;
         $courier = $attributes['courier'] ?? config('deliveries.couriers.0');
+        $routeVisibility = $attributes['route_visibility'] ?? 'full';
         unset($attributes['duration_minutes']);
         unset($attributes['final_duration_minutes']);
+        unset($attributes['route_visibility']);
 
         if (isset($attributes['origin_location'])) {
             $attributes['origin'] = $attributes['origin_location']['label'];
@@ -87,6 +89,7 @@ class CreateDelivery
             'arrives_at' => $arrivesAt,
             'final_duration_minutes' => $finalDurationMinutes,
             'route_steps' => $hasNarrativeSteps ? $routeSteps : [],
+            'route_visibility' => $routeVisibility,
             'route_legs' => $routeLegs ?: null,
             'access_token_hash' => hash('sha256', $recipientAccessToken),
             'sender_access_token_hash' => hash('sha256', $senderAccessToken),

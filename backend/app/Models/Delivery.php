@@ -19,6 +19,7 @@ class Delivery extends Model
         'destination_location',
         'route_legs',
         'route_steps',
+        'route_visibility',
         'courier',
         'starts_at',
         'arrives_at',
@@ -37,6 +38,7 @@ class Delivery extends Model
             'opened_at' => 'immutable_datetime:UTC',
             'route_legs' => 'array',
             'route_steps' => 'array',
+            'route_visibility' => 'string',
             'origin_location' => 'array',
             'destination_location' => 'array',
         ];

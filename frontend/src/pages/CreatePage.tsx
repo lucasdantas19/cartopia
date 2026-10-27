@@ -26,7 +26,7 @@ interface CreatedDelivery {
 const initialForm: CreateDeliveryInput = {
   message: '', sender_name: '', recipient_name: '', origin: '', origin_location: null,
   destination: '', destination_location: null, duration_minutes: 60, courier: 'paper-swallow',
-  final_duration_minutes: 30, steps: [],
+  final_duration_minutes: 30, steps: [], route_visibility: 'full',
 }
 
 function newStep(): CreateDeliveryStep {
