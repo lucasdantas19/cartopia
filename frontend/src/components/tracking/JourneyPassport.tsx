@@ -1,6 +1,7 @@
 import { getCourier } from '../../domain/delivery/couriers'
 import type { DeliveryStep, DeliveryStatus } from '../../domain/delivery/types'
 import { instant, formatLocalDate } from '../../utils/dateTime'
+import { buildJourneyNarrative } from '../../utils/journeyNarrative'
 
 interface JourneyPassportProps {
   publicId: string
@@ -28,6 +29,7 @@ export function JourneyPassport({ publicId, originLabel, destinationLabel, couri
   return <section className="journey-passport" aria-label="Passaporte da mensagem">
     <div className="passport-heading"><div><p className="passport-kicker">Passaporte da mensagem</p><h2>Uma rota para guardar</h2></div><span className="passport-code">CP-{publicId.slice(0, 6).toUpperCase()}</span></div>
     <div className="passport-route"><div><span>Partida</span><strong>{originLabel}</strong></div><span className="passport-route-line" aria-hidden="true">✦ · · · · ✦</span><div className="passport-destination"><span>Destino</span><strong>{destinationLabel}</strong></div></div>
+    <p className="passport-narrative">{buildJourneyNarrative({ origin: originLabel, destination: destinationLabel, status, steps, currentStep: steps.length ? steps.findIndex((step) => now >= instant(step.starts_at) && now < instant(step.arrives_at)) : null })}</p>
     {steps.length > 0 && <div className="passport-steps" aria-label="Capítulos da aventura">{steps.map((step, index) => {
       const completed = now >= instant(step.arrives_at)
       const current = now >= instant(step.starts_at) && !completed

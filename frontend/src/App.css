@@ -5,6 +5,7 @@
 .route-leg .text-button, .route-legs > .text-button { justify-self: start; border: 0; padding: 0; color: var(--coral); background: none; cursor: pointer; font: inherit; font-size: .75rem; }
 .route-legs > .text-button { margin-top: .2rem; }
 .passport-stops { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: 1rem; color: var(--muted); font-size: .78rem; }
+.passport-narrative { margin: 1rem 0 0; padding: .9rem 1rem; border-left: 3px solid var(--coral); border-radius: 0 .7rem .7rem 0; color: var(--ink); background: rgba(240,236,250,.58); font: 1rem/1.5 var(--display); }
 .passport-stops span { margin-right: .25rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .passport-stops strong { padding: .3rem .55rem; border: 1px solid rgba(228, 218, 204, .9); border-radius: 999px; color: var(--ink); font-weight: 600; }
 .passport-steps { display: grid; gap: .7rem; margin-top: 1.25rem; }
