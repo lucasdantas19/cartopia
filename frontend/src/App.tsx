@@ -3,6 +3,7 @@ import { CreatePage } from './pages/CreatePage'
 import { PrivacyPageShell } from './pages/PrivacyPageShell'
 import { TrackingPage } from './pages/TrackingPage'
 import { AdminPage } from './pages/AdminPage'
+import type { AccessRole } from './domain/delivery/types'
 import './App.css'
 
 type Route = { page: 'create' } | { page: 'tracking'; publicId: string } | { page: 'privacy' } | { page: 'admin' }
@@ -45,7 +46,7 @@ function App() {
 
   return (
     <CreatePage
-      onTrack={(publicId, token) => navigate(`/d/${publicId}#token=${encodeURIComponent(token)}`)}
+      onTrack={(publicId, token, role: AccessRole = 'recipient') => navigate(`/d/${publicId}#token=${encodeURIComponent(token)}${role === 'sender' ? '&role=sender' : ''}`)}
       onHome={onHome}
       onPrivacy={onPrivacy}
     />
