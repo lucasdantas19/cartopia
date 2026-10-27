@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ApiError, createDelivery } from '../services/api'
 import { createShareUrl } from '../services/accessToken'
@@ -24,6 +24,30 @@ interface CreatedDelivery {
   senderToken: string
 }
 
+const createdDeliveryStorageKey = 'cartopia.created_delivery'
+
+function readCreatedDelivery(): CreatedDelivery | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const stored = window.sessionStorage.getItem(createdDeliveryStorageKey)
+    if (!stored) return null
+
+    const value = JSON.parse(stored) as Partial<CreatedDelivery>
+    if (
+      typeof value.publicId !== 'string' ||
+      typeof value.recipientUrl !== 'string' ||
+      typeof value.senderUrl !== 'string' ||
+      typeof value.recipientToken !== 'string' ||
+      typeof value.senderToken !== 'string'
+    ) return null
+
+    return value as CreatedDelivery
+  } catch {
+    return null
+  }
+}
+
 const initialForm: CreateDeliveryInput = {
   message: '', sender_name: '', recipient_name: '', origin: '', origin_location: null,
   destination: '', destination_location: null, duration_minutes: 60, courier: 'paper-swallow',
@@ -42,9 +66,17 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
   const [adventureEnabled, setAdventureEnabled] = useState(false)
   const [showSummary, setShowSummary] = useState(true)
   const [showFirstUseGuide, setShowFirstUseGuide] = useState(() => shouldShowFirstUseGuide(window.localStorage.getItem(firstUseGuideStorageKey)))
-  const [created, setCreated] = useState<CreatedDelivery | null>(null)
+  const [created, setCreated] = useState<CreatedDelivery | null>(readCreatedDelivery)
   const [copied, setCopied] = useState<AccessRole | null>(null)
   const [copyError, setCopyError] = useState<AccessRole | null>(null)
+
+  useEffect(() => {
+    if (created) {
+      window.sessionStorage.setItem(createdDeliveryStorageKey, JSON.stringify(created))
+    } else {
+      window.sessionStorage.removeItem(createdDeliveryStorageKey)
+    }
+  }, [created])
 
   function updateField(field: keyof CreateDeliveryInput, value: string | number) {
     setForm((current) => ({ ...current, [field]: value }))
