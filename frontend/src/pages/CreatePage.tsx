@@ -203,7 +203,24 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
     if (adventureEnabled && !form.steps?.length) { setError('Adicione pelo menos uma parada para criar uma aventura.'); return }
     setSubmitting(true)
     try {
-      const response = await createDelivery({ ...form, sender_name: form.sender_name?.trim() || undefined, duration_minutes: Number(form.duration_minutes), final_duration_minutes: Number(form.final_duration_minutes), steps: adventureEnabled ? form.steps?.map(({ id: _id, ...step }) => ({ ...step, title: step.title.trim(), description: step.description?.trim() || undefined, duration_minutes: Number(step.duration_minutes) })) : undefined })
+      const { steps: _steps, legs: _legs, ...directForm } = form
+      const input: CreateDeliveryInput = adventureEnabled
+        ? {
+            ...form,
+            steps: form.steps?.map(({ id: _id, ...step }) => ({
+              ...step,
+              title: step.title.trim(),
+              description: step.description?.trim() || undefined,
+              duration_minutes: Number(step.duration_minutes),
+            })),
+          }
+        : directForm
+      const response = await createDelivery({
+        ...input,
+        sender_name: form.sender_name?.trim() || undefined,
+        duration_minutes: Number(form.duration_minutes),
+        final_duration_minutes: Number(form.final_duration_minutes),
+      })
       const recipientToken = response.recipient_access_token ?? response.access_token
       setCreated({ publicId: response.data.public_id, recipientUrl: createShareUrl(window.location.origin, response.data.public_id, recipientToken), senderUrl: createShareUrl(window.location.origin, response.data.public_id, response.sender_access_token, 'sender'), recipientToken, senderToken: response.sender_access_token })
     } catch (caught) {

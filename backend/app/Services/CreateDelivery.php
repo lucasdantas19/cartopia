@@ -30,20 +30,18 @@ class CreateDelivery
             $attributes['destination'] = $attributes['destination_location']['label'];
         }
 
-        $hasNarrativeSteps = array_key_exists('steps', $attributes) || array_key_exists('legs', $attributes);
+        $hasNarrativeSteps = ! empty($attributes['steps'] ?? null) || ! empty($attributes['legs'] ?? null);
         $steps = $attributes['steps'] ?? null;
         $legs = $attributes['legs'] ?? null;
-        if ($steps === null) {
+        if ($steps === null && $hasNarrativeSteps) {
             $steps = array_map(fn (array $leg): array => [
                 'title' => 'A caminho de '.$leg['destination'],
                 'description' => null,
                 'location' => null,
                 'duration_minutes' => $leg['duration_minutes'],
-            ], $legs ?? [[
-                'destination' => $attributes['destination'],
-                'duration_minutes' => $durationMinutes,
-            ]]);
+            ], $legs);
         }
+        $steps ??= [];
         unset($attributes['legs']);
         unset($attributes['steps']);
 
@@ -79,8 +77,12 @@ class CreateDelivery
             }
         }
 
-        $finalDurationMinutes ??= $hasNarrativeSteps ? 0 : $durationMinutes;
-        $arrivesAt = $hasNarrativeSteps ? $legStartsAt->addMinutes($finalDurationMinutes) : $legStartsAt;
+        $finalDurationMinutes = $hasNarrativeSteps
+            ? ($finalDurationMinutes ?? 0)
+            : $durationMinutes;
+        $arrivesAt = $hasNarrativeSteps
+            ? $legStartsAt->addMinutes($finalDurationMinutes)
+            : $startsAt->addMinutes($durationMinutes);
 
         $delivery = Delivery::create([
             ...$attributes,

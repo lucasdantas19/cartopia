@@ -40,7 +40,7 @@ class StoreDeliveryRequest extends FormRequest
             'legs' => ['sometimes', 'array', 'min:1', 'max:8'],
             'legs.*.destination' => ['required', 'string', Rule::in(config('deliveries.destinations'))],
             'legs.*.duration_minutes' => ['required', 'integer', 'min:1', 'max:'.config('deliveries.max_duration_minutes')],
-            'steps' => ['sometimes', 'array', 'min:1', 'max:12'],
+            'steps' => ['sometimes', 'array', 'max:12'],
             'steps.*.title' => ['required', 'string', 'max:120'],
             'steps.*.description' => ['nullable', 'string', 'max:500'],
             'steps.*.duration_minutes' => ['required', 'integer', 'min:1', 'max:'.config('deliveries.max_duration_minutes')],
@@ -54,7 +54,18 @@ class StoreDeliveryRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator): void {
-            if ($this->input('origin') === $this->input('destination') && ! $this->has('origin_location') && ! $this->has('destination_location')) {
+            $originLocation = $this->input('origin_location');
+            $destinationLocation = $this->input('destination_location');
+            $sameCoordinates = is_array($originLocation)
+                && is_array($destinationLocation)
+                && (float) ($originLocation['latitude'] ?? null) === (float) ($destinationLocation['latitude'] ?? null)
+                && (float) ($originLocation['longitude'] ?? null) === (float) ($destinationLocation['longitude'] ?? null);
+            $sameEndpointLabels = $this->input('origin') === $this->input('destination');
+            $hasDifferentCustomEndpoints = is_array($originLocation)
+                && is_array($destinationLocation)
+                && ! $sameCoordinates;
+
+            if (($sameEndpointLabels && ! $hasDifferentCustomEndpoints) || $sameCoordinates) {
                 $validator->errors()->add('destination', 'A origem e o destino devem ser diferentes.');
             }
             $steps = $this->input('steps');

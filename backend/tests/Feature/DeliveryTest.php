@@ -62,6 +62,20 @@ it('keeps a five-minute delivery five minutes apart in UTC', function () {
         ->and(Delivery::first()->starts_at->diffInSeconds(Delivery::first()->arrives_at))->toEqual(300);
 });
 
+it('creates a direct delivery when the steps array is empty', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
+
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'steps' => [],
+        'final_duration_minutes' => 30,
+    ]));
+
+    $response->assertCreated()
+        ->assertJsonCount(0, 'data.steps')
+        ->assertJsonPath('data.final_duration_minutes', 60)
+        ->assertJsonPath('data.arrives_at', '2026-10-21T16:00:00.000000Z');
+});
+
 it('creates an adventure with sequential route legs', function () {
     CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
 
@@ -176,6 +190,20 @@ it('accepts real custom locations for the origin and destination', function () {
         ->assertJsonPath('data.origin_location.latitude', -8.0472)
         ->assertJsonPath('data.destination', 'Keukenhof')
         ->assertJsonPath('data.destination_location.longitude', 4.5331);
+});
+
+it('accepts custom endpoints with the same generated label when coordinates differ', function () {
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'origin' => 'Ponto escolhido no mapa',
+        'origin_location' => ['label' => 'Ponto escolhido no mapa', 'latitude' => -8.30767396619585, 'longitude' => -34.8998],
+        'destination' => 'Ponto escolhido no mapa',
+        'destination_location' => ['label' => 'Ponto escolhido no mapa', 'latitude' => 0.2925015259327495, 'longitude' => -34.8998],
+        'duration_minutes' => 1,
+    ]));
+
+    $response->assertCreated()
+        ->assertJsonPath('data.origin_location.label', 'Ponto escolhido no mapa')
+        ->assertJsonPath('data.destination_location.label', 'Ponto escolhido no mapa');
 });
 
 it('rejects route legs whose final stop differs from the delivery destination', function () {

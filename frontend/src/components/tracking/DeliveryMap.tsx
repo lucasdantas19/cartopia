@@ -165,7 +165,11 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], h
       },
     })
     animationRef.current.start()
-    fitRoute(map)
+
+    // O acompanhamento atualiza o componente periodicamente. Não devemos
+    // reposicionar o mapa a cada atualização, pois isso sobrescreve o zoom e
+    // o deslocamento escolhidos pelo usuário.
+    if (shouldFitRoute(hasFittedRouteRef.current)) fitRoute(map)
   }, [fitRoute])
 
   useEffect(() => {
