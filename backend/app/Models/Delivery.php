@@ -90,21 +90,7 @@ class Delivery extends Model
     /** @return array<int, array<string, mixed>> */
     public function routeSteps(): array
     {
-        if ($this->route_steps !== null) {
-            return $this->route_steps;
-        }
-
-        return array_map(fn (array $leg): array => [
-            'title' => 'A caminho de '.$leg['destination'],
-            'description' => null,
-            'location' => null,
-            'starts_at' => $leg['starts_at'],
-            'arrives_at' => $leg['arrives_at'],
-        ], $this->route_legs ?: [[
-            'destination' => $this->destination,
-            'starts_at' => $this->starts_at,
-            'arrives_at' => $this->arrives_at,
-        ]]);
+        return $this->route_steps ?? [];
     }
 
     public function currentStepIndex(): ?int
