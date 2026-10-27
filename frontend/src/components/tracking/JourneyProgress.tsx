@@ -22,7 +22,15 @@ export function JourneyProgress({ originLabel, destinationLabel, progress, couri
         <span>{progress}% da jornada</span>
         <span>{destinationLabel}</span>
       </div>
-      <div className="journey-line" aria-label={`Progresso da viagem: ${progress}%`}>
+      <div
+        className="journey-line"
+        role="progressbar"
+        aria-label="Progresso da viagem"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress}
+        aria-valuetext={`${progress}% da jornada`}
+      >
         <span className="journey-fill" style={{ width: `${progress}%` }} />
         <span className="courier-icon" style={{ left: `${progress}%`, transform: progressMarkerTransform(progress) }}>
           <img src={courierOption.iconAsset} alt="" aria-hidden="true" onError={handleCourierImageError} />
