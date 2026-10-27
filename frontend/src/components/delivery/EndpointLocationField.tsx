@@ -15,6 +15,6 @@ export function EndpointLocationField({ label, location, fallback, onChange }: E
   return <div className="endpoint-location-field">
     <label>{label}</label>
     <div className="endpoint-location-current"><strong>{location?.label ?? `Escolha ${label.toLowerCase()}`}</strong></div>
-    <LocationPicker center={center} location={location ?? undefined} onChange={(value) => { if (value.latitude !== undefined && value.longitude !== undefined) onChange({ label: value.label, latitude: value.latitude, longitude: value.longitude }) }} onClear={() => onChange({ label: fallback.label, latitude: fallback.coordinates[1], longitude: fallback.coordinates[0] })} />
+    <LocationPicker center={center} location={location ?? undefined} clearLabel="restaurar local sugerido" onChange={(value) => { if (value.latitude !== undefined && value.longitude !== undefined) onChange({ label: value.label, latitude: value.latitude, longitude: value.longitude }) }} onClear={() => onChange({ label: fallback.label, latitude: fallback.coordinates[1], longitude: fallback.coordinates[0] })} />
   </div>
 }

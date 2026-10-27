@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Map, Marker, NavigationControl, setWorkerUrl } from 'maplibre-gl'
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import type { Coordinates } from '../../domain/delivery/locations'
@@ -16,6 +16,7 @@ interface LocationPickerProps {
   onChange: (location: NonNullable<CreateDeliveryStep['location']>) => void
   onClear: () => void
   openByDefault?: boolean
+  clearLabel?: string
 }
 
 interface MapboxFeature {
@@ -26,7 +27,8 @@ interface MapboxFeature {
   geometry?: { coordinates?: [number, number] }
 }
 
-export function LocationPicker({ center, location, onChange, onClear, openByDefault = false }: LocationPickerProps) {
+export function LocationPicker({ center, location, onChange, onClear, openByDefault = false, clearLabel = 'remover localização' }: LocationPickerProps) {
+  const searchId = useId()
   const [open, setOpen] = useState(Boolean(location) && openByDefault)
   const [mapError, setMapError] = useState(false)
   const [mapReady, setMapReady] = useState(false)
@@ -105,7 +107,7 @@ export function LocationPicker({ center, location, onChange, onClear, openByDefa
     const query = search.trim().replaceAll(';', '')
     const token = resolveMapboxAccessToken(import.meta.env)
     if (!token) {
-      setSearchError('Configure VITE_MAPBOX_ACCESS_TOKEN para pesquisar lugares.')
+      setSearchError('A pesquisa de lugares não está disponível agora. Escolha o ponto diretamente no mapa.')
       return
     }
     if (query.length < 3) {
@@ -150,15 +152,15 @@ export function LocationPicker({ center, location, onChange, onClear, openByDefa
 
   return <div className="location-picker">
     <div className="location-search" role="search">
-      <label htmlFor="location-search">Pesquisar lugar ou endereço</label>
-      <div className="location-search-row"><input id="location-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchPlaces() } }} placeholder="Ex.: Keukenhof, Paris" /><button type="button" className="button secondary" onClick={() => { void searchPlaces() }} disabled={searching}>{searching ? 'Buscando…' : 'Buscar'}</button></div>
+      <label htmlFor={searchId}>Pesquisar lugar ou endereço</label>
+      <div className="location-search-row"><input id={searchId} value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchPlaces() } }} placeholder="Ex.: Keukenhof, Paris" /><button type="button" className="button secondary" onClick={() => { void searchPlaces() }} disabled={searching}>{searching ? 'Buscando…' : 'Buscar'}</button></div>
       {results.length > 0 && <div className="location-search-results" role="listbox" aria-label="Resultados da busca">{results.map((result, index) => <button type="button" role="option" key={result.id ?? index} onClick={() => selectSearchResult(result)}>{result.properties?.full_address || result.properties?.name || result.place_name || result.text}</button>)}</div>}
       {searchError && <small className="location-picker-error" role="status">{searchError}</small>}
     </div>
     <div className="location-picker-map-shell"><div ref={containerRef} className="location-picker-map" aria-label="Mapa para escolher a localização da etapa" />{!mapReady && !mapError && <p className="location-picker-status" role="status">Carregando mapa…</p>}{mapError && <p className="location-picker-status error" role="status">Não foi possível carregar o mapa. Você ainda pode pesquisar um lugar acima.</p>}</div>
     <div className="location-picker-fields">
       <input aria-label="Nome da localização" value={location?.label ?? ''} placeholder="Nome do lugar ou momento" onChange={(event) => onChange({ label: event.target.value, latitude: location?.latitude, longitude: location?.longitude })} />
-      {location && <button type="button" className="text-button" onClick={() => { setOpen(false); onClear() }}>remover localização</button>}
+      {location && <button type="button" className="text-button" onClick={() => { setOpen(false); onClear() }}>{clearLabel}</button>}
     </div>
   </div>
 }
