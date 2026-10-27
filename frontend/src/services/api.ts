@@ -4,6 +4,7 @@ import type {
   Delivery,
   DeliveryMessage,
   ApiErrorPayload,
+  AdminDeliverySummary,
 } from '../domain/delivery/types'
 import { resolveApiBaseUrl } from '../config/runtimeConfig.ts'
 
@@ -62,4 +63,24 @@ export function openDeliveryMessage(publicId: string, token: string) {
   return request<{ data: DeliveryMessage }>(`/deliveries/${encodeURIComponent(publicId)}/message`, {
     headers: { Authorization: `Bearer ${token}` },
   })
+}
+
+function adminHeaders(token: string): HeadersInit {
+  return { Authorization: `Bearer ${token}` }
+}
+
+export function fetchAdminDeliveries(token: string, query = '', status = '', page = 1) {
+  const params = new URLSearchParams()
+  if (query.trim()) params.set('q', query.trim())
+  if (status) params.set('status', status)
+  params.set('page', String(page))
+  return request<{ data: AdminDeliverySummary[]; meta: { total: number; per_page: number; current_page: number; last_page: number } }>(`/admin/deliveries?${params}`, { headers: adminHeaders(token) })
+}
+
+export function regenerateAdminLinks(publicId: string, token: string) {
+  return request<{ data: { recipient_path: string; sender_path: string } }>(`/admin/deliveries/${encodeURIComponent(publicId)}/regenerate-links`, { method: 'POST', headers: adminHeaders(token) })
+}
+
+export function deleteAdminDelivery(publicId: string, token: string) {
+  return request<{ data: { deleted: boolean } }>(`/admin/deliveries/${encodeURIComponent(publicId)}`, { method: 'DELETE', headers: adminHeaders(token) })
 }

@@ -86,6 +86,21 @@ export interface CreateDeliveryResponse {
   sender_tracking_path: string
 }
 
+export interface AdminDeliverySummary {
+  public_id: string
+  recipient_name: string
+  sender_name: string | null
+  origin: string
+  destination: string
+  status: DeliveryStatus
+  progress: number
+  starts_at: string
+  arrives_at: string
+  steps_count: number
+  route_visibility: RouteVisibility
+  created_at: string
+}
+
 export interface DeliveryMessage {
   public_id: string
   message: string

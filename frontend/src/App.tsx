@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react'
 import { CreatePage } from './pages/CreatePage'
 import { PrivacyPageShell } from './pages/PrivacyPageShell'
 import { TrackingPage } from './pages/TrackingPage'
+import { AdminPage } from './pages/AdminPage'
 import './App.css'
 
-type Route = { page: 'create' } | { page: 'tracking'; publicId: string } | { page: 'privacy' }
+type Route = { page: 'create' } | { page: 'tracking'; publicId: string } | { page: 'privacy' } | { page: 'admin' }
 
 function routeFromLocation(): Route {
   const match = window.location.pathname.match(/^\/d\/([^/]+)$/)
   if (window.location.pathname === '/privacidade') return { page: 'privacy' }
+  if (window.location.pathname === '/admin') return { page: 'admin' }
   return match ? { page: 'tracking', publicId: decodeURIComponent(match[1]) } : { page: 'create' }
 }
 
@@ -31,6 +33,7 @@ function App() {
 
   if (route.page === 'tracking') return <TrackingPage publicId={route.publicId} onHome={onHome} onPrivacy={onPrivacy} />
   if (route.page === 'privacy') return <PrivacyPageShell onHome={onHome} onPrivacy={onPrivacy} />
+  if (route.page === 'admin') return <AdminPage onHome={onHome} />
   return <CreatePage onTrack={(publicId, token) => navigate(`/d/${publicId}#token=${encodeURIComponent(token)}`)} onHome={onHome} onPrivacy={onPrivacy} />
 }
 
