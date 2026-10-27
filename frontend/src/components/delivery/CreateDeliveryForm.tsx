@@ -30,6 +30,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
   const formRef = useRef<HTMLFormElement>(null)
   const [openSections, setOpenSections] = useState<FormSectionState>({ message: true, courier: false, adventure: false })
   const [courierSelected, setCourierSelected] = useState(false)
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (!Object.values(fieldErrors).some((messages) => messages.length > 0)) return
@@ -64,6 +65,10 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
     openSection('adventure')
   }
 
+  function touchField(field: string) {
+    setTouchedFields((current) => ({ ...current, [field]: true }))
+  }
+
   function handleSectionKeyDown(event: KeyboardEvent<HTMLDivElement>, section: keyof typeof openSections) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -77,6 +82,10 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
     form.steps?.length &&
     form.steps.every((step) => step.title.trim() && Number(step.duration_minutes) > 0),
   )
+  const recipientError = fieldErrors.recipient_name?.[0]
+    ?? (touchedFields.recipient_name && !form.recipient_name.trim() ? 'Informe o nome do destinatário.' : undefined)
+  const messageError = fieldErrors.message?.[0]
+    ?? (touchedFields.message && !form.message.trim() ? 'Escreva uma mensagem antes de continuar.' : undefined)
   const routeComplete = Boolean(
     form.origin_location &&
     form.destination_location &&
@@ -121,8 +130,8 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
           </div>
           <div>
             <label htmlFor="recipient_name">Nome do destinatário <span className="required">*</span></label>
-            <input id="recipient_name" required maxLength={120} value={form.recipient_name} aria-invalid={fieldErrors.recipient_name ? true : undefined} aria-describedby={fieldErrors.recipient_name ? 'recipient-name-error' : undefined} onChange={(event) => onFieldChange('recipient_name', event.target.value)} placeholder="Quem receberá?" />
-            {fieldErrors.recipient_name && <FieldError id="recipient-name-error" messages={fieldErrors.recipient_name} />}
+            <input id="recipient_name" required maxLength={120} value={form.recipient_name} aria-invalid={recipientError ? true : undefined} aria-describedby={recipientError ? 'recipient-name-error' : undefined} onBlur={() => touchField('recipient_name')} onChange={(event) => onFieldChange('recipient_name', event.target.value)} placeholder="Quem receberá?" />
+            {recipientError && <FieldError id="recipient-name-error" messages={[recipientError]} />}
           </div>
         </div>
         <div className="message-composer">
@@ -130,12 +139,12 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
             <label htmlFor="message" className="message-label">Sua mensagem <span className="required">*</span></label>
             <span>o coração da viagem</span>
           </div>
-          <textarea id="message" required maxLength={10000} value={form.message} aria-invalid={fieldErrors.message ? true : undefined} aria-describedby={fieldErrors.message ? 'message-error' : undefined} onChange={(event) => onFieldChange('message', event.target.value)} placeholder="Era uma vez uma mensagem..." rows={5} />
+          <textarea id="message" required maxLength={10000} value={form.message} aria-invalid={messageError ? true : undefined} aria-describedby={messageError ? 'message-error' : undefined} onBlur={() => touchField('message')} onChange={(event) => onFieldChange('message', event.target.value)} placeholder="Era uma vez uma mensagem..." rows={5} />
           <div className="message-composer-footer">
             <span>Escreva do seu jeito.</span>
             <small>{form.message.length.toLocaleString('pt-BR')} / 10.000</small>
           </div>
-          {fieldErrors.message && <FieldError id="message-error" messages={fieldErrors.message} />}
+          {messageError && <FieldError id="message-error" messages={[messageError]} />}
         </div>
         </div>
       </div>
