@@ -29,6 +29,7 @@ export interface CreateDeliveryLeg {
 }
 
 export interface CreateDeliveryStep {
+  id?: string
   title: string
   description?: string
   duration_minutes: number

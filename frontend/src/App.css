@@ -118,6 +118,11 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .step-editor { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: .7rem; padding: .9rem; border: 1px solid var(--line); border-radius: .9rem; background: rgba(255, 255, 255, .48); }
 .step-editor-number { padding-top: .75rem; color: var(--coral); font: 700 .72rem var(--mono); }
 .step-editor-fields { min-width: 0; }
+.step-editor-heading-row { display: flex; align-items: center; justify-content: space-between; gap: .8rem; margin-bottom: .55rem; color: var(--ink); font-size: .78rem; }
+.step-reorder { display: flex; gap: .2rem; }
+.step-order-button { border: 1px solid var(--line); border-radius: .45rem; padding: .3rem .45rem; color: var(--coral); background: var(--cream); cursor: pointer; font: 700 .68rem var(--body); }
+.step-order-button:hover:not(:disabled) { border-color: var(--coral); background: #f0ecfa; }
+.step-order-button:disabled { cursor: not-allowed; opacity: .3; }
 .step-editor-fields > input { margin-bottom: .55rem; }
 .step-editor-fields textarea { min-height: 5rem; }
 .step-duration { display: flex; align-items: center; gap: .55rem; margin-top: .6rem; }

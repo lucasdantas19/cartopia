@@ -27,7 +27,11 @@ const initialForm: CreateDeliveryInput = {
   message: '', sender_name: '', recipient_name: '', origin: locations[0].code,
   origin_location: { label: locations[0].label, latitude: locations[0].coordinates[1], longitude: locations[0].coordinates[0] },
   destination: locations[1].code, destination_location: { label: locations[1].label, latitude: locations[1].coordinates[1], longitude: locations[1].coordinates[0] }, duration_minutes: 60, courier: 'paper-swallow',
-  final_duration_minutes: 30,
+  final_duration_minutes: 30, steps: [],
+}
+
+function newStep(): CreateDeliveryStep {
+  return { id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `step-${Date.now()}-${Math.random()}`, title: '', description: '', duration_minutes: 30 }
 }
 
 export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
@@ -69,7 +73,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
   }
 
   function addStep() {
-    setForm((current) => ({ ...current, steps: [...(current.steps ?? []), { title: '', description: '', duration_minutes: 30 }] }))
+    setForm((current) => ({ ...current, steps: [...(current.steps ?? []), newStep()] }))
   }
 
   function toggleAdventure(enabled: boolean) {
@@ -83,13 +87,24 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
     setForm((current) => ({ ...current, steps: (current.steps ?? []).filter((_, stepIndex) => stepIndex !== index) }))
   }
 
+  function moveStep(index: number, direction: -1 | 1) {
+    setForm((current) => {
+      const steps = [...(current.steps ?? [])]
+      const targetIndex = index + direction
+      if (targetIndex < 0 || targetIndex >= steps.length) return current
+      const [step] = steps.splice(index, 1)
+      steps.splice(targetIndex, 0, step)
+      return { ...current, steps }
+    })
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(''); setFieldErrors({})
     if (form.origin_location.latitude === form.destination_location.latitude && form.origin_location.longitude === form.destination_location.longitude) { setError('Escolha localidades diferentes para a partida e o destino.'); return }
     if (adventureEnabled && !form.steps?.length) { setError('Adicione pelo menos uma parada para criar uma aventura.'); return }
     setSubmitting(true)
     try {
-      const response = await createDelivery({ ...form, sender_name: form.sender_name?.trim() || undefined, duration_minutes: Number(form.duration_minutes), final_duration_minutes: Number(form.final_duration_minutes), steps: adventureEnabled ? form.steps?.map((step) => ({ ...step, title: step.title.trim(), description: step.description?.trim() || undefined, duration_minutes: Number(step.duration_minutes) })) : undefined })
+      const response = await createDelivery({ ...form, sender_name: form.sender_name?.trim() || undefined, duration_minutes: Number(form.duration_minutes), final_duration_minutes: Number(form.final_duration_minutes), steps: adventureEnabled ? form.steps?.map(({ id: _id, ...step }) => ({ ...step, title: step.title.trim(), description: step.description?.trim() || undefined, duration_minutes: Number(step.duration_minutes) })) : undefined })
       const recipientToken = response.recipient_access_token ?? response.access_token
       setCreated({ publicId: response.data.public_id, recipientUrl: createShareUrl(window.location.origin, response.data.public_id, recipientToken), senderUrl: createShareUrl(window.location.origin, response.data.public_id, response.sender_access_token, 'sender'), recipientToken })
     } catch (caught) {
@@ -110,6 +125,6 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
 
   return <Shell onHome={onHome} onPrivacy={onPrivacy}>
     <section className="intro create-intro"><div className="intro-copy"><h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1><p className="lead">Escreva uma mensagem, trace uma rota e deixe a Cartopia transformar carinho em aventura.</p></div><div className="hero-route" aria-hidden="true"><div className="hero-route-stamp">CP · 01</div><div className="hero-route-map"><span className="hero-route-start" /><span className="hero-route-path">· · · · · · ·</span><span className="hero-route-end">✦</span></div><div className="hero-route-labels"><span>uma lembrança</span><span>alguém especial</span></div><p>toda carta começa<br />com um destino</p></div><div className="create-steps"><span><b>01</b> escreva</span><span><b>02</b> escolha a rota</span><span><b>03</b> acompanhe</span></div></section>
-  <div className={`create-layout ${showSummary ? '' : 'summary-hidden'}`}><CreateDeliveryForm form={form} adventureEnabled={adventureEnabled} error={error} fieldErrors={fieldErrors} submitting={submitting} onSubmit={submit} onFieldChange={updateField} onEndpointChange={updateEndpoint} onAdventureChange={toggleAdventure} onStepChange={updateStep} onStepLocationChange={updateStepLocation} onAddStep={addStep} onRemoveStep={removeStep} /><aside className={`create-sidebar ${showSummary ? '' : 'collapsed'}`}><button type="button" className="summary-toggle" onClick={() => setShowSummary((visible) => !visible)} aria-expanded={showSummary}>{showSummary ? 'Ocultar resumo −' : 'Mostrar resumo +'}</button>{showSummary && <DeliverySummary form={form} />}</aside></div>
+  <div className={`create-layout ${showSummary ? '' : 'summary-hidden'}`}><CreateDeliveryForm form={form} adventureEnabled={adventureEnabled} error={error} fieldErrors={fieldErrors} submitting={submitting} onSubmit={submit} onFieldChange={updateField} onEndpointChange={updateEndpoint} onAdventureChange={toggleAdventure} onStepChange={updateStep} onStepLocationChange={updateStepLocation} onAddStep={addStep} onRemoveStep={removeStep} onMoveStep={moveStep} /><aside className={`create-sidebar ${showSummary ? '' : 'collapsed'}`}><button type="button" className="summary-toggle" onClick={() => setShowSummary((visible) => !visible)} aria-expanded={showSummary}>{showSummary ? 'Ocultar resumo −' : 'Mostrar resumo +'}</button>{showSummary && <DeliverySummary form={form} />}</aside></div>
   </Shell>
 }
