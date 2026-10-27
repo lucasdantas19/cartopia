@@ -36,6 +36,10 @@ function statusLabel(status: DeliveryStatus) {
   return { SCHEDULED: 'Preparando a partida', IN_TRANSIT: 'A caminho', DELIVERED: 'Chegou ao destino' }[status]
 }
 
+function formatUpdatedAt(timestamp: number): string {
+  return new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(timestamp)
+}
+
 export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps) {
   const [auth, setAuth] = useState<{ ready: boolean; token: string | null; role: AccessRole }>({ ready: false, token: null, role: 'recipient' })
   const [delivery, setDelivery] = useState<Delivery | null>(null)
@@ -47,6 +51,7 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
   const [requestFailed, setRequestFailed] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
   const [now, setNow] = useState(initialNow)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null)
 
   useEffect(() => {
     const resolve = window.setTimeout(() => {
@@ -64,7 +69,7 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
     const load = async () => {
       try {
         const response = await fetchDelivery(publicId, token)
-        if (!cancelled) { setDelivery(response.data); setError(''); setRequestFailed(false) }
+        if (!cancelled) { setDelivery(response.data); setLastUpdatedAt(Date.now()); setError(''); setRequestFailed(false) }
       } catch (caught) {
         if (cancelled) return
         if (caught instanceof ApiError && caught.status === 404) {
@@ -122,12 +127,20 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
   const visualProgress = progressFromTime(delivery, now)
   const canOpen = visualStatus === 'DELIVERED'
   const visibleRealtimeStatus = auth.ready && auth.token && broadcastRole ? realtimeStatus : null
+  const syncMessage = visibleRealtimeStatus === 'unavailable'
+    ? 'Tempo real indisponível; a atualização automática continua ativa.'
+    : visibleRealtimeStatus === 'connected'
+      ? 'Atualização em tempo real ativa.'
+      : 'Atualização automática ativa.'
   const originMapLocation = mapLocation(delivery.origin, delivery.origin_location, 'origin')
   const destinationMapLocation = mapLocation(delivery.destination, delivery.destination_location, 'destination')
 
   return <Shell eyebrow="Acompanhamento da aventura" onHome={onHome} onPrivacy={onPrivacy}>
     <TrackingHeader recipientName={delivery.recipient_name} senderName={delivery.sender_name} statusClass={visualStatus.toLowerCase()} statusLabel={statusLabel(visualStatus)} />
     <JourneyProgress originLabel={locationLabel(delivery.origin, delivery.origin_location)} destinationLabel={locationLabel(delivery.destination, delivery.destination_location)} progress={visualProgress} courier={delivery.courier} arrivesAt={delivery.arrives_at} now={now} />
+    <p className={`tracking-sync-status ${visibleRealtimeStatus === 'unavailable' ? 'unavailable' : ''}`} role="status">
+      {lastUpdatedAt ? `Atualizado às ${formatUpdatedAt(lastUpdatedAt)}. ` : ''}{syncMessage}
+    </p>
     <JourneyPassport publicId={delivery.public_id} originLabel={locationLabel(delivery.origin, delivery.origin_location)} destinationLabel={locationLabel(delivery.destination, delivery.destination_location)} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} status={visualStatus} steps={delivery.steps} finalDurationMinutes={delivery.final_duration_minutes} hiddenStepsCount={delivery.hidden_steps_count} now={now} />
     {visibleRealtimeStatus === 'received' && <p className="realtime-indicator" role="status">Sinal em tempo real recebido.</p>}
     {originMapLocation && destinationMapLocation && <DeliveryMap origin={originMapLocation} destination={destinationMapLocation} stops={delivery.steps.flatMap((step, index) => step.location?.latitude !== undefined && step.location.longitude !== undefined ? [{ code: `step-${index}`, label: step.location.label, description: step.description ?? '', coordinates: [step.location.longitude, step.location.latitude] as [number, number], arrivesAt: step.arrives_at }] : [])} routeLegs={delivery.route_legs} hiddenStepsCount={delivery.hidden_steps_count} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />}
