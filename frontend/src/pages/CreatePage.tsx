@@ -7,8 +7,8 @@ import { CreateDeliveryForm } from '../components/delivery/CreateDeliveryForm'
 import { DeliverySummary } from '../components/delivery/DeliverySummary'
 import { DeliveryCreationSuccess } from '../components/delivery/DeliveryCreationSuccess'
 import { Shell } from '../components/layout/Shell'
-import { locations } from '../domain/delivery/locations'
 import type { AccessRole, CreateDeliveryInput, CreateDeliveryStep } from '../domain/delivery/types'
+import { firstUseGuideStorageKey, shouldShowFirstUseGuide } from '../utils/firstUseGuide'
 
 interface CreatePageProps {
   onTrack: (publicId: string, token: string) => void
@@ -24,9 +24,8 @@ interface CreatedDelivery {
 }
 
 const initialForm: CreateDeliveryInput = {
-  message: '', sender_name: '', recipient_name: '', origin: locations[0].code,
-  origin_location: { label: locations[0].label, latitude: locations[0].coordinates[1], longitude: locations[0].coordinates[0] },
-  destination: locations[1].code, destination_location: { label: locations[1].label, latitude: locations[1].coordinates[1], longitude: locations[1].coordinates[0] }, duration_minutes: 60, courier: 'paper-swallow',
+  message: '', sender_name: '', recipient_name: '', origin: '', origin_location: null,
+  destination: '', destination_location: null, duration_minutes: 60, courier: 'paper-swallow',
   final_duration_minutes: 30, steps: [],
 }
 
@@ -41,6 +40,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
   const [submitting, setSubmitting] = useState(false)
   const [adventureEnabled, setAdventureEnabled] = useState(false)
   const [showSummary, setShowSummary] = useState(true)
+  const [showFirstUseGuide, setShowFirstUseGuide] = useState(() => shouldShowFirstUseGuide(window.localStorage.getItem(firstUseGuideStorageKey)))
   const [created, setCreated] = useState<CreatedDelivery | null>(null)
   const [copied, setCopied] = useState<AccessRole | null>(null)
   const [copyError, setCopyError] = useState<AccessRole | null>(null)
@@ -83,6 +83,11 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
     }
   }
 
+  function dismissFirstUseGuide() {
+    window.localStorage.setItem(firstUseGuideStorageKey, 'true')
+    setShowFirstUseGuide(false)
+  }
+
   function removeStep(index: number) {
     setForm((current) => ({ ...current, steps: (current.steps ?? []).filter((_, stepIndex) => stepIndex !== index) }))
   }
@@ -100,6 +105,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(''); setFieldErrors({})
+    if (!form.origin_location || !form.destination_location) { setError('Escolha a origem e o destino da entrega para continuar.'); return }
     if (form.origin_location.latitude === form.destination_location.latitude && form.origin_location.longitude === form.destination_location.longitude) { setError('Escolha localidades diferentes para a partida e o destino.'); return }
     if (adventureEnabled && !form.steps?.length) { setError('Adicione pelo menos uma parada para criar uma aventura.'); return }
     setSubmitting(true)
@@ -124,7 +130,8 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
   </Shell>
 
   return <Shell onHome={onHome} onPrivacy={onPrivacy}>
-    <section className="intro create-intro"><div className="intro-copy"><h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1><p className="lead">Escreva uma mensagem, trace uma rota e deixe a Cartopia transformar carinho em aventura.</p></div><div className="hero-route" aria-hidden="true"><div className="hero-route-stamp">CP · 01</div><div className="hero-route-map"><span className="hero-route-start" /><span className="hero-route-path">· · · · · · ·</span><span className="hero-route-end">✦</span></div><div className="hero-route-labels"><span>uma lembrança</span><span>alguém especial</span></div><p>toda carta começa<br />com um destino</p></div><div className="create-steps"><span><b>01</b> escreva</span><span><b>02</b> escolha a rota</span><span><b>03</b> acompanhe</span></div></section>
+    <section className="intro create-intro"><div className="intro-copy"><h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1><p className="lead">Escreva uma mensagem, trace uma rota e deixe a Cartopia transformar carinho em aventura.</p></div><div className="hero-route" aria-hidden="true"><div className="hero-route-stamp">CP · 01</div><div className="hero-route-map"><span className="hero-route-start" /><span className="hero-route-path">· · · · · · ·</span><span className="hero-route-end">✦</span></div><div className="hero-route-labels"><span>uma lembrança</span><span>alguém especial</span></div><p>toda carta começa<br />com um destino</p></div><div className="create-steps" aria-label="Como funciona"><strong>Como funciona</strong><span><b>01</b><small>Escreva sua mensagem</small></span><span><b>02</b><small>Escolha o tipo de rota</small></span><span><b>03</b><small>Acompanhe a entrega</small></span></div></section>
+    {showFirstUseGuide && <aside className="first-use-guide" aria-labelledby="first-use-guide-title"><div><span className="eyebrow">Primeira vez por aqui?</span><h2 id="first-use-guide-title">Você cria a viagem em três passos.</h2><div className="first-use-guide-steps"><p><strong>1. Escreva</strong><span>Conte a história que será entregue.</span></p><p><strong>2. Escolha</strong><span>Envie direto ou adicione paradas à aventura.</span></p><p><strong>3. Acompanhe</strong><span>Compartilhe o link e veja a jornada acontecer.</span></p></div></div><button type="button" className="text-button first-use-guide-dismiss" onClick={dismissFirstUseGuide}>Entendi, começar ✦</button></aside>}
   <div className={`create-layout ${showSummary ? '' : 'summary-hidden'}`}><CreateDeliveryForm form={form} adventureEnabled={adventureEnabled} error={error} fieldErrors={fieldErrors} submitting={submitting} onSubmit={submit} onFieldChange={updateField} onEndpointChange={updateEndpoint} onAdventureChange={toggleAdventure} onStepChange={updateStep} onStepLocationChange={updateStepLocation} onAddStep={addStep} onRemoveStep={removeStep} onMoveStep={moveStep} /><aside className={`create-sidebar ${showSummary ? '' : 'collapsed'}`}><button type="button" className="summary-toggle" onClick={() => setShowSummary((visible) => !visible)} aria-expanded={showSummary}>{showSummary ? 'Ocultar resumo −' : 'Mostrar resumo +'}</button>{showSummary && <DeliverySummary form={form} />}</aside></div>
   </Shell>
 }

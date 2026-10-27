@@ -18,3 +18,7 @@ export function getMapPadding(width: number, height: number): number {
 export function hasMapDimensions(width: number, height: number): boolean {
   return width > 0 && height > 0
 }
+
+export function shouldFitRoute(hasFittedRoute: boolean, requestedByUser = false): boolean {
+  return requestedByUser || !hasFittedRoute
+}

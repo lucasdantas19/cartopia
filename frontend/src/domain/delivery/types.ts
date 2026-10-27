@@ -62,9 +62,9 @@ export interface CreateDeliveryInput {
   sender_name?: string
   recipient_name: string
   origin: string
-  origin_location: DeliveryLocationValue
+  origin_location: DeliveryLocationValue | null
   destination: string
-  destination_location: DeliveryLocationValue
+  destination_location: DeliveryLocationValue | null
   duration_minutes: number
   final_duration_minutes: number
   legs?: CreateDeliveryLeg[]

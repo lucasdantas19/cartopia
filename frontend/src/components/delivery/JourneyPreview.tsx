@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { LngLatBounds, Map, Marker, setWorkerUrl } from 'maplibre-gl'
 import type { GeoJSONSource } from 'maplibre-gl'
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
@@ -44,29 +44,29 @@ export function JourneyPreview({ origin, destination, steps, finalDurationMinute
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const markersRef = useRef<Marker[]>([])
-  const points: PreviewPoint[] = [
+  const points = useMemo<PreviewPoint[]>(() => [
     { label: origin.label, coordinates: [origin.longitude, origin.latitude] as Coordinates, kind: 'origin' },
     ...steps.map(customPoint).filter((point): point is PreviewPoint => Boolean(point)),
     { label: destination.label, coordinates: [destination.longitude, destination.latitude] as Coordinates, kind: 'destination' },
-  ]
+  ], [origin, destination, steps])
 
   useEffect(() => {
     if (!containerRef.current) return
-    const map = new Map({ container: containerRef.current, style: mapStyle, center: points[0]?.coordinates ?? [0, 0], zoom: 2, attributionControl: { compact: true } })
+    const map = new Map({ container: containerRef.current, style: mapStyle, center: [origin.longitude, origin.latitude], zoom: 2, attributionControl: { compact: true } })
     mapRef.current = map
-    map.once('load', () => drawPreview(map, points, markersRef))
+    map.once('load', () => drawPreview(map, [{ label: origin.label, coordinates: [origin.longitude, origin.latitude], kind: 'origin' }, { label: destination.label, coordinates: [destination.longitude, destination.latitude], kind: 'destination' }], markersRef))
     return () => {
       markersRef.current.forEach((marker) => marker.remove())
       markersRef.current = []
       map.remove()
       mapRef.current = null
     }
-  }, [])
+  }, [origin, destination])
 
   useEffect(() => {
     const map = mapRef.current
     if (map?.isStyleLoaded()) drawPreview(map, points, markersRef)
-  }, [origin, destination, steps, finalDurationMinutes])
+  }, [points])
 
   return <section className="journey-preview" aria-label="Prévia da aventura">
     <div className="journey-preview-heading"><div><h3>Prévia da sua aventura</h3><p>Veja a ordem dos momentos antes de selar a entrega.</p></div><strong>{steps.reduce((total, step) => total + Number(step.duration_minutes || 0), Number(finalDurationMinutes || 0))} min</strong></div>

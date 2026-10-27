@@ -4,7 +4,7 @@ import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import type { GeoJSONSource } from 'maplibre-gl'
 import { createCourierAnimation } from './map/courierAnimation'
 import { getCourier } from '../../domain/delivery/couriers'
-import { getMapPadding, hasMapDimensions } from './map/mapViewport'
+import { getMapPadding, hasMapDimensions, shouldFitRoute } from './map/mapViewport'
 import type { DeliveryLocation } from '../../domain/delivery/locations'
 import type { DeliveryRouteLeg } from '../../domain/delivery/types'
 import 'maplibre-gl/dist/maplibre-gl.css'
@@ -62,12 +62,12 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], c
   const courierRef = useRef(courier)
   const animationRef = useRef<ReturnType<typeof createCourierAnimation> | null>(null)
   const hasFittedRouteRef = useRef(false)
-  const routeRef = useRef({ origin, destination, stops, startsAt, arrivesAt })
+  const routeRef = useRef({ origin, destination, stops, routeLegs, startsAt, arrivesAt })
   const [mapError, setMapError] = useState(false)
 
   useEffect(() => {
-    routeRef.current = { origin, destination, stops, startsAt, arrivesAt }
-  }, [origin, destination, stops, startsAt, arrivesAt])
+    routeRef.current = { origin, destination, stops, routeLegs, startsAt, arrivesAt }
+  }, [origin, destination, stops, routeLegs, startsAt, arrivesAt])
 
   useEffect(() => {
     courierRef.current = courier
@@ -150,7 +150,7 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], c
       destination: currentDestination.coordinates,
       startsAt: routeRef.current.startsAt,
       arrivesAt: routeRef.current.arrivesAt,
-      legs: animationLegs.length === routeLocations.length - 1 ? animationLegs : routeLegs.map((leg, index) => ({
+      legs: animationLegs.length === routeLocations.length - 1 ? animationLegs : routeRef.current.routeLegs.map((leg, index) => ({
         origin: routeLocations[index].coordinates,
         destination: routeLocations[index + 1].coordinates,
         startsAt: leg.starts_at,
@@ -164,7 +164,6 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], c
       },
     })
     animationRef.current.start()
-    hasFittedRouteRef.current = false
     fitRoute(map)
   }, [fitRoute])
 
@@ -190,7 +189,7 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], c
 
       resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
         map.resize()
-        if (!hasFittedRouteRef.current && map.isStyleLoaded()) fitRoute(map)
+        if (shouldFitRoute(hasFittedRouteRef.current) && map.isStyleLoaded()) fitRoute(map)
       })
       if (resizeObserver && containerRef.current) resizeObserver.observe(containerRef.current)
 
@@ -219,8 +218,14 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], c
     if (map.isStyleLoaded()) drawRoute(map)
   }, [drawRoute, origin, destination])
 
+  function recenterRoute() {
+    const map = mapRef.current
+    if (map) fitRoute(map)
+  }
+
   return <div className="delivery-map-wrapper">
     <div ref={containerRef} className="delivery-map" aria-label={`Mapa da rota entre ${origin.label} e ${destination.label}`} />
+    <button type="button" className="delivery-map-recenter" onClick={recenterRoute}>Centralizar rota</button>
     {mapError && <p className="delivery-map-fallback" role="status">O mapa não pôde ser carregado, mas o acompanhamento continua disponível.</p>}
   </div>
 }

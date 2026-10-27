@@ -8,8 +8,8 @@ interface DeliverySummaryProps {
 
 export function DeliverySummary({ form }: DeliverySummaryProps) {
   const courier = getCourier(form.courier)
-  const origin = form.origin_location
-  const destination = form.destination_location
+  const origin = form.origin_location ?? { label: 'Origem não definida', latitude: 0, longitude: 0 }
+  const destination = form.destination_location ?? { label: 'Destino não definido', latitude: 0, longitude: 0 }
   const totalDuration = form.steps?.length ? form.steps.reduce((total, step) => total + Number(step.duration_minutes || 0), Number(form.final_duration_minutes || 0)) : Number(form.duration_minutes || 0)
   const stops = form.steps ?? []
 

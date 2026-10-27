@@ -38,10 +38,17 @@ export function LocationPicker({ center, location, onChange, onClear, openByDefa
   const mapRef = useRef<Map | null>(null)
   const markerRef = useRef<Marker | null>(null)
   const locationRef = useRef(location)
+  const centerRef = useRef(center)
+  const onChangeRef = useRef(onChange)
 
   useEffect(() => {
     locationRef.current = location
-    if (location && openByDefault) setOpen(true)
+    centerRef.current = center
+    onChangeRef.current = onChange
+  }, [location, center, onChange])
+
+  useEffect(() => {
+    if (location && openByDefault) window.setTimeout(() => setOpen(true), 0)
     const marker = markerRef.current
     if (!marker || location?.latitude === undefined || location.longitude === undefined) return
     marker.setLngLat([location.longitude, location.latitude])
@@ -50,15 +57,13 @@ export function LocationPicker({ center, location, onChange, onClear, openByDefa
   useEffect(() => {
     if (!open || !containerRef.current) return
 
-    setMapError(false)
-    setMapReady(false)
     let map: Map
     try {
       map = new Map({
         container: containerRef.current,
         style: mapStyle,
-        center: location?.longitude !== undefined && location.latitude !== undefined ? [location.longitude, location.latitude] : center,
-        zoom: location ? 8 : 2,
+        center: locationRef.current?.longitude !== undefined && locationRef.current.latitude !== undefined ? [locationRef.current.longitude, locationRef.current.latitude] : centerRef.current,
+        zoom: locationRef.current ? 8 : 2,
         attributionControl: { compact: true },
       })
       map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
@@ -77,14 +82,14 @@ export function LocationPicker({ center, location, onChange, onClear, openByDefa
         const coordinates: Coordinates = [event.lngLat.lng, event.lngLat.lat]
         markerRef.current?.remove()
         markerRef.current = new Marker({ color: '#d96d5e' }).setLngLat(coordinates).addTo(map)
-        onChange({
+        onChangeRef.current({
           label: locationRef.current?.label || 'Ponto escolhido no mapa',
           longitude: coordinates[0],
           latitude: coordinates[1],
         })
       })
     } catch {
-      setMapError(true)
+      window.setTimeout(() => setMapError(true), 0)
       return
     }
     mapRef.current = map
@@ -141,7 +146,7 @@ export function LocationPicker({ center, location, onChange, onClear, openByDefa
     setResults([])
   }
 
-  if (!open) return <button type="button" className="location-picker-trigger" onClick={() => setOpen(true)}>＋ escolher localização no mapa</button>
+  if (!open) return <button type="button" className="location-picker-trigger" onClick={() => { setMapError(false); setMapReady(false); setOpen(true) }}>＋ escolher localização no mapa</button>
 
   return <div className="location-picker">
     <div className="location-search" role="search">
