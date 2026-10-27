@@ -1,7 +1,8 @@
 interface FieldErrorProps {
   messages: string[]
+  id?: string
 }
 
-export function FieldError({ messages }: FieldErrorProps) {
-  return <p className="field-error" role="alert">{messages[0]}</p>
+export function FieldError({ messages, id }: FieldErrorProps) {
+  return <p id={id} className="field-error" role="alert">{messages[0]}</p>
 }

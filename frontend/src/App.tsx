@@ -31,10 +31,25 @@ function App() {
   const onHome = () => navigate('/')
   const onPrivacy = () => navigate('/privacidade')
 
-  if (route.page === 'tracking') return <TrackingPage publicId={route.publicId} onHome={onHome} onPrivacy={onPrivacy} />
-  if (route.page === 'privacy') return <PrivacyPageShell onHome={onHome} onPrivacy={onPrivacy} />
-  if (route.page === 'admin') return <AdminPage onHome={onHome} />
-  return <CreatePage onTrack={(publicId, token) => navigate(`/d/${publicId}#token=${encodeURIComponent(token)}`)} onHome={onHome} onPrivacy={onPrivacy} />
+  if (route.page === 'tracking') {
+    return <TrackingPage publicId={route.publicId} onHome={onHome} onPrivacy={onPrivacy} />
+  }
+
+  if (route.page === 'privacy') {
+    return <PrivacyPageShell onHome={onHome} onPrivacy={onPrivacy} />
+  }
+
+  if (route.page === 'admin') {
+    return <AdminPage onHome={onHome} />
+  }
+
+  return (
+    <CreatePage
+      onTrack={(publicId, token) => navigate(`/d/${publicId}#token=${encodeURIComponent(token)}`)}
+      onHome={onHome}
+      onPrivacy={onPrivacy}
+    />
+  )
 }
 
 export default App

@@ -6,5 +6,16 @@ interface DeliveryDetailsProps {
 }
 
 export function DeliveryDetails({ startsAt, arrivesAt }: DeliveryDetailsProps) {
-  return <section className="details-grid"><div><span>Partida</span><strong>{formatLocalDate(startsAt)}</strong></div><div><span>Chegada prevista</span><strong>{formatLocalDate(arrivesAt)}</strong></div></section>
+  return (
+    <section className="details-grid">
+      <div>
+        <span>Partida</span>
+        <strong>{formatLocalDate(startsAt)}</strong>
+      </div>
+      <div>
+        <span>Chegada prevista</span>
+        <strong>{formatLocalDate(arrivesAt)}</strong>
+      </div>
+    </section>
+  )
 }

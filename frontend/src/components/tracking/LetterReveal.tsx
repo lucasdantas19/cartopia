@@ -13,19 +13,25 @@ interface LetterRevealProps {
 }
 
 function EnvelopeScene({ message, state, onOpened }: { message: string | null; state: VisualState; onOpened: () => void }) {
-  return <div className={`letter-stage ${state}`}>
-    {message !== null && <div className="letter-paper" onAnimationEnd={(event) => { if (event.animationName === 'paper-emerge') onOpened() }}>
-      <p className="letter-label">Uma carta para você</p>
-      <p className="letter-message">{message}</p>
-      <span className="letter-signature">Com carinho, Cartopia ✦</span>
-    </div>}
+  return (
+    <div className={`letter-stage ${state}`}>
+      {message !== null && (
+        <div className="letter-paper" onAnimationEnd={(event) => { if (event.animationName === 'paper-emerge') onOpened() }}>
+          <p className="letter-label">Uma carta para você</p>
+          <p className="letter-message">{message}</p>
+          <span className="letter-signature">Com carinho, Cartopia ✦</span>
+        </div>
+      )}
     <div className="envelope-body" aria-hidden="true">
       <span className="envelope-side envelope-side-left" />
       <span className="envelope-side envelope-side-right" />
       <span className="envelope-bottom" />
     </div>
-    <div className="envelope-flap" aria-hidden="true"><span className="envelope-seal">✦</span></div>
-  </div>
+      <div className="envelope-flap" aria-hidden="true">
+        <span className="envelope-seal">✦</span>
+      </div>
+    </div>
+  )
 }
 
 function initialVisualState(message: string | null): VisualState {
@@ -38,19 +44,28 @@ export function LetterReveal({ courier, canOpen, opening, message, error, onOpen
   const [visualState, setVisualState] = useState<VisualState>(() => initialVisualState(message))
 
   if (message !== null) {
-    return <article className="letter-reveal-card" aria-live="polite">
-      <EnvelopeScene message={message} state={visualState} onOpened={() => setVisualState('opened')} />
-    </article>
+    return (
+      <article className="letter-reveal-card" aria-live="polite">
+        <EnvelopeScene message={message} state={visualState} onOpened={() => setVisualState('opened')} />
+      </article>
+    )
   }
 
   if (canOpen) {
     return <section className="arrival-card" aria-live="polite">
-      <img className="arrival-mascot" src={getCourier(courier).cardAsset} alt={getCourier(courier).label} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = '/couriers/paper-swallow.svg' }} />
+      <img
+        className="arrival-mascot"
+        src={getCourier(courier).cardAsset}
+        alt={getCourier(courier).label}
+        onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = '/couriers/paper-swallow.svg' }}
+      />
       <p className="arrival-kicker">A aventura terminou</p>
       <h2>Sua surpresa chegou!</h2>
       <p>O último carimbo foi registrado. A mensagem está pronta para ser descoberta.</p>
       <EnvelopeScene message={null} state="closed" onOpened={() => undefined} />
-      <button className="button primary" type="button" disabled={opening} aria-busy={opening} onClick={onOpen}>{opening ? 'Abrindo minha carta…' : 'Abrir minha carta'}</button>
+      <button className="button primary" type="button" disabled={opening} aria-busy={opening} onClick={onOpen}>
+        {opening ? 'Abrindo minha carta…' : 'Abrir minha carta'}
+      </button>
       {error && <p className="error-message" role="alert">{error}</p>}
     </section>
   }

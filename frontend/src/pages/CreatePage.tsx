@@ -125,13 +125,88 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
     setCopyError(role)
   }
 
-  if (created) return <Shell eyebrow="A aventura está pronta" onHome={onHome} onPrivacy={onPrivacy}>
-    <DeliveryCreationSuccess created={created} copied={copied} copyError={copyError} onCopy={copyLink} onTrack={onTrack} onCreateAnother={() => setCreated(null)} />
-  </Shell>
+  if (created) {
+    return (
+      <Shell eyebrow="A aventura está pronta" onHome={onHome} onPrivacy={onPrivacy}>
+        <DeliveryCreationSuccess
+          created={created}
+          copied={copied}
+          copyError={copyError}
+          onCopy={copyLink}
+          onTrack={onTrack}
+          onCreateAnother={() => setCreated(null)}
+        />
+      </Shell>
+    )
+  }
 
-  return <Shell onHome={onHome} onPrivacy={onPrivacy}>
-    <section className="intro create-intro"><div className="intro-copy"><h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1><p className="lead">Escreva uma mensagem, trace uma rota e deixe a Cartopia transformar carinho em aventura.</p></div><div className="hero-route" aria-hidden="true"><div className="hero-route-stamp">CP · 01</div><div className="hero-route-map"><span className="hero-route-start" /><span className="hero-route-path">· · · · · · ·</span><span className="hero-route-end">✦</span></div><div className="hero-route-labels"><span>uma lembrança</span><span>alguém especial</span></div><p>toda carta começa<br />com um destino</p></div><div className="create-steps" aria-label="Como funciona"><strong>Como funciona</strong><span><b>01</b><small>Escreva sua mensagem</small></span><span><b>02</b><small>Escolha o tipo de rota</small></span><span><b>03</b><small>Acompanhe a entrega</small></span></div></section>
-    {showFirstUseGuide && <aside className="first-use-guide" aria-labelledby="first-use-guide-title"><div><span className="eyebrow">Primeira vez por aqui?</span><h2 id="first-use-guide-title">Você cria a viagem em três passos.</h2><div className="first-use-guide-steps"><p><strong>1. Escreva</strong><span>Conte a história que será entregue.</span></p><p><strong>2. Escolha</strong><span>Envie direto ou adicione paradas à aventura.</span></p><p><strong>3. Acompanhe</strong><span>Compartilhe o link e veja a jornada acontecer.</span></p></div></div><button type="button" className="text-button first-use-guide-dismiss" onClick={dismissFirstUseGuide}>Entendi, começar ✦</button></aside>}
-  <div className={`create-layout ${showSummary ? '' : 'summary-hidden'}`}><CreateDeliveryForm form={form} adventureEnabled={adventureEnabled} error={error} fieldErrors={fieldErrors} submitting={submitting} onSubmit={submit} onFieldChange={updateField} onEndpointChange={updateEndpoint} onAdventureChange={toggleAdventure} onStepChange={updateStep} onStepLocationChange={updateStepLocation} onAddStep={addStep} onRemoveStep={removeStep} onMoveStep={moveStep} /><aside className={`create-sidebar ${showSummary ? '' : 'collapsed'}`}><button type="button" className="summary-toggle" onClick={() => setShowSummary((visible) => !visible)} aria-expanded={showSummary}>{showSummary ? 'Ocultar resumo −' : 'Mostrar resumo +'}</button>{showSummary && <DeliverySummary form={form} />}</aside></div>
-  </Shell>
+  return (
+    <Shell onHome={onHome} onPrivacy={onPrivacy}>
+      <section className="intro create-intro">
+        <div className="intro-copy">
+          <h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1>
+          <p className="lead">Escreva uma mensagem, trace uma rota e deixe a Cartopia transformar carinho em aventura.</p>
+        </div>
+        <div className="hero-route" aria-hidden="true">
+          <div className="hero-route-stamp">CP · 01</div>
+          <div className="hero-route-map">
+            <span className="hero-route-start" />
+            <span className="hero-route-path">· · · · · · ·</span>
+            <span className="hero-route-end">✦</span>
+          </div>
+          <div className="hero-route-labels">
+            <span>uma lembrança</span>
+            <span>alguém especial</span>
+          </div>
+          <p>toda carta começa<br />com um destino</p>
+        </div>
+        <div className="create-steps" aria-label="Como funciona">
+          <strong>Como funciona</strong>
+          <span><b>01</b><small>Escreva sua mensagem</small></span>
+          <span><b>02</b><small>Escolha o tipo de rota</small></span>
+          <span><b>03</b><small>Acompanhe a entrega</small></span>
+        </div>
+      </section>
+      {showFirstUseGuide && (
+        <aside className="first-use-guide" aria-labelledby="first-use-guide-title">
+          <div>
+            <span className="eyebrow">Primeira vez por aqui?</span>
+            <h2 id="first-use-guide-title">Você cria a viagem em três passos.</h2>
+            <div className="first-use-guide-steps">
+              <p><strong>1. Escreva</strong><span>Conte a história que será entregue.</span></p>
+              <p><strong>2. Escolha</strong><span>Envie direto ou adicione paradas à aventura.</span></p>
+              <p><strong>3. Acompanhe</strong><span>Compartilhe o link e veja a jornada acontecer.</span></p>
+            </div>
+          </div>
+          <button type="button" className="text-button first-use-guide-dismiss" onClick={dismissFirstUseGuide}>
+            Entendi, começar ✦
+          </button>
+        </aside>
+      )}
+      <div className={`create-layout ${showSummary ? '' : 'summary-hidden'}`}>
+        <CreateDeliveryForm
+          form={form}
+          adventureEnabled={adventureEnabled}
+          error={error}
+          fieldErrors={fieldErrors}
+          submitting={submitting}
+          onSubmit={submit}
+          onFieldChange={updateField}
+          onEndpointChange={updateEndpoint}
+          onAdventureChange={toggleAdventure}
+          onStepChange={updateStep}
+          onStepLocationChange={updateStepLocation}
+          onAddStep={addStep}
+          onRemoveStep={removeStep}
+          onMoveStep={moveStep}
+        />
+        <aside className={`create-sidebar ${showSummary ? '' : 'collapsed'}`}>
+          <button type="button" className="summary-toggle" onClick={() => setShowSummary((visible) => !visible)} aria-expanded={showSummary}>
+            {showSummary ? 'Ocultar resumo −' : 'Mostrar resumo +'}
+          </button>
+          {showSummary && <DeliverySummary form={form} />}
+        </aside>
+      </div>
+    </Shell>
+  )
 }
