@@ -136,7 +136,7 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
   const destinationMapLocation = mapLocation(delivery.destination, delivery.destination_location, 'destination')
 
   return <Shell eyebrow="Acompanhamento da aventura" onHome={onHome} onPrivacy={onPrivacy}>
-    <TrackingHeader recipientName={delivery.recipient_name} senderName={delivery.sender_name} statusClass={visualStatus.toLowerCase()} statusLabel={statusLabel(visualStatus)} />
+    <TrackingHeader recipientName={delivery.recipient_name} senderName={delivery.sender_name} accessRole={auth.role} statusClass={visualStatus.toLowerCase()} statusLabel={statusLabel(visualStatus)} />
     <JourneyProgress originLabel={locationLabel(delivery.origin, delivery.origin_location)} destinationLabel={locationLabel(delivery.destination, delivery.destination_location)} progress={visualProgress} courier={delivery.courier} arrivesAt={delivery.arrives_at} now={now} />
     <p className={`tracking-sync-status ${visibleRealtimeStatus === 'unavailable' ? 'unavailable' : ''}`} role="status">
       {lastUpdatedAt ? `Atualizado às ${formatUpdatedAt(lastUpdatedAt)}. ` : ''}{syncMessage}
