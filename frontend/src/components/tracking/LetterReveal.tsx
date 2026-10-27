@@ -66,6 +66,7 @@ export function LetterReveal({ courier, canOpen, opening, message, error, onOpen
       <button className="button primary" type="button" disabled={opening} aria-busy={opening} onClick={onOpen}>
         {opening ? 'Abrindo minha carta…' : 'Abrir minha carta'}
       </button>
+      {opening && <p className="letter-opening-status" role="status">Preparando a abertura da sua carta…</p>}
       {error && <p className="error-message" role="alert">{error}</p>}
     </section>
   }

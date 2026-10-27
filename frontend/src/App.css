@@ -203,6 +203,7 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .arrival-mascot { position: relative; z-index: 1; width: 4.5rem; height: 4.5rem; margin-bottom: 1rem; filter: drop-shadow(0 4px 5px rgba(47, 56, 54, .2)); }
 .arrival-kicker { position: relative; z-index: 1; margin-bottom: .55rem; color: var(--coral); font-size: .72rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .arrival-card h2, .arrival-card p, .arrival-card button { position: relative; z-index: 1; }.arrival-card h2 { margin-bottom: .5rem; font: 700 clamp(1.7rem, 5vw, 2.5rem) var(--display); letter-spacing: -.04em; }.arrival-card > p:not(.arrival-kicker) { color: var(--muted); }.arrival-card .button { margin-top: .7rem; }
+.letter-opening-status { color: var(--muted); font-size: .78rem; }
 .letter-reveal-card { padding: 1rem; border: 1px solid #d9cdec; border-radius: 1.2rem; background: #f0ecfa; box-shadow: 0 12px 30px rgba(48, 65, 86, .08); }
 .letter-stage { position: relative; width: min(100%, 20rem); height: 17rem; margin: 0 auto; perspective: 800px; }
 .letter-stage .envelope-body { position: absolute; right: 6%; bottom: 1.5rem; left: 6%; z-index: 1; height: 9rem; overflow: hidden; border: 2px solid #61549e; border-radius: .65rem; background: linear-gradient(145deg, #a99bd5, #7668b5); box-shadow: 0 12px 22px rgba(48, 65, 86, .15); }
