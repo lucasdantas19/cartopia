@@ -73,10 +73,16 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
 
   const messageComplete = Boolean(form.message.trim() && form.recipient_name.trim())
   const courierComplete = courierSelected
+  const stepsComplete = Boolean(
+    form.steps?.length &&
+    form.steps.every((step) => step.title.trim() && Number(step.duration_minutes) > 0),
+  )
   const routeComplete = Boolean(
     form.origin_location &&
     form.destination_location &&
-    (!adventureEnabled || form.steps?.length),
+    Number(form.duration_minutes) > 0 &&
+    Number(form.final_duration_minutes) > 0 &&
+    (!adventureEnabled || stepsComplete),
   )
 
   return (
