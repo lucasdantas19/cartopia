@@ -3,6 +3,7 @@ import { Map, Marker, NavigationControl, setWorkerUrl } from 'maplibre-gl'
 import mapWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import type { Coordinates } from '../../domain/delivery/locations'
 import type { CreateDeliveryStep } from '../../domain/delivery/types'
+import { resolveMapboxAccessToken } from '../../config/runtimeConfig'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 setWorkerUrl(mapWorkerUrl)
@@ -28,6 +29,7 @@ interface MapboxFeature {
 export function LocationPicker({ center, location, onChange, onClear, openByDefault = false }: LocationPickerProps) {
   const [open, setOpen] = useState(Boolean(location) && openByDefault)
   const [mapError, setMapError] = useState(false)
+  const [mapReady, setMapReady] = useState(false)
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<MapboxFeature[]>([])
   const [searching, setSearching] = useState(false)
@@ -48,6 +50,8 @@ export function LocationPicker({ center, location, onChange, onClear, openByDefa
   useEffect(() => {
     if (!open || !containerRef.current) return
 
+    setMapError(false)
+    setMapReady(false)
     let map: Map
     try {
       map = new Map({
@@ -63,6 +67,7 @@ export function LocationPicker({ center, location, onChange, onClear, openByDefa
       map.once('load', () => {
         map.resize()
         window.requestAnimationFrame(() => map.resize())
+        setMapReady(true)
         const current = locationRef.current
         if (current?.longitude !== undefined && current.latitude !== undefined) {
           markerRef.current = new Marker({ color: '#d96d5e' }).setLngLat([current.longitude, current.latitude]).addTo(map)
@@ -93,7 +98,7 @@ export function LocationPicker({ center, location, onChange, onClear, openByDefa
 
   async function searchPlaces() {
     const query = search.trim().replaceAll(';', '')
-    const token = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim()
+    const token = resolveMapboxAccessToken(import.meta.env)
     if (!token) {
       setSearchError('Configure VITE_MAPBOX_ACCESS_TOKEN para pesquisar lugares.')
       return
@@ -145,8 +150,7 @@ export function LocationPicker({ center, location, onChange, onClear, openByDefa
       {results.length > 0 && <div className="location-search-results" role="listbox" aria-label="Resultados da busca">{results.map((result, index) => <button type="button" role="option" key={result.id ?? index} onClick={() => selectSearchResult(result)}>{result.properties?.full_address || result.properties?.name || result.place_name || result.text}</button>)}</div>}
       {searchError && <small className="location-picker-error" role="status">{searchError}</small>}
     </div>
-    <div ref={containerRef} className="location-picker-map" aria-label="Mapa para escolher a localização da etapa" />
-    {mapError && <p className="location-picker-error" role="status">Não foi possível carregar o mapa. Tente novamente ou informe as coordenadas manualmente.</p>}
+    <div className="location-picker-map-shell"><div ref={containerRef} className="location-picker-map" aria-label="Mapa para escolher a localização da etapa" />{!mapReady && !mapError && <p className="location-picker-status" role="status">Carregando mapa…</p>}{mapError && <p className="location-picker-status error" role="status">Não foi possível carregar o mapa. Você ainda pode pesquisar um lugar acima.</p>}</div>
     <div className="location-picker-fields">
       <input aria-label="Nome da localização" value={location?.label ?? ''} placeholder="Nome do lugar ou momento" onChange={(event) => onChange({ label: event.target.value, latitude: location?.latitude, longitude: location?.longitude })} />
       {location && <button type="button" className="text-button" onClick={() => { setOpen(false); onClear() }}>remover localização</button>}

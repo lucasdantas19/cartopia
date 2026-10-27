@@ -6,6 +6,7 @@ export type FrontendEnvironment = {
   VITE_REVERB_PORT?: string
   VITE_REVERB_SCHEME?: string
   VITE_BROADCAST_AUTH_URL?: string
+  VITE_MAPBOX_ACCESS_TOKEN?: string
 }
 
 export class FrontendConfigurationError extends Error {
@@ -45,4 +46,15 @@ export function resolveApiBaseUrl(env: FrontendEnvironment): string {
   if (!isProductionEnvironment(env) && !env.VITE_API_URL) return 'http://localhost:8000/api'
 
   return validatePublicUrl(env.VITE_API_URL, 'VITE_API_URL', isProductionEnvironment(env))
+}
+
+export function resolveMapboxAccessToken(env: FrontendEnvironment): string | null {
+  const token = env.VITE_MAPBOX_ACCESS_TOKEN?.trim()
+  if (!token) return null
+
+  if (token.startsWith('sk.')) {
+    throw new FrontendConfigurationError('VITE_MAPBOX_ACCESS_TOKEN', 'deve ser um token público pk., nunca um token secreto sk.')
+  }
+
+  return token
 }

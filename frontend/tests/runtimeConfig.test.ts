@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { FrontendConfigurationError, resolveApiBaseUrl } from '../src/config/runtimeConfig.ts'
+import { FrontendConfigurationError, resolveApiBaseUrl, resolveMapboxAccessToken } from '../src/config/runtimeConfig.ts'
 
 test('keeps the localhost API fallback for development', () => {
   assert.equal(resolveApiBaseUrl({}), 'http://localhost:8000/api')
@@ -20,4 +20,13 @@ test('rejects localhost and non-HTTPS API URLs in production', () => {
 
 test('accepts a public HTTPS API URL in production', () => {
   assert.equal(resolveApiBaseUrl({ PROD: true, VITE_API_URL: 'https://api.example.com/api/' }), 'https://api.example.com/api')
+})
+
+test('returns a public Mapbox token when configured', () => {
+  assert.equal(resolveMapboxAccessToken({ VITE_MAPBOX_ACCESS_TOKEN: 'pk.public-token' }), 'pk.public-token')
+  assert.equal(resolveMapboxAccessToken({}), null)
+})
+
+test('rejects a secret Mapbox token in frontend configuration', () => {
+  assert.throws(() => resolveMapboxAccessToken({ VITE_MAPBOX_ACCESS_TOKEN: 'sk.secret-token' }), FrontendConfigurationError)
 })

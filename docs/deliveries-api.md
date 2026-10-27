@@ -63,7 +63,7 @@ Para uma rota com paradas, envie `legs` e use como `destination` o destino do ú
 }
 ```
 
-O campo `duration_minutes` permanece aceito para manter o formato de rota direta. Em aventuras, `final_duration_minutes` representa o último trecho entre a parada final e o destino. A resposta inclui `data.steps`, com título, descrição, localização e horários de cada capítulo. `route_legs` permanece temporariamente na resposta para compatibilidade com clientes antigos.
+O campo `duration_minutes` permanece aceito para manter o formato de rota direta. Em aventuras, `final_duration_minutes` representa o último trecho entre a parada final e o destino. A resposta inclui `data.steps`, com título, descrição, localização e horários de cada capítulo. `route_steps` é a estrutura canônica persistida; `route_legs` permanece temporariamente na resposta para compatibilidade com clientes antigos.
 
 Resposta `201 Created`:
 
