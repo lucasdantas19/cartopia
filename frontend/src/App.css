@@ -334,6 +334,7 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .first-use-guide-steps strong { color: var(--coral); font-size: .78rem; }
 .first-use-guide-steps span { margin-top: .2rem; color: var(--muted); font-size: .72rem; line-height: 1.35; }
 .first-use-guide-dismiss { flex: none; white-space: nowrap; }
+.draft-restored { margin: 0 0 1rem; color: var(--success); font-size: .78rem; font-weight: 700; }
 
 @media (max-width: 650px) {
   .topbar, .page-content { width: min(100% - 2rem, 900px); }.topbar-note { display: none; }.page-content { padding-top: 2.5rem; }

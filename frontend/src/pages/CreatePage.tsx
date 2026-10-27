@@ -54,21 +54,60 @@ const initialForm: CreateDeliveryInput = {
   final_duration_minutes: 30, steps: [], route_visibility: 'full',
 }
 
+const draftStorageKey = 'cartopia.delivery_draft'
+
+interface DeliveryDraft {
+  form: CreateDeliveryInput
+  adventureEnabled: boolean
+}
+
+function readDeliveryDraft(): DeliveryDraft | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const stored = window.sessionStorage.getItem(draftStorageKey)
+    if (!stored) return null
+
+    const value = JSON.parse(stored) as Partial<DeliveryDraft>
+    if (!value.form || typeof value.form !== 'object') return null
+
+    return {
+      form: { ...initialForm, ...value.form, steps: Array.isArray(value.form.steps) ? value.form.steps : [] },
+      adventureEnabled: value.adventureEnabled === true,
+    }
+  } catch {
+    return null
+  }
+}
+
+function hasDeliveryDraft(form: CreateDeliveryInput, adventureEnabled: boolean): boolean {
+  return Boolean(
+    adventureEnabled ||
+    form.message.trim() ||
+    form.sender_name?.trim() ||
+    form.recipient_name.trim() ||
+    form.origin_location ||
+    form.destination_location ||
+    form.steps?.length,
+  )
+}
+
 function newStep(): CreateDeliveryStep {
   return { id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `step-${Date.now()}-${Math.random()}`, title: '', description: '', duration_minutes: 30 }
 }
 
 export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
-  const [form, setForm] = useState<CreateDeliveryInput>(initialForm)
+  const [form, setForm] = useState<CreateDeliveryInput>(() => readDeliveryDraft()?.form ?? initialForm)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [adventureEnabled, setAdventureEnabled] = useState(false)
+  const [adventureEnabled, setAdventureEnabled] = useState(() => readDeliveryDraft()?.adventureEnabled ?? false)
   const [showSummary, setShowSummary] = useState(true)
   const [showFirstUseGuide, setShowFirstUseGuide] = useState(() => shouldShowFirstUseGuide(window.localStorage.getItem(firstUseGuideStorageKey)))
   const [created, setCreated] = useState<CreatedDelivery | null>(readCreatedDelivery)
   const [copied, setCopied] = useState<AccessRole | null>(null)
   const [copyError, setCopyError] = useState<AccessRole | null>(null)
+  const [draftRecovered] = useState(() => readDeliveryDraft() !== null)
 
   useEffect(() => {
     if (created) {
@@ -77,6 +116,15 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
       window.sessionStorage.removeItem(createdDeliveryStorageKey)
     }
   }, [created])
+
+  useEffect(() => {
+    if (created || !hasDeliveryDraft(form, adventureEnabled)) {
+      window.sessionStorage.removeItem(draftStorageKey)
+      return
+    }
+
+    window.sessionStorage.setItem(draftStorageKey, JSON.stringify({ form, adventureEnabled } satisfies DeliveryDraft))
+  }, [created, form, adventureEnabled])
 
   function updateField(field: keyof CreateDeliveryInput, value: string | number) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -176,6 +224,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
   return (
     <Shell onHome={onHome} onPrivacy={onPrivacy}>
       <section className="intro create-intro">
+        {draftRecovered && <p className="draft-restored" role="status">Rascunho recuperado desta sessão.</p>}
         <div className="intro-copy">
           <h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1>
           <p className="lead">Escreva uma mensagem, trace uma rota e deixe a Cartopia transformar carinho em aventura.</p>
