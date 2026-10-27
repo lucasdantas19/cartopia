@@ -7,6 +7,8 @@
 .passport-stops { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: 1rem; color: var(--muted); font-size: .78rem; }
 .passport-narrative { margin: 1rem 0 0; padding: .9rem 1rem; border-left: 3px solid var(--coral); border-radius: 0 .7rem .7rem 0; color: var(--ink); background: rgba(240,236,250,.58); font: 1rem/1.5 var(--display); }
 .passport-surprise { margin: .6rem 0 0; color: var(--coral); font-size: .78rem; font-weight: 700; }
+.passport-next-step { margin: .7rem 0 0; padding: .65rem .8rem; border-radius: .55rem; color: var(--muted); background: rgba(255, 255, 255, .48); font-size: .8rem; }
+.passport-next-step strong { color: var(--ink); }
 .journey-visibility { display: grid; gap: .65rem; margin: 1.2rem 0 0; padding: 0; border: 0; }
 .journey-visibility legend { margin-bottom: .25rem; color: var(--ink); font: 700 1.05rem var(--display); }
 .passport-stops span { margin-right: .25rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }

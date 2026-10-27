@@ -26,6 +26,7 @@ const stamps: Array<{ status: DeliveryStatus; label: string }> = [
 export function JourneyPassport({ publicId, originLabel, destinationLabel, courier, startsAt, arrivesAt, status, steps, finalDurationMinutes, hiddenStepsCount, now }: JourneyPassportProps) {
   const courierOption = getCourier(courier)
   const activeStamp = stamps.findIndex((stamp) => stamp.status === status)
+  const nextStep = steps.find((step) => now < instant(step.arrives_at))
 
   return <section className="journey-passport" aria-label="Passaporte da mensagem">
     <div className="passport-heading">
@@ -50,6 +51,7 @@ export function JourneyPassport({ publicId, originLabel, destinationLabel, couri
         currentStep: steps.length ? steps.findIndex((step) => now >= instant(step.starts_at) && now < instant(step.arrives_at)) : null,
       })}
     </p>
+    {nextStep && status !== 'DELIVERED' && <p className="passport-next-step" role="status">Próxima parada: <strong>{nextStep.title}</strong></p>}
     {hiddenStepsCount > 0 && <p className="passport-surprise" role="status">✦ {hiddenStepsCount === 1 ? 'Uma próxima etapa' : `${hiddenStepsCount} próximas etapas`} serão reveladas conforme a viagem continuar.</p>}
     {steps.length > 0 && <div className="passport-steps" aria-label="Capítulos da aventura">{steps.map((step, index) => {
       const completed = now >= instant(step.arrives_at)
