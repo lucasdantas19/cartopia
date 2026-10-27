@@ -1,5 +1,5 @@
 import { getCourier } from '../../domain/delivery/couriers'
-import { formatRemaining } from '../../utils/dateTime'
+import { formatRemaining, instant } from '../../utils/dateTime'
 import { progressMarkerTransform } from '../../utils/progressVisual'
 import { handleCourierImageError } from '../delivery/courierImage'
 
@@ -8,12 +8,16 @@ interface JourneyProgressProps {
   destinationLabel: string
   progress: number
   courier: string
+  startsAt: string
   arrivesAt: string
   now: number
 }
 
-export function JourneyProgress({ originLabel, destinationLabel, progress, courier, arrivesAt, now }: JourneyProgressProps) {
+export function JourneyProgress({ originLabel, destinationLabel, progress, courier, startsAt, arrivesAt, now }: JourneyProgressProps) {
   const courierOption = getCourier(courier)
+  const journeyTiming = now < instant(startsAt)
+    ? formatRemaining(startsAt, now).replace('Chega em', 'Parte em')
+    : formatRemaining(arrivesAt, now)
 
   return (
     <section className="journey-card">
@@ -40,7 +44,7 @@ export function JourneyProgress({ originLabel, destinationLabel, progress, couri
       </div>
       <div className="journey-footer">
         <span>✦ {courierOption.label}</span>
-        <strong>{formatRemaining(arrivesAt, now)}</strong>
+        <strong>{journeyTiming}</strong>
       </div>
     </section>
   )
