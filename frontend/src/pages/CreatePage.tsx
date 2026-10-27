@@ -71,8 +71,20 @@ function readDeliveryDraft(): DeliveryDraft | null {
     const value = JSON.parse(stored) as Partial<DeliveryDraft>
     if (!value.form || typeof value.form !== 'object') return null
 
+    const draftForm = value.form
+    if (
+      typeof draftForm.message !== 'string' ||
+      typeof draftForm.recipient_name !== 'string' ||
+      typeof draftForm.origin !== 'string' ||
+      typeof draftForm.destination !== 'string' ||
+      typeof draftForm.duration_minutes !== 'number' ||
+      typeof draftForm.final_duration_minutes !== 'number' ||
+      typeof draftForm.courier !== 'string' ||
+      typeof draftForm.route_visibility !== 'string'
+    ) return null
+
     return {
-      form: { ...initialForm, ...value.form, steps: Array.isArray(value.form.steps) ? value.form.steps : [] },
+      form: { ...initialForm, ...draftForm, steps: Array.isArray(draftForm.steps) ? draftForm.steps : [] },
       adventureEnabled: value.adventureEnabled === true,
     }
   } catch {
