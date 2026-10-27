@@ -6,6 +6,17 @@ interface DeliverySummaryProps {
   form: CreateDeliveryInput
 }
 
+function getSummaryNote(form: CreateDeliveryInput): string {
+  if (!form.origin_location || !form.destination_location) {
+    return 'Escolha a origem e o destino para traçar a rota.'
+  }
+
+  const sameLocation = form.origin_location.latitude === form.destination_location.latitude
+    && form.origin_location.longitude === form.destination_location.longitude
+
+  return sameLocation ? 'Escolha lugares diferentes para traçar a rota.' : 'Tudo pronto para traçar a rota.'
+}
+
 export function DeliverySummary({ form }: DeliverySummaryProps) {
   const courier = getCourier(form.courier)
   const origin = form.origin_location ?? { label: 'Origem não definida', latitude: 0, longitude: 0 }
@@ -29,6 +40,6 @@ export function DeliverySummary({ form }: DeliverySummaryProps) {
       {stops.map((step, index) => <div className="summary-route-point" key={index}><i>{step.duration_minutes || 0} min</i><span /><strong>{step.location?.label || step.title || `Parada ${index + 1}`}</strong></div>)}
       <div className="summary-route-point end"><i>{stops.length ? `${form.final_duration_minutes || 0} min` : `${form.duration_minutes || 0} min`}</i><span /> <strong>{destination.label}</strong></div>
     </div>
-    <p className="summary-note">{form.origin === form.destination ? 'Escolha lugares diferentes para traçar a rota.' : 'Tudo pronto para traçar a rota.'}</p>
+    <p className="summary-note">{getSummaryNote(form)}</p>
   </aside>
 }
