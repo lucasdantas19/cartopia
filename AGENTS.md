@@ -14,6 +14,9 @@ Cartopia é uma plataforma de entregas virtuais e lúdicas para mensagens, carta
 
 - Prefira soluções simples, incrementais e alinhadas às convenções dos frameworks.
 - Não introduza dependências, abstrações ou padrões arquiteturais sem justificativa clara.
+- No frontend, mantenha JSX/HTML e estruturas aninhadas quebrados em múltiplas linhas, com indentação consistente e leitura manual fácil.
+- Evite componentes, propriedades, condicionais ou handlers inteiros em uma única linha; não compacte código apenas para reduzir o número de linhas.
+- Ao editar arquivos existentes do frontend, preserve e melhore a formatação legível para humanos.
 - Toda regra de negócio relevante deve ter testes automatizados.
 - Preserve arquivos existentes e nunca inclua credenciais ou segredos no Git.
 - Não implemente nesta etapa autenticação, entregas, filas, Redis, WebSockets, mapas, infraestrutura Docker/Kubernetes ou IA generativa.
