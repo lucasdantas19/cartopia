@@ -224,8 +224,11 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], h
     if (map) fitRoute(map)
   }
 
+  const routeDescription = [origin.label, ...stops.map((stop) => stop.label), destination.label].join(' → ')
+
   return <div className="delivery-map-wrapper">
-    <div ref={containerRef} className="delivery-map" aria-label={`Mapa da rota entre ${origin.label} e ${destination.label}`} />
+    <div ref={containerRef} className="delivery-map" aria-label={`Mapa da rota entre ${origin.label} e ${destination.label}`} aria-describedby="delivery-map-route-description" />
+    <p id="delivery-map-route-description" className="sr-only">Rota da entrega: {routeDescription}.</p>
     <button type="button" className="delivery-map-recenter" onClick={recenterRoute}>Centralizar rota</button>
     {hiddenStepsCount > 0 && <p className="delivery-map-surprise" role="status">✦ O restante do caminho é surpresa.</p>}
     {mapError && <p className="delivery-map-fallback" role="status">O mapa não pôde ser carregado, mas o acompanhamento continua disponível.</p>}

@@ -263,6 +263,7 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .realtime-indicator { margin: -.5rem 0 1rem; color: var(--muted); font-size: .75rem; text-align: right; }
 .tracking-sync-status { margin: .65rem 0 1rem; color: var(--muted); font-size: .75rem; text-align: right; }
 .tracking-sync-status.unavailable { color: var(--danger); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .delivery-map-wrapper { position: relative; min-height: 18rem; margin: 1rem 0 2.2rem; overflow: hidden; border: 1px solid var(--line); border-radius: 1.2rem; background: #dcebee; box-shadow: 0 12px 30px rgba(32, 56, 68, .1); }
 .delivery-map-recenter { position: absolute; z-index: 2; top: .75rem; left: .75rem; padding: .55rem .75rem; border: 1px solid var(--line); border-radius: .55rem; color: var(--ink); background: rgba(255, 250, 240, .94); box-shadow: 0 3px 10px rgba(47, 56, 54, .14); cursor: pointer; font: 700 .72rem var(--body); }
 .delivery-map-recenter:hover { background: var(--cream); }
