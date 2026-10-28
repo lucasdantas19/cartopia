@@ -1,19 +1,33 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, deleteLocation, deleteRecipient, fetchAccount, getAuthToken, logout, saveLocation, saveRecipient, setAuthToken, type AccountDelivery, type AuthUser, type SavedLocation, type SavedRecipient } from '../services/api'
+import { ApiError, deleteLocation, deleteRecipient, deleteTrackedDelivery, fetchAccount, fetchTrackedDeliveryToken, getAuthToken, logout, saveLocation, saveRecipient, saveTrackedDelivery, setAuthToken, type AccountDelivery, type AuthUser, type SavedLocation, type SavedRecipient, type TrackedDelivery } from '../services/api'
 import { Shell } from '../components/layout/Shell'
 import { LocationPicker } from '../components/delivery/LocationPicker'
+import { parseDeliveryLink } from '../services/accessToken'
 
-interface AccountPageProps { onHome: () => void; onPrivacy: () => void; onLogout: () => void }
+interface AccountPageProps { onHome: () => void; onPrivacy: () => void; onLogout: () => void; onTrack: (publicId: string, token: string, role: 'sender' | 'recipient') => void }
 
-export function AccountPage({ onHome, onPrivacy, onLogout }: AccountPageProps) {
-  const [account, setAccount] = useState<{ user: AuthUser; deliveries: AccountDelivery[]; locations: SavedLocation[]; recipients: SavedRecipient[] } | null>(null)
+const statusLabels: Record<string, string> = {
+  SCHEDULED: 'Agendada',
+  IN_TRANSIT: 'Em trânsito',
+  DELIVERED: 'Entregue',
+}
+
+function statusLabel(status: string): string {
+  return statusLabels[status] ?? status
+}
+
+export function AccountPage({ onHome, onPrivacy, onLogout, onTrack }: AccountPageProps) {
+  const [account, setAccount] = useState<{ user: AuthUser; deliveries: AccountDelivery[]; locations: SavedLocation[]; recipients: SavedRecipient[]; trackedDeliveries: TrackedDelivery[] } | null>(null)
   const [error, setError] = useState('')
+  const [trackedLink, setTrackedLink] = useState('')
+  const [trackedLabel, setTrackedLabel] = useState('')
+  const [savingTracked, setSavingTracked] = useState(false)
   const [location, setLocation] = useState({ name: '', label: '', latitude: '', longitude: '' })
   const [recipient, setRecipient] = useState({ name: '', nickname: '' })
 
   async function refresh() {
-    try { const data = await fetchAccount(); setAccount({ user: data, deliveries: data.deliveries, locations: data.locations, recipients: data.recipients }) }
+    try { const data = await fetchAccount(); setAccount({ user: data, deliveries: data.deliveries, locations: data.locations, recipients: data.recipients, trackedDeliveries: data.trackedDeliveries }) }
     catch (caught) { setError(caught instanceof ApiError ? caught.message : 'Não foi possível carregar sua conta.') }
   }
   useEffect(() => { void refresh() }, [])
@@ -46,38 +60,130 @@ export function AccountPage({ onHome, onPrivacy, onLogout }: AccountPageProps) {
   }
   async function addRecipient(event: FormEvent) { event.preventDefault(); await saveRecipient(recipient); setRecipient({ name: '', nickname: '' }); await refresh() }
 
+  async function addTrackedDelivery(event: FormEvent) {
+    event.preventDefault()
+    const parsed = parseDeliveryLink(trackedLink)
+    if (!parsed) {
+      setError('Cole um link completo de entrega, incluindo o token de acesso.')
+      return
+    }
+
+    setSavingTracked(true)
+    setError('')
+    try {
+      await saveTrackedDelivery({
+        public_id: parsed.publicId,
+        access_token: parsed.token,
+        role: parsed.role,
+        label: trackedLabel.trim() || undefined,
+      })
+      setTrackedLink('')
+      setTrackedLabel('')
+      await refresh()
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Não foi possível salvar essa entrega.')
+    } finally {
+      setSavingTracked(false)
+    }
+  }
+
+  async function openTrackedDelivery(item: TrackedDelivery) {
+    try {
+      const response = await fetchTrackedDeliveryToken(item.id)
+      onTrack(response.data.public_id, response.data.access_token, response.data.role)
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Não foi possível abrir essa entrega.')
+    }
+  }
+
   const mapLocation = location.label && location.latitude !== '' && location.longitude !== ''
     ? { label: location.label, latitude: Number(location.latitude), longitude: Number(location.longitude) }
     : undefined
 
   if (!getAuthToken()) return null
+  const deliveryCount = account?.deliveries.length ?? 0
+  const locationCount = account?.locations.length ?? 0
+  const recipientCount = account?.recipients.length ?? 0
+  const trackedCount = account?.trackedDeliveries.length ?? 0
+  const firstName = account?.user.name.split(' ')[0] ?? 'por aqui'
+
   return <Shell eyebrow="Seu atlas de lembranças" onHome={onHome} onPrivacy={onPrivacy}>
-    <section className="account-header">
-      <div>
-        <p className="eyebrow">Conta</p>
-        <h1>{account?.user.name ?? 'Carregando…'}</h1>
-        <p className="lead">{account?.user.email}</p>
+    <section className="account-hero">
+      <div className="account-avatar" aria-hidden="true">{firstName.charAt(0).toUpperCase()}</div>
+      <div className="account-hero-copy">
+        <p className="eyebrow">Painel da sua conta</p>
+        <h1>Olá, {firstName}.</h1>
+        <p className="lead">Suas viagens, lugares e pessoas especiais ficam reunidos aqui.</p>
+        <span className="account-email">{account?.user.email ?? 'Carregando conta…'}</span>
       </div>
-      <button className="text-button" type="button" onClick={() => { void signOut() }}>Sair</button>
+      <button className="button secondary account-logout" type="button" onClick={() => { void signOut() }}>Sair da conta</button>
     </section>
     {error && <p className="error-message" role="alert">{error}</p>}
-    <section className="account-section">
-      <h2>Histórico de envios</h2>
-      {account?.deliveries.length ? account.deliveries.map((delivery) => (
-        <article className="account-item" key={delivery.public_id}>
-          <strong>{delivery.recipient_name}</strong>
-          <span>{delivery.origin} → {delivery.destination}</span>
-          <small>{delivery.status} · {delivery.progress}%</small>
+    <section className="account-overview" aria-label="Resumo da conta">
+      <article className="account-stat account-stat-highlight">
+        <span className="account-stat-icon" aria-hidden="true">↗</span>
+        <div><strong>{deliveryCount}</strong><small>envios realizados</small></div>
+      </article>
+      <article className="account-stat">
+        <span className="account-stat-icon" aria-hidden="true">⌖</span>
+        <div><strong>{locationCount}</strong><small>lugares salvos</small></div>
+      </article>
+      <article className="account-stat">
+        <span className="account-stat-icon" aria-hidden="true">♡</span>
+        <div><strong>{recipientCount}</strong><small>destinatários</small></div>
+      </article>
+      <article className="account-stat">
+        <span className="account-stat-icon" aria-hidden="true">◷</span>
+        <div><strong>{trackedCount}</strong><small>entregas acompanhadas</small></div>
+      </article>
+    </section>
+    <section className="account-section tracked-section">
+      <div className="account-section-heading">
+        <div><p className="account-section-kicker">Sempre por perto</p><h2>Entregas acompanhadas</h2></div>
+        <span>{trackedCount}</span>
+      </div>
+      <p className="account-section-description">Salve um link recebido para acompanhar a viagem direto da sua conta.</p>
+      <form className="tracked-delivery-form" onSubmit={addTrackedDelivery}>
+        <div className="tracked-delivery-fields">
+          <label htmlFor="tracked-delivery-link">Link da entrega</label>
+          <input id="tracked-delivery-link" type="url" required value={trackedLink} onChange={(event) => setTrackedLink(event.target.value)} placeholder="https://cartopia.../d/...#token=..." />
+          <label htmlFor="tracked-delivery-label">Nome para lembrar <small>(opcional)</small></label>
+          <input id="tracked-delivery-label" value={trackedLabel} onChange={(event) => setTrackedLabel(event.target.value)} placeholder="Ex.: Carta da Ana" />
+        </div>
+        <button className="button secondary" type="submit" disabled={savingTracked}>{savingTracked ? 'Salvando…' : 'Salvar entrega'}</button>
+      </form>
+      {trackedCount > 0 && <div className="tracked-delivery-list">{account?.trackedDeliveries.map((item) => (
+        <article className="tracked-delivery-card" key={item.id}>
+          <div className="tracked-delivery-card-main"><span className={`delivery-status ${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span><h3>{item.label || `Entrega para ${item.recipient_name}`}</h3><p>{item.origin} <i aria-hidden="true">→</i> {item.destination}</p><small>Acesso como {item.role === 'sender' ? 'remetente' : 'destinatário'} · {item.progress}% concluído</small></div>
+          <div className="tracked-delivery-card-actions"><button className="button secondary" type="button" onClick={() => { void openTrackedDelivery(item) }}>Acompanhar</button><button className="text-button danger" type="button" onClick={() => { void deleteTrackedDelivery(item.id).then(refresh) }}>Remover</button></div>
         </article>
-      )) : <p className="muted-copy">Seus próximos envios aparecerão aqui. Criar uma entrega continua possível sem login.</p>}
+      ))}</div>}
+    </section>
+    <section className="account-section account-history">
+      <div className="account-section-heading">
+        <div><p className="account-section-kicker">Suas viagens</p><h2>Histórico de envios</h2></div>
+        <span>{deliveryCount} {deliveryCount === 1 ? 'envio' : 'envios'}</span>
+      </div>
+      {deliveryCount ? account?.deliveries.map((delivery) => (
+        <article className="delivery-history-card" key={delivery.public_id}>
+          <div className="delivery-history-topline">
+            <span className={`delivery-status ${delivery.status.toLowerCase()}`}>{statusLabel(delivery.status)}</span>
+            <small>{delivery.progress}% concluído</small>
+          </div>
+          <h3>Uma mensagem para {delivery.recipient_name}</h3>
+          <p className="delivery-history-route"><span>{delivery.origin}</span><i aria-hidden="true">→</i><span>{delivery.destination}</span></p>
+          <div className="delivery-progress" aria-label={`${delivery.progress}% da entrega concluída`}><span style={{ width: `${delivery.progress}%` }} /></div>
+          <div className="delivery-history-footer"><small>Chegada prevista</small><strong>{new Date(delivery.arrives_at).toLocaleDateString('pt-BR')}</strong></div>
+        </article>
+      )) : <div className="account-empty-state"><span aria-hidden="true">✦</span><p>Suas próximas aventuras aparecerão aqui.</p><small>Crie uma entrega e acompanhe cada passo da viagem.</small></div>}
     </section>
     <div className="account-columns">
       <section className="account-section">
-        <h2>Lugares salvos</h2>
+        <div className="account-section-heading"><div><p className="account-section-kicker">Pontos de partida</p><h2>Lugares salvos</h2></div><span>{locationCount}</span></div>
         {account?.locations.map((item) => (
-          <article className="account-item" key={item.id}>
-            <strong>{item.name}</strong>
-            <span>{item.label}</span>
+          <article className="saved-item" key={item.id}>
+            <span className="saved-item-icon" aria-hidden="true">⌖</span>
+            <div><strong>{item.name}</strong><span>{item.label}</span></div>
             <button className="text-button danger" type="button" onClick={() => { void deleteLocation(item.id).then(refresh) }}>Apagar</button>
           </article>
         ))}
@@ -97,11 +203,11 @@ export function AccountPage({ onHome, onPrivacy, onLogout }: AccountPageProps) {
         </form>
       </section>
       <section className="account-section">
-        <h2>Destinatários salvos</h2>
+        <div className="account-section-heading"><div><p className="account-section-kicker">Pessoas especiais</p><h2>Destinatários salvos</h2></div><span>{recipientCount}</span></div>
         {account?.recipients.map((item) => (
-          <article className="account-item" key={item.id}>
-            <strong>{item.name}</strong>
-            <span>{item.nickname || 'Sem apelido'}</span>
+          <article className="saved-item" key={item.id}>
+            <span className="saved-item-icon" aria-hidden="true">♡</span>
+            <div><strong>{item.name}</strong><span>{item.nickname || 'Sem apelido'}</span></div>
             <button className="text-button danger" type="button" onClick={() => { void deleteRecipient(item.id).then(refresh) }}>Apagar</button>
           </article>
         ))}

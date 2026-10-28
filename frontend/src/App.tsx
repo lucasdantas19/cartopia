@@ -51,7 +51,7 @@ function App() {
   }
 
   if (route.page === 'auth') return <AuthPage onHome={onHome} onPrivacy={onPrivacy} onAuthenticated={() => navigate('/conta')} />
-  if (route.page === 'account') return <AccountPage onHome={onHome} onPrivacy={onPrivacy} onLogout={() => navigate('/')} />
+  if (route.page === 'account') return <AccountPage onHome={onHome} onPrivacy={onPrivacy} onLogout={() => navigate('/')} onTrack={(publicId, token, role) => navigate(`/d/${publicId}#token=${encodeURIComponent(token)}${role === 'sender' ? '&role=sender' : ''}`)} />
 
   return (
     <CreatePage

@@ -67,6 +67,11 @@ class Delivery extends Model
         return 'IN_TRANSIT';
     }
 
+    public function trackedByUsers()
+    {
+        return $this->hasMany(TrackedDelivery::class);
+    }
+
     public function progress(): int
     {
         $now = CarbonImmutable::now('UTC');

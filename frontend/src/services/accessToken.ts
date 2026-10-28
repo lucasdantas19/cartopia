@@ -28,6 +28,18 @@ export function extractTokenFromFragment(hash: string): string | null {
   return token || null
 }
 
+export function parseDeliveryLink(value: string): { publicId: string; token: string; role: AccessRole } | null {
+  try {
+    const url = new URL(value.trim(), window.location.origin)
+    const match = url.pathname.match(/^\/d\/([^/]+)$/)
+    const token = extractTokenFromFragment(url.hash)
+    if (!match || !token) return null
+    return { publicId: decodeURIComponent(match[1]), token, role: accessRoleFromFragment(url.hash) }
+  } catch {
+    return null
+  }
+}
+
 export function accessRoleFromFragment(hash: string): AccessRole {
   return new URLSearchParams(hash.replace(/^#/, '')).get('role') === 'sender' ? 'sender' : 'recipient'
 }

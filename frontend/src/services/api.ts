@@ -62,6 +62,7 @@ export interface AuthUser { id: number; name: string; email: string }
 export interface SavedLocation { id: number; name: string; label: string; latitude: number; longitude: number }
 export interface SavedRecipient { id: number; name: string; nickname: string | null }
 export interface AccountDelivery { public_id: string; recipient_name: string; origin: string; destination: string; status: string; progress: number; starts_at: string; arrives_at: string }
+export interface TrackedDelivery { id: number; public_id: string; label: string | null; role: 'sender' | 'recipient'; recipient_name: string; origin: string; destination: string; status: string; progress: number; arrives_at: string }
 
 export function register(input: { name: string; email: string; password: string }) {
   return request<{ data: AuthUser; token: string }>('/auth/register', { method: 'POST', body: JSON.stringify(input) })
@@ -81,7 +82,8 @@ export function fetchAccount() {
     request<{ data: AccountDelivery[] }>('/account/deliveries'),
     request<{ data: SavedLocation[] }>('/account/locations'),
     request<{ data: SavedRecipient[] }>('/account/recipients'),
-  ]).then(([user, deliveries, locations, recipients]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data }))
+    request<{ data: TrackedDelivery[] }>('/account/tracked-deliveries'),
+  ]).then(([user, deliveries, locations, recipients, trackedDeliveries]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data, trackedDeliveries: trackedDeliveries.data }))
 }
 
 export function fetchSavedItems() {
@@ -105,6 +107,18 @@ export function saveRecipient(input: { name: string; nickname?: string }) {
 
 export function deleteRecipient(id: number) {
   return request(`/account/recipients/${id}`, { method: 'DELETE' })
+}
+
+export function saveTrackedDelivery(input: { public_id: string; access_token: string; role: 'sender' | 'recipient'; label?: string }) {
+  return request<{ data: { id: number; public_id: string; role: 'sender' | 'recipient' } }>('/account/tracked-deliveries', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function fetchTrackedDeliveryToken(id: number) {
+  return request<{ data: { public_id: string; role: 'sender' | 'recipient'; access_token: string } }>(`/account/tracked-deliveries/${id}/token`)
+}
+
+export function deleteTrackedDelivery(id: number) {
+  return request(`/account/tracked-deliveries/${id}`, { method: 'DELETE' })
 }
 
 export function createDelivery(input: CreateDeliveryInput) {

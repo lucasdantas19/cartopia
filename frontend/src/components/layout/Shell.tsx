@@ -21,7 +21,7 @@ export function Shell({ children, eyebrow = 'Cartas que atravessam mundos', onHo
           <span className="topbar-route" aria-hidden="true"><i /><b>· · ·</b><i /></span>
           Cada mensagem, uma aventura.
         </span>
-        {onAccount && <button className="text-button account-link" type="button" onClick={onAccount}>Minha conta</button>}
+        {onAccount && <button className="account-link" type="button" onClick={onAccount}><span className="account-link-icon" aria-hidden="true">✦</span><span>Minha conta</span></button>}
       </header>
       <main className="page-content">
         <p className="eyebrow">{eyebrow}</p>

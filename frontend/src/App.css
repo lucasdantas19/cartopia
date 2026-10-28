@@ -191,7 +191,9 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .submit-button { margin-top: 1rem; padding: 1rem 1.5rem; }
 .error-message, .field-error { margin: .65rem 0 0; color: var(--danger); font-size: .82rem; }
 .text-button { border: 0; background: none; color: var(--muted); cursor: pointer; font: inherit; text-decoration: underline; }
-.account-link { margin-left: auto; color: var(--coral); font-size: .75rem; font-weight: 700; }
+.account-link { display: inline-flex; align-items: center; gap: .45rem; margin-left: auto; border: 1px solid rgba(190, 91, 67, .3); border-radius: 999px; padding: .48rem .75rem .48rem .5rem; color: var(--coral); background: rgba(255, 255, 255, .5); cursor: pointer; font: 700 .75rem var(--body); transition: background .2s, border-color .2s, transform .2s; }
+.account-link:hover { border-color: var(--coral); background: #fff9ed; transform: translateY(-1px); }
+.account-link-icon { display: grid; place-items: center; width: 1.35rem; height: 1.35rem; border-radius: 50%; color: var(--cream); background: var(--coral); font-size: .62rem; }
 .account-card, .account-section { max-width: 760px; padding: clamp(1.5rem, 5vw, 3rem); border: 1px solid var(--line); border-radius: 1.2rem; background: var(--surface); box-shadow: var(--shadow-soft); }
 .account-card { margin: 0 auto; }
 .account-card h1, .account-header h1 { margin-bottom: .75rem; }
@@ -210,7 +212,70 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .saved-location-map { margin: .35rem 0 .4rem; }
 .saved-location-map .location-picker { margin-top: .25rem; }
 .saved-location-select, .saved-recipient-select { height: 2.5rem; margin-top: .55rem; padding: 0 .7rem; font-size: .78rem; }
+.account-hero { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1.25rem; align-items: center; margin-bottom: 1.25rem; padding: clamp(1.3rem, 4vw, 2.2rem); overflow: hidden; border: 1px solid #d3c9e6; border-radius: 1.25rem 1.25rem 1.25rem .3rem; background: linear-gradient(125deg, #f0ecfa, #e6f0f2 65%, #fff9ed); box-shadow: 8px 8px 0 rgba(227, 182, 93, .38); }
+.account-hero::after { position: absolute; right: -3rem; bottom: -5rem; width: 12rem; height: 12rem; border: 1px solid rgba(118, 104, 181, .2); border-radius: 50%; content: ''; }
+.account-avatar { position: relative; z-index: 1; display: grid; place-items: center; width: 4.5rem; height: 4.5rem; border: 2px solid var(--cream); border-radius: 1rem 1rem 1rem .25rem; color: var(--cream); background: var(--coral); box-shadow: 4px 4px 0 var(--peach); font: 700 1.8rem var(--display); transform: rotate(-4deg); }
+.account-hero-copy { position: relative; z-index: 1; }
+.account-hero-copy .eyebrow { margin-bottom: .45rem; }
+.account-hero-copy h1 { margin-bottom: .35rem; font-size: clamp(2.5rem, 6vw, 4rem); }
+.account-hero-copy .lead { margin-bottom: .55rem; font-size: .92rem; }
+.account-email { color: var(--coral); font: .7rem var(--mono); }
+.account-logout { position: relative; z-index: 1; white-space: nowrap; }
+.account-overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; margin-bottom: 1.25rem; }
+.account-stat { display: flex; align-items: center; gap: .7rem; padding: 1rem; border: 1px solid var(--line); border-radius: .9rem; background: rgba(255, 255, 255, .58); }
+.account-stat-highlight { border-color: rgba(190, 91, 67, .28); background: #fff9ed; }
+.account-stat-icon { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .55rem; color: var(--coral); background: #f0ecfa; font-size: 1.05rem; }
+.account-stat strong, .account-stat small { display: block; }
+.account-stat strong { color: var(--ink); font: 700 1.45rem var(--mono); line-height: 1; }
+.account-stat small { margin-top: .25rem; color: var(--muted); font-size: .7rem; }
+.account-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.account-section-heading h2 { margin: 0; }
+.account-section-heading > span { color: var(--coral); font: 700 .72rem var(--mono); }
+.account-section-kicker { margin: 0 0 .25rem; color: var(--coral); font-size: .64rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.delivery-history-card { margin-top: .7rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: .9rem; background: rgba(255, 255, 255, .52); transition: border-color .2s, transform .2s, box-shadow .2s; }
+.delivery-history-card:hover { border-color: rgba(190, 91, 67, .35); box-shadow: 0 8px 20px rgba(47, 56, 54, .06); transform: translateY(-1px); }
+.delivery-history-topline, .delivery-history-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.delivery-history-topline small, .delivery-history-footer small { color: var(--muted); font-size: .7rem; }
+.delivery-status { display: inline-flex; align-items: center; gap: .35rem; color: var(--coral); font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.delivery-status::before { width: .42rem; height: .42rem; border-radius: 50%; background: currentColor; content: ''; }
+.delivery-status.delivered { color: #648b6c; }
+.delivery-status.scheduled { color: #9a7a45; }
+.delivery-history-card h3 { margin: .7rem 0 .3rem; color: var(--ink); font: 700 1.05rem var(--display); }
+.delivery-history-route { display: flex; align-items: center; gap: .55rem; margin: 0; color: var(--muted); font-size: .78rem; }
+.delivery-history-route span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delivery-history-route i { color: var(--coral); font-style: normal; }
+.delivery-progress { height: .35rem; margin: .9rem 0 .65rem; overflow: hidden; border-radius: 999px; background: #e9e3dc; }
+.delivery-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--coral), var(--peach)); }
+.delivery-history-footer strong { color: var(--ink); font: 700 .72rem var(--mono); }
+.account-empty-state { display: grid; justify-items: center; padding: 2rem 1rem 1.4rem; border: 1px dashed var(--peach); border-radius: .8rem; background: rgba(255, 249, 237, .45); text-align: center; }
+.account-empty-state > span { display: grid; place-items: center; width: 2.3rem; height: 2.3rem; margin-bottom: .7rem; border-radius: 50%; color: var(--cream); background: var(--coral); }
+.account-empty-state p { margin-bottom: .25rem; color: var(--ink); font: 700 1rem var(--display); }
+.account-empty-state small { color: var(--muted); font-size: .75rem; }
+.account-section-description { margin: -.35rem 0 1rem; color: var(--muted); font-size: .8rem; }
+.tracked-delivery-form { display: flex; align-items: end; gap: .8rem; padding: 1rem; border: 1px dashed var(--peach); border-radius: .8rem; background: rgba(255, 249, 237, .48); }
+.tracked-delivery-fields { display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .45rem .7rem; flex: 1; }
+.tracked-delivery-fields label { margin: 0; font-size: .72rem; white-space: nowrap; }
+.tracked-delivery-fields input { height: 2.55rem; min-width: 0; font-size: .78rem; }
+.tracked-delivery-form > .button { flex: none; }
+.tracked-delivery-list { display: grid; gap: .65rem; margin-top: 1rem; }
+.tracked-delivery-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .8rem; background: rgba(255, 255, 255, .55); }
+.tracked-delivery-card-main { min-width: 0; }
+.tracked-delivery-card-main h3 { margin: .35rem 0 .2rem; color: var(--ink); font: 700 1rem var(--display); }
+.tracked-delivery-card-main p { margin: 0 0 .35rem; overflow: hidden; color: var(--muted); font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+.tracked-delivery-card-main p i { color: var(--coral); font-style: normal; }
+.tracked-delivery-card-main > small { color: var(--muted); font-size: .7rem; }
+.tracked-delivery-card-actions { display: flex; align-items: center; gap: .8rem; flex: none; }
+.tracked-delivery-card-actions .button { padding: .6rem .8rem; font-size: .76rem; }
+.tracked-delivery-card-actions .text-button { font-size: .7rem; }
+.saved-item { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: .65rem; align-items: center; padding: .7rem 0; border-top: 1px solid var(--line); }
+.saved-item-icon { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: .5rem; color: var(--coral); background: #f0ecfa; font-size: .95rem; }
+.saved-item strong, .saved-item span { display: block; }
+.saved-item strong { color: var(--ink); font-size: .82rem; }
+.saved-item span { margin-top: .15rem; overflow: hidden; color: var(--muted); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.saved-item .text-button { font-size: .7rem; }
 @media (max-width: 720px) { .account-columns { grid-template-columns: 1fr; } .topbar-note { display: none; } }
+@media (max-width: 720px) { .account-overview { grid-template-columns: repeat(2, 1fr); } .tracked-delivery-form { align-items: stretch; flex-direction: column; } .tracked-delivery-fields { grid-template-columns: 1fr; } .tracked-delivery-fields label { margin-top: .25rem; } .tracked-delivery-card { align-items: stretch; flex-direction: column; } .tracked-delivery-card-actions { justify-content: flex-start; } }
+@media (max-width: 620px) { .account-hero { grid-template-columns: auto minmax(0, 1fr); } .account-logout { grid-column: 1 / -1; justify-self: start; } .account-overview { gap: .5rem; } .account-stat { display: block; padding: .7rem; } .account-stat-icon { margin-bottom: .5rem; } }
 
 .success-card, .state-card { max-width: 680px; padding: clamp(2rem, 7vw, 4rem); border: 1px solid var(--line); border-radius: 1.5rem; background: var(--surface); text-align: center; box-shadow: var(--shadow-soft); }
 .success-icon, .state-icon { display: inline-grid; place-items: center; width: 3.5rem; height: 3.5rem; margin-bottom: 1.5rem; border-radius: 50%; color: var(--cream); background: var(--coral); font-size: 1.5rem; }

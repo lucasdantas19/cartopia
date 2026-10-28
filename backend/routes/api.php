@@ -23,6 +23,10 @@ Route::middleware('user.auth')->group(function (): void {
     Route::get('/account/recipients', [AccountController::class, 'recipients']);
     Route::post('/account/recipients', [AccountController::class, 'storeRecipient']);
     Route::delete('/account/recipients/{recipient}', [AccountController::class, 'deleteRecipient']);
+    Route::get('/account/tracked-deliveries', [AccountController::class, 'trackedDeliveries']);
+    Route::post('/account/tracked-deliveries', [AccountController::class, 'storeTrackedDelivery']);
+    Route::get('/account/tracked-deliveries/{trackedDelivery}/token', [AccountController::class, 'trackedDeliveryToken']);
+    Route::delete('/account/tracked-deliveries/{trackedDelivery}', [AccountController::class, 'deleteTrackedDelivery']);
 });
 
 Route::post('/deliveries', [DeliveryController::class, 'store'])

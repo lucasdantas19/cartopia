@@ -44,3 +44,23 @@ it('stores saved recipients and locations only for their owner', function () {
     $this->withToken($secondToken)->deleteJson('/api/account/locations/'.$location['id'])->assertNotFound();
     $this->withToken($secondToken)->deleteJson('/api/account/recipients/'.$recipient['id'])->assertNotFound();
 });
+
+it('associates a delivery link with the authenticated account and protects it from other users', function () {
+    $owner = User::factory()->create();
+    $other = User::factory()->create();
+    $ownerToken = $this->postJson('/api/auth/login', ['email' => $owner->email, 'password' => 'password'])->json('token');
+    $otherToken = $this->postJson('/api/auth/login', ['email' => $other->email, 'password' => 'password'])->json('token');
+    $delivery = $this->postJson('/api/deliveries', deliveryPayload())->assertCreated();
+
+    $this->withToken($ownerToken)->postJson('/api/account/tracked-deliveries', [
+        'public_id' => $delivery->json('data.public_id'),
+        'access_token' => $delivery->json('recipient_access_token'),
+        'label' => 'Carta importante',
+    ])->assertCreated();
+
+    $this->withToken($ownerToken)->getJson('/api/account/tracked-deliveries')->assertOk()->assertJsonPath('data.0.label', 'Carta importante');
+    $this->withToken($otherToken)->getJson('/api/account/tracked-deliveries')->assertOk()->assertJsonCount(0, 'data');
+    $this->withToken($ownerToken)->postJson('/api/account/tracked-deliveries', [
+        'public_id' => $delivery->json('data.public_id'), 'access_token' => 'token-invalido',
+    ])->assertUnprocessable()->assertJsonPath('error.code', 'INVALID_DELIVERY_LINK');
+});

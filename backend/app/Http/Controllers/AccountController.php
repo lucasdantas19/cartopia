@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Delivery;
 use App\Models\SavedLocation;
 use App\Models\SavedRecipient;
+use App\Models\TrackedDelivery;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -41,6 +43,62 @@ class AccountController extends Controller
     public function recipients(Request $request): JsonResponse
     {
         return response()->json(['data' => $request->user()->savedRecipients()->latest()->get()]);
+    }
+
+    public function trackedDeliveries(Request $request): JsonResponse
+    {
+        $tracked = $request->user()->trackedDeliveries()->with('delivery')->latest()->get();
+
+        return response()->json(['data' => $tracked->map(fn (TrackedDelivery $item): array => [
+            'id' => $item->id,
+            'public_id' => $item->delivery->public_id,
+            'label' => $item->label,
+            'role' => $item->role,
+            'recipient_name' => $item->delivery->recipient_name,
+            'origin' => $item->delivery->origin,
+            'destination' => $item->delivery->destination,
+            'status' => $item->delivery->status(),
+            'progress' => $item->delivery->progress(),
+            'arrives_at' => $item->delivery->arrives_at?->toISOString(),
+        ])]);
+    }
+
+    public function storeTrackedDelivery(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'public_id' => ['required', 'uuid'],
+            'access_token' => ['required', 'string', 'max:255'],
+            'role' => ['nullable', 'in:sender,recipient'],
+            'label' => ['nullable', 'string', 'max:120'],
+        ]);
+        $delivery = \App\Models\Delivery::where('public_id', $data['public_id'])->first();
+        $role = $data['role'] ?? 'recipient';
+        $tokenHash = hash('sha256', $data['access_token']);
+        $valid = $delivery && (($role === 'sender' && hash_equals((string) $delivery->sender_access_token_hash, $tokenHash)) || ($role === 'recipient' && hash_equals($delivery->access_token_hash, $tokenHash)));
+
+        if (! $valid) {
+            return response()->json(['error' => ['code' => 'INVALID_DELIVERY_LINK', 'message' => 'Esse link não é válido ou não dá acesso a esta entrega.']], 422);
+        }
+
+        $tracked = $request->user()->trackedDeliveries()->updateOrCreate(
+            ['delivery_id' => $delivery->id, 'role' => $role],
+            ['access_token_encrypted' => Crypt::encryptString($data['access_token']), 'label' => $data['label'] ?? null],
+        );
+
+        return response()->json(['data' => ['id' => $tracked->id, 'public_id' => $delivery->public_id, 'role' => $role]], 201);
+    }
+
+    public function trackedDeliveryToken(Request $request, TrackedDelivery $trackedDelivery): JsonResponse
+    {
+        abort_unless($trackedDelivery->user_id === $request->user()->id, 404);
+        return response()->json(['data' => ['public_id' => $trackedDelivery->delivery->public_id, 'role' => $trackedDelivery->role, 'access_token' => Crypt::decryptString($trackedDelivery->access_token_encrypted)]]);
+    }
+
+    public function deleteTrackedDelivery(Request $request, TrackedDelivery $trackedDelivery): JsonResponse
+    {
+        abort_unless($trackedDelivery->user_id === $request->user()->id, 404);
+        $trackedDelivery->delete();
+        return response()->json(['data' => ['deleted' => true]]);
     }
 
     public function storeRecipient(Request $request): JsonResponse

@@ -39,6 +39,11 @@ class User extends Authenticatable
         return $this->hasMany(SavedRecipient::class);
     }
 
+    public function trackedDeliveries()
+    {
+        return $this->hasMany(TrackedDelivery::class);
+    }
+
     /**
      * The attributes that should be hidden for serialization.
      *
