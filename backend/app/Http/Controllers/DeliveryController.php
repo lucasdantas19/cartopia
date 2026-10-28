@@ -19,7 +19,7 @@ class DeliveryController extends Controller
             'delivery' => $delivery,
             'recipient_access_token' => $recipientAccessToken,
             'sender_access_token' => $senderAccessToken,
-        ] = $createDelivery->handle($request->validated());
+        ] = $createDelivery->handle($request->validated(), $request->user()?->id);
 
         $recipientPath = '/d/'.$delivery->public_id.'#token='.$recipientAccessToken;
         $senderPath = '/d/'.$delivery->public_id.'#token='.$senderAccessToken.'&role=sender';

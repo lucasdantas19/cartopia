@@ -10,7 +10,7 @@ class CreateDelivery
     /**
      * @return array{delivery: Delivery, recipient_access_token: string, sender_access_token: string}
      */
-    public function handle(array $attributes): array
+    public function handle(array $attributes, ?int $userId = null): array
     {
         $startsAt = CarbonImmutable::now('UTC');
         $recipientAccessToken = bin2hex(random_bytes(32));
@@ -86,6 +86,7 @@ class CreateDelivery
 
         $delivery = Delivery::create([
             ...$attributes,
+            'user_id' => $userId,
             'courier' => $courier,
             'starts_at' => $startsAt,
             'arrives_at' => $arrivesAt,

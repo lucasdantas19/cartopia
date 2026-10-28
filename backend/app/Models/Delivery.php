@@ -10,6 +10,7 @@ class Delivery extends Model
 {
     protected $fillable = [
         'public_id',
+        'user_id',
         'message',
         'sender_name',
         'recipient_name',

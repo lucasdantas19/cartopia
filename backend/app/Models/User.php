@@ -24,6 +24,21 @@ class User extends Authenticatable
         'password',
     ];
 
+    public function deliveries()
+    {
+        return $this->hasMany(Delivery::class);
+    }
+
+    public function savedLocations()
+    {
+        return $this->hasMany(SavedLocation::class);
+    }
+
+    public function savedRecipients()
+    {
+        return $this->hasMany(SavedRecipient::class);
+    }
+
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -32,6 +47,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'api_token_hash',
     ];
 
     /**

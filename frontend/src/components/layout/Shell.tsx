@@ -6,9 +6,10 @@ interface ShellProps {
   eyebrow?: string
   onHome: () => void
   onPrivacy: () => void
+  onAccount?: () => void
 }
 
-export function Shell({ children, eyebrow = 'Cartas que atravessam mundos', onHome, onPrivacy }: ShellProps) {
+export function Shell({ children, eyebrow = 'Cartas que atravessam mundos', onHome, onPrivacy, onAccount }: ShellProps) {
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -20,6 +21,7 @@ export function Shell({ children, eyebrow = 'Cartas que atravessam mundos', onHo
           <span className="topbar-route" aria-hidden="true"><i /><b>· · ·</b><i /></span>
           Cada mensagem, uma aventura.
         </span>
+        {onAccount && <button className="text-button account-link" type="button" onClick={onAccount}>Minha conta</button>}
       </header>
       <main className="page-content">
         <p className="eyebrow">{eyebrow}</p>

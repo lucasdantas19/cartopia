@@ -191,6 +191,23 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .submit-button { margin-top: 1rem; padding: 1rem 1.5rem; }
 .error-message, .field-error { margin: .65rem 0 0; color: var(--danger); font-size: .82rem; }
 .text-button { border: 0; background: none; color: var(--muted); cursor: pointer; font: inherit; text-decoration: underline; }
+.account-link { margin-left: auto; color: var(--coral); font-size: .75rem; font-weight: 700; }
+.account-card, .account-section { max-width: 760px; padding: clamp(1.5rem, 5vw, 3rem); border: 1px solid var(--line); border-radius: 1.2rem; background: var(--surface); box-shadow: var(--shadow-soft); }
+.account-card { margin: 0 auto; }
+.account-card h1, .account-header h1 { margin-bottom: .75rem; }
+.account-form { display: grid; gap: .65rem; max-width: 30rem; margin: 2rem 0 1rem; }
+.account-form.compact { margin-top: 1.25rem; }
+.account-form .button { justify-self: start; margin-top: .4rem; }
+.account-header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.account-section { max-width: none; margin-top: 1rem; }
+.account-section h2 { margin: 0 0 1rem; font: 700 1.35rem var(--display); }
+.account-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.account-item { display: grid; grid-template-columns: 1fr auto; gap: .2rem .8rem; padding: .8rem 0; border-top: 1px solid var(--line); }
+.account-item strong, .account-item span, .account-item small { display: block; }
+.account-item span, .account-item small { color: var(--muted); font-size: .78rem; }
+.account-item button { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: .72rem; }
+.muted-copy { color: var(--muted); font-size: .85rem; }
+@media (max-width: 720px) { .account-columns { grid-template-columns: 1fr; } .topbar-note { display: none; } }
 
 .success-card, .state-card { max-width: 680px; padding: clamp(2rem, 7vw, 4rem); border: 1px solid var(--line); border-radius: 1.5rem; background: var(--surface); text-align: center; box-shadow: var(--shadow-soft); }
 .success-icon, .state-icon { display: inline-grid; place-items: center; width: 3.5rem; height: 3.5rem; margin-bottom: 1.5rem; border-radius: 50%; color: var(--cream); background: var(--coral); font-size: 1.5rem; }

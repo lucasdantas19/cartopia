@@ -14,6 +14,7 @@ interface CreatePageProps {
   onTrack: (publicId: string, token: string, role?: AccessRole) => void
   onHome: () => void
   onPrivacy: () => void
+  onAccount: () => void
 }
 
 interface CreatedDelivery {
@@ -108,7 +109,7 @@ function newStep(): CreateDeliveryStep {
   return { id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `step-${Date.now()}-${Math.random()}`, title: '', description: '', duration_minutes: 30 }
 }
 
-export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
+export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePageProps) {
   const [form, setForm] = useState<CreateDeliveryInput>(() => readDeliveryDraft()?.form ?? initialForm)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
@@ -237,7 +238,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
 
   if (created) {
     return (
-      <Shell eyebrow="A aventura está pronta" onHome={onHome} onPrivacy={onPrivacy}>
+      <Shell eyebrow="A aventura está pronta" onHome={onHome} onPrivacy={onPrivacy} onAccount={onAccount}>
         <DeliveryCreationSuccess
           created={created}
           copied={copied}
@@ -251,7 +252,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy }: CreatePageProps) {
   }
 
   return (
-    <Shell onHome={onHome} onPrivacy={onPrivacy}>
+    <Shell onHome={onHome} onPrivacy={onPrivacy} onAccount={onAccount}>
       <section className="intro create-intro">
         {draftRecovered && <p className="draft-restored" role="status">Rascunho recuperado desta sessão.</p>}
         <div className="intro-copy">

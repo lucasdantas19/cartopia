@@ -9,6 +9,17 @@ import type {
 import { resolveApiBaseUrl } from '../config/runtimeConfig.ts'
 
 const apiBaseUrl = resolveApiBaseUrl(import.meta.env)
+const authTokenStorageKey = 'cartopia.auth_token'
+
+export function getAuthToken(): string | null {
+  return typeof window === 'undefined' ? null : window.localStorage.getItem(authTokenStorageKey)
+}
+
+export function setAuthToken(token: string | null) {
+  if (typeof window === 'undefined') return
+  if (token) window.localStorage.setItem(authTokenStorageKey, token)
+  else window.localStorage.removeItem(authTokenStorageKey)
+}
 
 export class ApiError extends Error {
   status: number
@@ -32,6 +43,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers: {
       Accept: 'application/json',
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
       ...options.headers,
     },
   })
@@ -44,6 +56,48 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   return payload as T
+}
+
+export interface AuthUser { id: number; name: string; email: string }
+export interface SavedLocation { id: number; name: string; label: string; latitude: number; longitude: number }
+export interface SavedRecipient { id: number; name: string; nickname: string | null }
+export interface AccountDelivery { public_id: string; recipient_name: string; origin: string; destination: string; status: string; progress: number; starts_at: string; arrives_at: string }
+
+export function register(input: { name: string; email: string; password: string }) {
+  return request<{ data: AuthUser; token: string }>('/auth/register', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function login(input: { email: string; password: string }) {
+  return request<{ data: AuthUser; token: string }>('/auth/login', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function logout() {
+  return request<{ data: { logged_out: boolean } }>('/auth/logout', { method: 'POST' })
+}
+
+export function fetchAccount() {
+  return Promise.all([
+    request<{ data: AuthUser }>('/auth/me'),
+    request<{ data: AccountDelivery[] }>('/account/deliveries'),
+    request<{ data: SavedLocation[] }>('/account/locations'),
+    request<{ data: SavedRecipient[] }>('/account/recipients'),
+  ]).then(([user, deliveries, locations, recipients]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data }))
+}
+
+export function saveLocation(input: Omit<SavedLocation, 'id'>) {
+  return request<{ data: SavedLocation }>('/account/locations', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function deleteLocation(id: number) {
+  return request(`/account/locations/${id}`, { method: 'DELETE' })
+}
+
+export function saveRecipient(input: { name: string; nickname?: string }) {
+  return request<{ data: SavedRecipient }>('/account/recipients', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function deleteRecipient(id: number) {
+  return request(`/account/recipients/${id}`, { method: 'DELETE' })
 }
 
 export function createDelivery(input: CreateDeliveryInput) {
