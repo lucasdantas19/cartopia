@@ -212,6 +212,9 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .saved-location-map { margin: .35rem 0 .4rem; }
 .saved-location-map .location-picker { margin-top: .25rem; }
 .saved-location-select, .saved-recipient-select { height: 2.5rem; margin-top: .55rem; padding: 0 .7rem; font-size: .78rem; }
+.save-new-option { display: flex; align-items: center; gap: .45rem; margin: .55rem 0 0; color: var(--coral); font-size: .72rem; font-weight: 700; }
+.save-new-option input { width: auto; height: auto; accent-color: var(--coral); }
+.recipient-email-field { margin-top: .6rem; }
 .account-hero { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 1.25rem; align-items: center; margin-bottom: 1.25rem; padding: clamp(1.3rem, 4vw, 2.2rem); overflow: hidden; border: 1px solid #d3c9e6; border-radius: 1.25rem 1.25rem 1.25rem .3rem; background: linear-gradient(125deg, #f0ecfa, #e6f0f2 65%, #fff9ed); box-shadow: 8px 8px 0 rgba(227, 182, 93, .38); }
 .account-hero::after { position: absolute; right: -3rem; bottom: -5rem; width: 12rem; height: 12rem; border: 1px solid rgba(118, 104, 181, .2); border-radius: 50%; content: ''; }
 .account-avatar { position: relative; z-index: 1; display: grid; place-items: center; width: 4.5rem; height: 4.5rem; border: 2px solid var(--cream); border-radius: 1rem 1rem 1rem .25rem; color: var(--cream); background: var(--coral); box-shadow: 4px 4px 0 var(--peach); font: 700 1.8rem var(--display); transform: rotate(-4deg); }
@@ -221,7 +224,7 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .account-hero-copy .lead { margin-bottom: .55rem; font-size: .92rem; }
 .account-email { color: var(--coral); font: .7rem var(--mono); }
 .account-logout { position: relative; z-index: 1; white-space: nowrap; }
-.account-overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; margin-bottom: 1.25rem; }
+.account-overview { display: grid; grid-template-columns: repeat(5, 1fr); gap: .8rem; margin-bottom: 1.25rem; }
 .account-stat { display: flex; align-items: center; gap: .7rem; padding: 1rem; border: 1px solid var(--line); border-radius: .9rem; background: rgba(255, 255, 255, .58); }
 .account-stat-highlight { border-color: rgba(190, 91, 67, .28); background: #fff9ed; }
 .account-stat-icon { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .55rem; color: var(--coral); background: #f0ecfa; font-size: 1.05rem; }

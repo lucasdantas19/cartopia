@@ -22,6 +22,33 @@ class AccountController extends Controller
         ])]);
     }
 
+    public function incomingDeliveries(Request $request): JsonResponse
+    {
+        return response()->json(['data' => Delivery::whereRaw('LOWER(recipient_email) = ?', [strtolower($request->user()->email)])->latest()->get()->map(fn (Delivery $delivery): array => [
+            'public_id' => $delivery->public_id,
+            'sender_name' => $delivery->sender_name,
+            'recipient_name' => $delivery->recipient_name,
+            'origin' => $delivery->origin,
+            'destination' => $delivery->destination,
+            'status' => $delivery->status(),
+            'progress' => $delivery->progress(),
+            'arrives_at' => $delivery->arrives_at?->toISOString(),
+        ])]);
+    }
+
+    public function incomingDeliveryToken(Request $request, string $publicId): JsonResponse
+    {
+        $delivery = Delivery::where('public_id', $publicId)
+            ->whereRaw('LOWER(recipient_email) = ?', [strtolower($request->user()->email)])
+            ->firstOrFail();
+
+        return response()->json(['data' => [
+            'public_id' => $delivery->public_id,
+            'role' => 'recipient',
+            'access_token' => Crypt::decryptString($delivery->recipient_access_token_encrypted),
+        ]]);
+    }
+
     public function locations(Request $request): JsonResponse
     {
         return response()->json(['data' => $request->user()->savedLocations()->latest()->get()]);
@@ -103,7 +130,7 @@ class AccountController extends Controller
 
     public function storeRecipient(Request $request): JsonResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:120'], 'nickname' => ['nullable', 'string', 'max:80']]);
+        $data = $request->validate(['name' => ['required', 'string', 'max:120'], 'email' => ['nullable', 'email', 'max:255'], 'nickname' => ['nullable', 'string', 'max:80']]);
         return response()->json(['data' => $request->user()->savedRecipients()->create($data)], 201);
     }
 

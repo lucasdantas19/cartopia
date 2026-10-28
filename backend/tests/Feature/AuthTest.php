@@ -64,3 +64,17 @@ it('associates a delivery link with the authenticated account and protects it fr
         'public_id' => $delivery->json('data.public_id'), 'access_token' => 'token-invalido',
     ])->assertUnprocessable()->assertJsonPath('error.code', 'INVALID_DELIVERY_LINK');
 });
+
+it('shows deliveries addressed to a registered recipient in their account', function () {
+    $recipient = User::factory()->create(['email' => 'ana@example.com']);
+    $recipientToken = $this->postJson('/api/auth/login', ['email' => 'ana@example.com', 'password' => 'password'])->json('token');
+
+    $this->postJson('/api/deliveries', deliveryPayload([
+        'recipient_name' => 'Ana', 'recipient_email' => 'ANA@example.com',
+    ]))->assertCreated();
+
+    $this->withToken($recipientToken)->getJson('/api/account/incoming-deliveries')
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.recipient_name', 'Ana');
+    $this->withToken($recipientToken)->getJson('/api/account/incoming-deliveries/'.Delivery::first()->public_id.'/token')
+        ->assertOk()->assertJsonPath('data.role', 'recipient');
+});

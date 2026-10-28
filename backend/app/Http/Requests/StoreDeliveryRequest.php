@@ -18,6 +18,7 @@ class StoreDeliveryRequest extends FormRequest
             'message' => ['required', 'string', 'max:10000'],
             'sender_name' => ['nullable', 'string', 'max:120'],
             'recipient_name' => ['required', 'string', 'max:120'],
+            'recipient_email' => ['nullable', 'email', 'max:255'],
             'origin' => ['required', 'string', 'max:160'],
             'origin_location' => ['sometimes', 'array'],
             'origin_location.label' => ['required_with:origin_location', 'string', 'max:160'],

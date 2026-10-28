@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, deleteLocation, deleteRecipient, deleteTrackedDelivery, fetchAccount, fetchTrackedDeliveryToken, getAuthToken, logout, saveLocation, saveRecipient, saveTrackedDelivery, setAuthToken, type AccountDelivery, type AuthUser, type SavedLocation, type SavedRecipient, type TrackedDelivery } from '../services/api'
+import { ApiError, deleteLocation, deleteRecipient, deleteTrackedDelivery, fetchAccount, fetchIncomingDeliveryToken, fetchTrackedDeliveryToken, getAuthToken, logout, saveLocation, saveRecipient, saveTrackedDelivery, setAuthToken, type AccountDelivery, type AuthUser, type IncomingDelivery, type SavedLocation, type SavedRecipient, type TrackedDelivery } from '../services/api'
 import { Shell } from '../components/layout/Shell'
 import { LocationPicker } from '../components/delivery/LocationPicker'
 import { parseDeliveryLink } from '../services/accessToken'
@@ -18,16 +18,16 @@ function statusLabel(status: string): string {
 }
 
 export function AccountPage({ onHome, onPrivacy, onLogout, onTrack }: AccountPageProps) {
-  const [account, setAccount] = useState<{ user: AuthUser; deliveries: AccountDelivery[]; locations: SavedLocation[]; recipients: SavedRecipient[]; trackedDeliveries: TrackedDelivery[] } | null>(null)
+  const [account, setAccount] = useState<{ user: AuthUser; deliveries: AccountDelivery[]; locations: SavedLocation[]; recipients: SavedRecipient[]; trackedDeliveries: TrackedDelivery[]; incomingDeliveries: IncomingDelivery[] } | null>(null)
   const [error, setError] = useState('')
   const [trackedLink, setTrackedLink] = useState('')
   const [trackedLabel, setTrackedLabel] = useState('')
   const [savingTracked, setSavingTracked] = useState(false)
   const [location, setLocation] = useState({ name: '', label: '', latitude: '', longitude: '' })
-  const [recipient, setRecipient] = useState({ name: '', nickname: '' })
+  const [recipient, setRecipient] = useState({ name: '', email: '', nickname: '' })
 
   async function refresh() {
-    try { const data = await fetchAccount(); setAccount({ user: data, deliveries: data.deliveries, locations: data.locations, recipients: data.recipients, trackedDeliveries: data.trackedDeliveries }) }
+    try { const data = await fetchAccount(); setAccount({ user: data, deliveries: data.deliveries, locations: data.locations, recipients: data.recipients, trackedDeliveries: data.trackedDeliveries, incomingDeliveries: data.incomingDeliveries }) }
     catch (caught) { setError(caught instanceof ApiError ? caught.message : 'Não foi possível carregar sua conta.') }
   }
   useEffect(() => { void refresh() }, [])
@@ -58,7 +58,7 @@ export function AccountPage({ onHome, onPrivacy, onLogout, onTrack }: AccountPag
     }))
     setError('')
   }
-  async function addRecipient(event: FormEvent) { event.preventDefault(); await saveRecipient(recipient); setRecipient({ name: '', nickname: '' }); await refresh() }
+  async function addRecipient(event: FormEvent) { event.preventDefault(); await saveRecipient({ ...recipient, email: recipient.email || undefined }); setRecipient({ name: '', email: '', nickname: '' }); await refresh() }
 
   async function addTrackedDelivery(event: FormEvent) {
     event.preventDefault()
@@ -105,6 +105,7 @@ export function AccountPage({ onHome, onPrivacy, onLogout, onTrack }: AccountPag
   const locationCount = account?.locations.length ?? 0
   const recipientCount = account?.recipients.length ?? 0
   const trackedCount = account?.trackedDeliveries.length ?? 0
+  const incomingCount = account?.incomingDeliveries.length ?? 0
   const firstName = account?.user.name.split(' ')[0] ?? 'por aqui'
 
   return <Shell eyebrow="Seu atlas de lembranças" onHome={onHome} onPrivacy={onPrivacy}>
@@ -136,7 +137,22 @@ export function AccountPage({ onHome, onPrivacy, onLogout, onTrack }: AccountPag
         <span className="account-stat-icon" aria-hidden="true">◷</span>
         <div><strong>{trackedCount}</strong><small>entregas acompanhadas</small></div>
       </article>
+      <article className="account-stat account-stat-highlight">
+        <span className="account-stat-icon" aria-hidden="true">✉</span>
+        <div><strong>{incomingCount}</strong><small>novas para acompanhar</small></div>
+      </article>
     </section>
+    {incomingCount > 0 && <section className="account-section incoming-section">
+      <div className="account-section-heading"><div><p className="account-section-kicker">Chegou para você</p><h2>Novas entregas</h2></div><span>{incomingCount}</span></div>
+      <p className="account-section-description">Mensagens enviadas para o seu e-mail aparecem aqui automaticamente.</p>
+      <div className="incoming-delivery-list">{account?.incomingDeliveries.map((item) => (
+        <article className="incoming-delivery-card" key={item.public_id}>
+          <span className={`delivery-status ${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span>
+          <div><h3>{item.sender_name ? `${item.sender_name} enviou uma mensagem` : 'Você recebeu uma nova mensagem'}</h3><p>{item.origin} <i aria-hidden="true">→</i> {item.destination}</p></div>
+          <button className="button primary" type="button" onClick={() => { void fetchIncomingDeliveryToken(item.public_id).then((response) => onTrack(response.data.public_id, response.data.access_token, 'recipient')).catch((caught) => setError(caught instanceof ApiError ? caught.message : 'Não foi possível abrir essa entrega.')) }}>Acompanhar</button>
+        </article>
+      ))}</div>
+    </section>}
     <section className="account-section tracked-section">
       <div className="account-section-heading">
         <div><p className="account-section-kicker">Sempre por perto</p><h2>Entregas acompanhadas</h2></div>
@@ -213,6 +229,7 @@ export function AccountPage({ onHome, onPrivacy, onLogout, onTrack }: AccountPag
         ))}
         <form className="account-form compact" onSubmit={addRecipient}>
           <input required placeholder="Nome do destinatário" value={recipient.name} onChange={(event) => setRecipient({ ...recipient, name: event.target.value })} />
+          <input type="email" placeholder="E-mail para reconhecer a pessoa" value={recipient.email} onChange={(event) => setRecipient({ ...recipient, email: event.target.value })} />
           <input placeholder="Apelido (opcional)" value={recipient.nickname} onChange={(event) => setRecipient({ ...recipient, nickname: event.target.value })} />
           <button className="button secondary" type="submit">Salvar destinatário</button>
         </form>

@@ -10,10 +10,14 @@ interface EndpointLocationFieldProps {
   onChange: (location: DeliveryLocationValue) => void
   savedLocations: SavedLocation[]
   onSavedLocation: (location: SavedLocation) => void
+  canSave: boolean
+  saveNewLocation: boolean
+  onSaveNewLocationChange: (shouldSave: boolean) => void
 }
 
-export function EndpointLocationField({ label, location, fallback, onChange, savedLocations, onSavedLocation }: EndpointLocationFieldProps) {
+export function EndpointLocationField({ label, location, fallback, onChange, savedLocations, onSavedLocation, canSave, saveNewLocation, onSaveNewLocationChange }: EndpointLocationFieldProps) {
   const center: Coordinates = location ? [location.longitude, location.latitude] : fallback.coordinates
+  const isNewLocation = Boolean(location && !savedLocations.some((saved) => saved.latitude === location.latitude && saved.longitude === location.longitude))
 
   return <div className="endpoint-location-field">
     <label>{label}</label>
@@ -28,6 +32,7 @@ export function EndpointLocationField({ label, location, fallback, onChange, sav
         {savedLocations.map((saved) => <option key={saved.id} value={saved.id}>{saved.name} · {saved.label}</option>)}
       </select>
     )}
+    {canSave && isNewLocation && <label className="save-new-option"><input type="checkbox" checked={saveNewLocation} onChange={(event) => onSaveNewLocationChange(event.target.checked)} /><span>Salvar este lugar na minha conta</span></label>}
     <LocationPicker center={center} location={location ?? undefined} clearLabel="restaurar local sugerido" onChange={(value) => { if (value.latitude !== undefined && value.longitude !== undefined) onChange({ label: value.label, latitude: value.latitude, longitude: value.longitude }) }} onClear={() => onChange({ label: fallback.label, latitude: fallback.coordinates[1], longitude: fallback.coordinates[0] })} />
   </div>
 }

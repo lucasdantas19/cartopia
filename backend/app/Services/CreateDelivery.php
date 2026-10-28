@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Delivery;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Crypt;
 
 class CreateDelivery
 {
@@ -95,6 +96,7 @@ class CreateDelivery
             'route_visibility' => $routeVisibility,
             'route_legs' => $routeLegs ?: null,
             'access_token_hash' => hash('sha256', $recipientAccessToken),
+            'recipient_access_token_encrypted' => Crypt::encryptString($recipientAccessToken),
             'sender_access_token_hash' => hash('sha256', $senderAccessToken),
         ]);
 

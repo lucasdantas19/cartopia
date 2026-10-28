@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, createDelivery, fetchSavedItems, getAuthToken, type SavedLocation, type SavedRecipient } from '../services/api'
+import { ApiError, createDelivery, fetchSavedItems, getAuthToken, saveLocation, saveRecipient, type SavedLocation, type SavedRecipient } from '../services/api'
 import { createShareUrl } from '../services/accessToken'
 import { copyText } from '../utils/clipboard'
 import { CreateDeliveryForm } from '../components/delivery/CreateDeliveryForm'
@@ -123,6 +123,9 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
   const [draftRecovered] = useState(() => readDeliveryDraft() !== null)
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([])
   const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>([])
+  const [saveNewRecipient, setSaveNewRecipient] = useState(false)
+  const [saveNewOrigin, setSaveNewOrigin] = useState(false)
+  const [saveNewDestination, setSaveNewDestination] = useState(false)
 
   useEffect(() => {
     if (!getAuthToken()) return
@@ -232,6 +235,19 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
         duration_minutes: Number(form.duration_minutes),
         final_duration_minutes: Number(form.final_duration_minutes),
       })
+      if (getAuthToken()) {
+        const saveRequests: Promise<unknown>[] = []
+        if (saveNewRecipient && form.recipient_name.trim()) {
+          saveRequests.push(saveRecipient({ name: form.recipient_name.trim(), email: form.recipient_email?.trim() || undefined }))
+        }
+        if (saveNewOrigin && form.origin_location) {
+          saveRequests.push(saveLocation({ name: form.origin_location.label, label: form.origin_location.label, latitude: form.origin_location.latitude, longitude: form.origin_location.longitude }))
+        }
+        if (saveNewDestination && form.destination_location) {
+          saveRequests.push(saveLocation({ name: form.destination_location.label, label: form.destination_location.label, latitude: form.destination_location.latitude, longitude: form.destination_location.longitude }))
+        }
+        await Promise.allSettled(saveRequests)
+      }
       const recipientToken = response.recipient_access_token ?? response.access_token
       setCreated({ publicId: response.data.public_id, recipientUrl: createShareUrl(window.location.origin, response.data.public_id, recipientToken), senderUrl: createShareUrl(window.location.origin, response.data.public_id, response.sender_access_token, 'sender'), recipientToken, senderToken: response.sender_access_token })
     } catch (caught) {
@@ -323,6 +339,13 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
           onMoveStep={moveStep}
           savedLocations={savedLocations}
           savedRecipients={savedRecipients}
+          canSaveNewItems={Boolean(getAuthToken())}
+          saveNewRecipient={saveNewRecipient}
+          onSaveNewRecipientChange={setSaveNewRecipient}
+          saveNewOrigin={saveNewOrigin}
+          onSaveNewOriginChange={setSaveNewOrigin}
+          saveNewDestination={saveNewDestination}
+          onSaveNewDestinationChange={setSaveNewDestination}
         />
         <aside className={`create-sidebar ${showSummary ? '' : 'collapsed'}`}>
           <button type="button" className="summary-toggle" onClick={() => setShowSummary((visible) => !visible)} aria-expanded={showSummary}>

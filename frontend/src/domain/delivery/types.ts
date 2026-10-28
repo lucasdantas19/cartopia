@@ -41,6 +41,7 @@ export interface Delivery {
   public_id: string
   sender_name: string | null
   recipient_name: string
+  recipient_email?: string
   origin: string
   origin_location: DeliveryLocationValue | null
   destination: string
@@ -64,6 +65,7 @@ export interface CreateDeliveryInput {
   message: string
   sender_name?: string
   recipient_name: string
+  recipient_email?: string
   origin: string
   origin_location: DeliveryLocationValue | null
   destination: string

@@ -60,8 +60,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export interface AuthUser { id: number; name: string; email: string }
 export interface SavedLocation { id: number; name: string; label: string; latitude: number; longitude: number }
-export interface SavedRecipient { id: number; name: string; nickname: string | null }
+export interface SavedRecipient { id: number; name: string; email: string | null; nickname: string | null }
 export interface AccountDelivery { public_id: string; recipient_name: string; origin: string; destination: string; status: string; progress: number; starts_at: string; arrives_at: string }
+export interface IncomingDelivery { public_id: string; sender_name: string | null; recipient_name: string; origin: string; destination: string; status: string; progress: number; arrives_at: string }
 export interface TrackedDelivery { id: number; public_id: string; label: string | null; role: 'sender' | 'recipient'; recipient_name: string; origin: string; destination: string; status: string; progress: number; arrives_at: string }
 
 export function register(input: { name: string; email: string; password: string }) {
@@ -83,7 +84,8 @@ export function fetchAccount() {
     request<{ data: SavedLocation[] }>('/account/locations'),
     request<{ data: SavedRecipient[] }>('/account/recipients'),
     request<{ data: TrackedDelivery[] }>('/account/tracked-deliveries'),
-  ]).then(([user, deliveries, locations, recipients, trackedDeliveries]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data, trackedDeliveries: trackedDeliveries.data }))
+    request<{ data: IncomingDelivery[] }>('/account/incoming-deliveries'),
+  ]).then(([user, deliveries, locations, recipients, trackedDeliveries, incomingDeliveries]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data, trackedDeliveries: trackedDeliveries.data, incomingDeliveries: incomingDeliveries.data }))
 }
 
 export function fetchSavedItems() {
@@ -101,8 +103,12 @@ export function deleteLocation(id: number) {
   return request(`/account/locations/${id}`, { method: 'DELETE' })
 }
 
-export function saveRecipient(input: { name: string; nickname?: string }) {
+export function saveRecipient(input: { name: string; email?: string; nickname?: string }) {
   return request<{ data: SavedRecipient }>('/account/recipients', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function fetchIncomingDeliveryToken(publicId: string) {
+  return request<{ data: { public_id: string; role: 'recipient'; access_token: string } }>(`/account/incoming-deliveries/${encodeURIComponent(publicId)}/token`)
 }
 
 export function deleteRecipient(id: number) {

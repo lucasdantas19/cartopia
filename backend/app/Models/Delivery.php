@@ -14,6 +14,7 @@ class Delivery extends Model
         'message',
         'sender_name',
         'recipient_name',
+        'recipient_email',
         'origin',
         'origin_location',
         'destination',
@@ -26,6 +27,7 @@ class Delivery extends Model
         'arrives_at',
         'final_duration_minutes',
         'access_token_hash',
+        'recipient_access_token_encrypted',
         'sender_access_token_hash',
         'opened_at',
     ];

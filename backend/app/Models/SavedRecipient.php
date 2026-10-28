@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class SavedRecipient extends Model
 {
-    protected $fillable = ['name', 'nickname'];
+    protected $fillable = ['name', 'email', 'nickname'];
 }
