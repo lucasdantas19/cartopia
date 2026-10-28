@@ -7,6 +7,7 @@ import { JourneyPreview } from './JourneyPreview'
 import { couriers } from '../../domain/delivery/couriers'
 import { locations } from '../../domain/delivery/locations'
 import type { CreateDeliveryInput, CreateDeliveryStep } from '../../domain/delivery/types'
+import type { SavedLocation, SavedRecipient } from '../../services/api'
 import { toggleFormSection, type FormSectionState } from '../../utils/formSections'
 
 interface CreateDeliveryFormProps {
@@ -24,9 +25,11 @@ interface CreateDeliveryFormProps {
   onAddStep: () => void
   onRemoveStep: (index: number) => void
   onMoveStep: (index: number, direction: -1 | 1) => void
+  savedLocations: SavedLocation[]
+  savedRecipients: SavedRecipient[]
 }
 
-export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors, submitting, onSubmit, onFieldChange, onEndpointChange, onAdventureChange, onStepChange, onStepLocationChange, onAddStep, onRemoveStep, onMoveStep }: CreateDeliveryFormProps) {
+export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors, submitting, onSubmit, onFieldChange, onEndpointChange, onAdventureChange, onStepChange, onStepLocationChange, onAddStep, onRemoveStep, onMoveStep, savedLocations, savedRecipients }: CreateDeliveryFormProps) {
   const formRef = useRef<HTMLFormElement>(null)
   const [openSections, setOpenSections] = useState<FormSectionState>({ message: true, courier: false, adventure: false })
   const [courierSelected, setCourierSelected] = useState(false)
@@ -67,6 +70,10 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
 
   function touchField(field: string) {
     setTouchedFields((current) => ({ ...current, [field]: true }))
+  }
+
+  function useSavedLocation(kind: 'origin' | 'destination', location: SavedLocation) {
+    onEndpointChange(kind, { label: location.label, latitude: location.latitude, longitude: location.longitude })
   }
 
   function handleSectionKeyDown(event: KeyboardEvent<HTMLDivElement>, section: keyof typeof openSections) {
@@ -131,6 +138,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
           <div>
             <label htmlFor="recipient_name">Nome do destinatário <span className="required">*</span></label>
             <input id="recipient_name" required maxLength={120} value={form.recipient_name} aria-invalid={recipientError ? true : undefined} aria-describedby={recipientError ? 'recipient-name-error' : undefined} onBlur={() => touchField('recipient_name')} onChange={(event) => onFieldChange('recipient_name', event.target.value)} placeholder="Quem receberá?" />
+            {savedRecipients.length > 0 && <select className="saved-recipient-select" aria-label="Usar destinatário salvo" defaultValue="" onChange={(event) => { const recipient = savedRecipients.find((item) => String(item.id) === event.target.value); if (recipient) onFieldChange('recipient_name', recipient.name); event.currentTarget.value = '' }}><option value="">Usar destinatário salvo…</option>{savedRecipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.nickname ? `${recipient.nickname} · ${recipient.name}` : recipient.name}</option>)}</select>}
             {recipientError && <FieldError id="recipient-name-error" messages={[recipientError]} />}
           </div>
         </div>
@@ -207,9 +215,9 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
           </fieldset>
         )}
         <div className="route-fields">
-          <EndpointLocationField label="De" location={form.origin_location} fallback={locations[0]} onChange={(location) => onEndpointChange('origin', location)} />
+          <EndpointLocationField label="De" location={form.origin_location} fallback={locations[0]} savedLocations={savedLocations} onSavedLocation={(location) => useSavedLocation('origin', location)} onChange={(location) => onEndpointChange('origin', location)} />
           <span className="route-arrow" aria-hidden="true">→</span>
-          <EndpointLocationField label="Para" location={form.destination_location} fallback={locations[1]} onChange={(location) => onEndpointChange('destination', location)} />
+          <EndpointLocationField label="Para" location={form.destination_location} fallback={locations[1]} savedLocations={savedLocations} onSavedLocation={(location) => useSavedLocation('destination', location)} onChange={(location) => onEndpointChange('destination', location)} />
         </div>
         {!adventureEnabled && (
           <div className="duration-field">

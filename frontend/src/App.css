@@ -207,6 +207,9 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .account-item span, .account-item small { color: var(--muted); font-size: .78rem; }
 .account-item button { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: .72rem; }
 .muted-copy { color: var(--muted); font-size: .85rem; }
+.saved-location-map { margin: .35rem 0 .4rem; }
+.saved-location-map .location-picker { margin-top: .25rem; }
+.saved-location-select, .saved-recipient-select { height: 2.5rem; margin-top: .55rem; padding: 0 .7rem; font-size: .78rem; }
 @media (max-width: 720px) { .account-columns { grid-template-columns: 1fr; } .topbar-note { display: none; } }
 
 .success-card, .state-card { max-width: 680px; padding: clamp(2rem, 7vw, 4rem); border: 1px solid var(--line); border-radius: 1.5rem; background: var(--surface); text-align: center; box-shadow: var(--shadow-soft); }

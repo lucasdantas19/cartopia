@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, createDelivery } from '../services/api'
+import { ApiError, createDelivery, fetchSavedItems, getAuthToken, type SavedLocation, type SavedRecipient } from '../services/api'
 import { createShareUrl } from '../services/accessToken'
 import { copyText } from '../utils/clipboard'
 import { CreateDeliveryForm } from '../components/delivery/CreateDeliveryForm'
@@ -121,6 +121,16 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
   const [copied, setCopied] = useState<AccessRole | null>(null)
   const [copyError, setCopyError] = useState<AccessRole | null>(null)
   const [draftRecovered] = useState(() => readDeliveryDraft() !== null)
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([])
+  const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>([])
+
+  useEffect(() => {
+    if (!getAuthToken()) return
+    void fetchSavedItems().then(({ locations, recipients }) => {
+      setSavedLocations(locations)
+      setSavedRecipients(recipients)
+    }).catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     if (created) {
@@ -311,6 +321,8 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
           onAddStep={addStep}
           onRemoveStep={removeStep}
           onMoveStep={moveStep}
+          savedLocations={savedLocations}
+          savedRecipients={savedRecipients}
         />
         <aside className={`create-sidebar ${showSummary ? '' : 'collapsed'}`}>
           <button type="button" className="summary-toggle" onClick={() => setShowSummary((visible) => !visible)} aria-expanded={showSummary}>

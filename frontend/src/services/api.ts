@@ -84,6 +84,13 @@ export function fetchAccount() {
   ]).then(([user, deliveries, locations, recipients]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data }))
 }
 
+export function fetchSavedItems() {
+  return Promise.all([
+    request<{ data: SavedLocation[] }>('/account/locations'),
+    request<{ data: SavedRecipient[] }>('/account/recipients'),
+  ]).then(([locations, recipients]) => ({ locations: locations.data, recipients: recipients.data }))
+}
+
 export function saveLocation(input: Omit<SavedLocation, 'id'>) {
   return request<{ data: SavedLocation }>('/account/locations', { method: 'POST', body: JSON.stringify(input) })
 }
