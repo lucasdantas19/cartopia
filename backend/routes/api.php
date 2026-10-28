@@ -43,3 +43,7 @@ Route::middleware('admin.access')->prefix('admin')->group(function (): void {
     Route::post('/deliveries/{publicId}/regenerate-links', [AdminDeliveryController::class, 'regenerateLinks']);
     Route::delete('/deliveries/{publicId}', [AdminDeliveryController::class, 'destroy']);
 });
+
+Route::prefix('v1')->group(function (): void {
+    require __DIR__.'/api_v1.php';
+});

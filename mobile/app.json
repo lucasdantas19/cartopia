@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Cartopia",
+    "slug": "cartopia",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "cartopia",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cartopia.app"
+    },
+    "android": {
+      "package": "com.cartopia.app"
+    }
+  }
+}
