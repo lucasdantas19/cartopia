@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   Share,
   StyleSheet,
@@ -15,12 +14,14 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Linking from 'expo-linking'
 import { ApiError, fetchDelivery, fetchRecipientShareLink, openDeliveryMessage } from '../src/api'
 import { createDeliveryShareUrl, parseDeliveryLink, previewDeliveryShareUrl } from '../src/deepLinks'
 import { webUrl } from '../src/config'
 import type { Delivery } from '../src/domain'
 import { DeliveryJourneyMap } from '../src/components/DeliveryJourneyMap'
+import { useSession } from '../src/context/SessionContext'
 import { arrivalLabel, deliveryProgressPercent, deliveryStatusLabel } from '../src/trackingDisplay'
 import { deliveryMapRoute } from '../src/trackingMap'
 
@@ -40,8 +41,12 @@ const couriers = {
 }
 
 export default function TrackScreen() {
-  const params = useLocalSearchParams<{ publicId?: string; token?: string }>()
+  const params = useLocalSearchParams<{ publicId?: string; token?: string; fromAccount?: string }>()
   const router = useRouter()
+  const { session } = useSession()
+  const accessToken = params.fromAccount === 'sender'
+    ? session?.token
+    : typeof params.token === 'string' ? params.token : undefined
   const [link, setLink] = useState('')
   const [delivery, setDelivery] = useState<Delivery | null>(null)
   const [error, setError] = useState('')
@@ -64,7 +69,7 @@ export default function TrackScreen() {
 
   useEffect(() => {
     const publicId = typeof params.publicId === 'string' ? params.publicId : undefined
-    const token = typeof params.token === 'string' ? params.token : undefined
+    const token = accessToken
     requestId.current += 1
     messageRequestId.current += 1
     shareRequestId.current += 1
@@ -84,7 +89,7 @@ export default function TrackScreen() {
     setShowFullShareLink(false)
 
     if (publicId && token) void load(publicId, token, true)
-  }, [params.publicId, params.token])
+  }, [params.publicId, accessToken])
 
   useEffect(() => () => {
     requestId.current += 1
@@ -94,7 +99,7 @@ export default function TrackScreen() {
 
   useEffect(() => {
     const publicId = typeof params.publicId === 'string' ? params.publicId : undefined
-    const token = typeof params.token === 'string' ? params.token : undefined
+    const token = accessToken
     if (!publicId || !token || delivery?.status === 'DELIVERED') return
 
     const refresh = setInterval(() => {
@@ -102,12 +107,12 @@ export default function TrackScreen() {
     }, 30000)
 
     return () => clearInterval(refresh)
-  }, [delivery?.status, params.publicId, params.token])
+  }, [delivery?.status, params.publicId, accessToken])
 
   useEffect(() => {
     const subscription = Linking.addEventListener('url', ({ url }) => {
       const parsed = parseDeliveryLink(url)
-      if (parsed) router.setParams({ publicId: parsed.publicId, token: parsed.token })
+      if (parsed) router.setParams({ publicId: parsed.publicId, token: parsed.token, fromAccount: '' })
     })
 
     return () => subscription.remove()
@@ -142,12 +147,12 @@ export default function TrackScreen() {
       setError('Cole o link original de acompanhamento da entrega.')
       return
     }
-    router.setParams({ publicId: parsed.publicId, token: parsed.token })
+    router.setParams({ publicId: parsed.publicId, token: parsed.token, fromAccount: '' })
   }
 
   async function revealMessage() {
     const publicId = typeof params.publicId === 'string' ? params.publicId : undefined
-    const token = typeof params.token === 'string' ? params.token : undefined
+    const token = accessToken
     if (!publicId || !token) return
 
     const currentRequest = ++messageRequestId.current
@@ -167,7 +172,7 @@ export default function TrackScreen() {
 
   async function loadRecipientShareLink() {
     const publicId = typeof params.publicId === 'string' ? params.publicId : undefined
-    const senderToken = typeof params.token === 'string' ? params.token : undefined
+    const senderToken = accessToken
     if (!publicId || !senderToken || delivery?.access_role !== 'sender') return
 
     const currentRequest = ++shareRequestId.current
@@ -230,7 +235,7 @@ export default function TrackScreen() {
 
   function refresh() {
     const publicId = typeof params.publicId === 'string' ? params.publicId : undefined
-    const token = typeof params.token === 'string' ? params.token : undefined
+    const token = accessToken
     if (publicId && token) void load(publicId, token, false, true)
   }
 
@@ -283,10 +288,10 @@ export default function TrackScreen() {
                 <Pressable accessibilityRole="button" onPress={submit} style={styles.button}>
                   <Text style={styles.buttonText}>Abrir viagem</Text>
                 </Pressable>
-                {error && params.publicId && params.token ? (
+                {error && params.publicId && accessToken ? (
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => void load(String(params.publicId), String(params.token), true)}
+                    onPress={() => void load(String(params.publicId), accessToken, true)}
                     style={styles.retryButton}
                   >
                     <Text style={styles.retryButtonText}>Tentar novamente</Text>

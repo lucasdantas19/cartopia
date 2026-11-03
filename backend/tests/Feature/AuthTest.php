@@ -23,12 +23,35 @@ it('keeps account data private and allows anonymous deliveries', function () {
     $this->getJson('/api/account/deliveries')->assertUnauthorized();
     $this->withToken($token)->getJson('/api/account/deliveries')->assertOk()->assertJsonCount(0, 'data');
 
-    $anonymous = $this->postJson('/api/deliveries', deliveryPayload())->assertCreated();
-    expect(Delivery::find(1)->user_id)->toBeNull();
+    $anonymous = $this->withHeaders(['Authorization' => ''])->postJson('/api/deliveries', deliveryPayload())->assertCreated();
+    expect(Delivery::where('public_id', $anonymous->json('data.public_id'))->firstOrFail()->user_id)->toBeNull();
 
     $this->withToken($token)->postJson('/api/deliveries', deliveryPayload(['recipient_name' => 'Pessoa autenticada']))->assertCreated();
     expect(Delivery::where('user_id', $user->id)->count())->toBe(1);
     $this->withToken($token)->getJson('/api/account/deliveries')->assertJsonCount(1, 'data');
+});
+
+it('lets an account owner follow their sent delivery without exposing recipient content', function () {
+    $owner = User::factory()->create();
+    $other = User::factory()->create();
+    $ownerToken = $this->postJson('/api/v1/auth/login', ['email' => $owner->email, 'password' => 'password'])->json('token');
+    $otherToken = $this->postJson('/api/v1/auth/login', ['email' => $other->email, 'password' => 'password'])->json('token');
+    $created = $this->withToken($ownerToken)->postJson('/api/v1/deliveries', deliveryPayload())->assertCreated();
+    $publicId = $created->json('data.public_id');
+
+    $this->withToken($ownerToken)->getJson('/api/v1/deliveries/'.$publicId)
+        ->assertOk()->assertJsonPath('data.access_role', 'sender');
+    $this->withToken($ownerToken)->getJson('/api/v1/deliveries/'.$publicId.'/recipient-share-link')
+        ->assertOk()->assertJsonPath('data.recipient_access_token', $created->json('recipient_access_token'));
+    Delivery::where('public_id', $publicId)->update(['sender_access_token_hash' => null]);
+    $this->withToken($ownerToken)->getJson('/api/v1/deliveries/'.$publicId)
+        ->assertOk()->assertJsonPath('data.access_role', 'sender');
+    $this->withToken($ownerToken)->getJson('/api/v1/deliveries/'.$publicId.'/message')->assertNotFound();
+    $this->withToken($otherToken)->getJson('/api/v1/deliveries/'.$publicId)->assertNotFound();
+    $this->withToken($otherToken)->getJson('/api/v1/deliveries/'.$publicId.'/recipient-share-link')->assertNotFound();
+
+    $this->withToken($ownerToken)->postJson('/api/v1/auth/logout')->assertOk();
+    $this->withToken($ownerToken)->getJson('/api/v1/deliveries/'.$publicId)->assertNotFound();
 });
 
 it('stores saved recipients and locations only for their owner', function () {

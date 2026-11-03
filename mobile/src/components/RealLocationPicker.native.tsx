@@ -6,13 +6,13 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import MapView, { Marker, type LatLng } from 'react-native-maps'
 import { mapboxAccessToken } from '../config'
 import type { DeliveryLocation } from '../domain'

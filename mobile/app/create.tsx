@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Share,
   StyleSheet,
@@ -17,6 +16,7 @@ import {
   View,
   type ScrollViewInstance,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { ApiError, createDelivery } from '../src/api'
 import { webUrl } from '../src/config'
 import { RealLocationPicker } from '../src/components/RealLocationPicker'

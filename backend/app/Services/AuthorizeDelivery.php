@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Delivery;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class AuthorizeDelivery
@@ -23,6 +24,12 @@ class AuthorizeDelivery
         $role = hash_equals($delivery->access_token_hash, $hash)
             ? 'recipient'
             : ($delivery->sender_access_token_hash !== null && hash_equals($delivery->sender_access_token_hash, $hash) ? 'sender' : null);
+
+        if ($role === null && $delivery->user_id !== null) {
+            if (User::whereKey($delivery->user_id)->where('api_token_hash', $hash)->exists()) {
+                $role = 'sender';
+            }
+        }
 
         if ($role === null || ($requiredRole !== null && $role !== $requiredRole)) {
             abort(404);
