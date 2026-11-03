@@ -14,7 +14,9 @@ export type Delivery = {
   sender_name: string | null
   recipient_name: string
   origin: string
+  origin_location?: DeliveryLocation | null
   destination: string
+  destination_location?: DeliveryLocation | null
   starts_at: string | null
   arrives_at: string | null
   status: 'SCHEDULED' | 'IN_TRANSIT' | 'DELIVERED'

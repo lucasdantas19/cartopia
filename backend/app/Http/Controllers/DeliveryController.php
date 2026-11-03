@@ -10,6 +10,7 @@ use App\Services\CreateDelivery;
 use App\Services\OpenDeliveryMessage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 
 class DeliveryController extends Controller
 {
@@ -41,6 +42,27 @@ class DeliveryController extends Controller
         $delivery->setAttribute('access_role', $role);
 
         return DeliveryResource::make($delivery);
+    }
+
+    public function recipientShareLink(Request $request, string $publicId, AuthorizeDelivery $authorizeDelivery): JsonResponse
+    {
+        $delivery = $authorizeDelivery->handle($request, $publicId, 'sender')['delivery'];
+
+        if ($delivery->recipient_access_token_encrypted === null) {
+            return response()->json([
+                'error' => [
+                    'code' => 'SHARE_LINK_UNAVAILABLE',
+                    'message' => 'The recipient link is unavailable for this delivery.',
+                ],
+            ], 409);
+        }
+
+        return response()->json([
+            'data' => [
+                'public_id' => $delivery->public_id,
+                'recipient_access_token' => Crypt::decryptString($delivery->recipient_access_token_encrypted),
+            ],
+        ])->header('Cache-Control', 'no-store');
     }
 
     public function message(Request $request, string $publicId, AuthorizeDelivery $authorizeDelivery, OpenDeliveryMessage $openDeliveryMessage): DeliveryMessageResource|JsonResponse

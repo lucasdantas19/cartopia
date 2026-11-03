@@ -1,5 +1,9 @@
 # Cartopia Mobile
 
+## Entregas recentes sem login
+
+No celular, as cinco entregas mais recentes criadas no app ficam em **Recentes neste celular**, na tela inicial. O app guarda o acesso de remetente com `expo-secure-store`, permitindo reabrir o acompanhamento e recuperar o link do destinatário depois de fechar o aplicativo. Cada entrega pode ser removida da lista. Esses dados não são sincronizados entre aparelhos; no Android, a desinstalação do app apaga esse armazenamento local. Guarde o link de remetente se precisar acessar a entrega em outro aparelho.
+
 ## Testar em um celular na rede local
 
 O celular não consegue acessar `localhost` do computador. Crie `mobile/.env.local` apontando para o IP local da máquina que executa o Laravel:
@@ -51,6 +55,10 @@ A tela de criação pede uma origem e um destino reais. Em cada campo, é possí
 EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.seu_token_publico
 ```
 
-Sem esse token, ainda é possível tocar no mapa e informar o nome do lugar. O app envia nome e coordenadas em `origin_location` e `destination_location` para a API; os dois pontos precisam ser diferentes. O mapa funciona no Expo Go com o Expo SDK 58; para distribuir um build Android próprio, configure a chave do Google Maps conforme a documentação do `react-native-maps` no Expo. Restrinja os tokens públicos no provedor e nunca coloque chaves privadas em variáveis `EXPO_PUBLIC_`.
+No celular, sem esse token, ainda é possível tocar no mapa e informar o nome do lugar. No navegador, a escolha usa a busca de lugares e precisa do token. O app envia nome e coordenadas em `origin_location` e `destination_location` para a API; os dois pontos precisam ser diferentes. O mapa funciona no Expo Go com o Expo SDK 58; para distribuir um build Android próprio, configure a chave do Google Maps conforme a documentação do `react-native-maps` no Expo. Restrinja os tokens públicos no provedor e nunca coloque chaves privadas em variáveis `EXPO_PUBLIC_`.
+
+Na tela de acompanhamento do celular, entregas com coordenadas reais podem alternar entre **Porcentagem** e **Mapa**. O marcador do entregador avança entre origem e destino conforme o tempo da viagem. A linha no mapa é ilustrativa e não representa ruas percorridas ou localização por GPS. Entregas antigas sem coordenadas continuam com a visualização por porcentagem.
+
+Se o Expo Go não abrir o projeto após atualizar as dependências, confirme que o aplicativo Expo Go instalado no celular é compatível com o SDK 58 e reinicie o servidor com `npm start -- --lan --clear`. Use a versão de Node indicada no `.nvmrc` da raiz do repositório (`nvm use`).
 
 Para Android Emulator, a URL normalmente é `http://10.0.2.2:8000/api/v1`; para iOS Simulator, `http://127.0.0.1:8000/api/v1`.

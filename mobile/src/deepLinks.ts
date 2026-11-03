@@ -44,3 +44,11 @@ export function createDeliveryShareUrl(
     return null
   }
 }
+
+export function previewDeliveryShareUrl(url: string) {
+  const parsed = new URL(url)
+  const publicId = parsed.pathname.split('/').pop() ?? ''
+  const shortId = publicId.length > 8 ? `${publicId.slice(0, 8)}…` : publicId
+
+  return `${parsed.host}/d/${shortId}`
+}

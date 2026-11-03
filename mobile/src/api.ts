@@ -63,6 +63,14 @@ export function fetchDelivery(publicId: string, token: string) {
   return request<{ data: Delivery }>(`/deliveries/${encodeURIComponent(publicId)}`, {}, token)
 }
 
+export function fetchRecipientShareLink(publicId: string, senderToken: string) {
+  return request<{ data: { public_id: string; recipient_access_token: string } }>(
+    `/deliveries/${encodeURIComponent(publicId)}/recipient-share-link`,
+    {},
+    senderToken,
+  )
+}
+
 export function openDeliveryMessage(publicId: string, token: string) {
   return request<{ data: DeliveryMessage }>(`/deliveries/${encodeURIComponent(publicId)}/message`, {}, token)
 }

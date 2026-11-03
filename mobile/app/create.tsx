@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import * as Clipboard from 'expo-clipboard'
 import { Link, usePreventRemove, useRouter } from 'expo-router'
 import {
   ActivityIndicator,
@@ -20,8 +21,9 @@ import { ApiError, createDelivery } from '../src/api'
 import { webUrl } from '../src/config'
 import { RealLocationPicker } from '../src/components/RealLocationPicker'
 import { useSession } from '../src/context/SessionContext'
-import { createDeliveryShareUrl } from '../src/deepLinks'
+import { createDeliveryShareUrl, previewDeliveryShareUrl } from '../src/deepLinks'
 import type { DeliveryLocation } from '../src/domain'
+import { saveRecentDelivery } from '../src/recentDeliveries'
 import {
   validateCreateDelivery,
   type CreateDeliveryErrors,
@@ -67,6 +69,10 @@ export default function CreateScreen() {
   const [fieldErrors, setFieldErrors] = useState<CreateDeliveryErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [copying, setCopying] = useState(false)
+  const [copiedLink, setCopiedLink] = useState<'sender' | 'recipient' | null>(null)
+  const [expandedLink, setExpandedLink] = useState<'sender' | 'recipient' | null>(null)
+  const [recentSaveState, setRecentSaveState] = useState<'idle' | 'saved' | 'failed'>('idle')
   const [created, setCreated] = useState<{
     publicId: string
     recipientToken: string
@@ -154,6 +160,22 @@ export default function CreateScreen() {
         duration_minutes: durationMinutes,
       }, session?.token)
 
+      if (Platform.OS !== 'web') {
+        try {
+          await saveRecentDelivery({
+            publicId: response.data.public_id,
+            senderToken: response.sender_access_token,
+            recipientName: recipientName.trim(),
+            origin,
+            destination,
+            createdAt: new Date().toISOString(),
+          })
+          setRecentSaveState('saved')
+        } catch {
+          setRecentSaveState('failed')
+        }
+      }
+
       setCreated({
         publicId: response.data.public_id,
         recipientToken: response.recipient_access_token,
@@ -197,9 +219,30 @@ export default function CreateScreen() {
     try {
       await Share.share({ message: url })
     } catch {
-      setError('Não foi possível abrir o compartilhamento. Selecione e copie o link abaixo.')
+      setError('Não foi possível compartilhar. Copie o link ou abra a versão completa abaixo.')
     } finally {
       setSharing(false)
+    }
+  }
+
+  async function copyLink(role: 'sender' | 'recipient') {
+    if (!created) return
+    const token = role === 'sender' ? created.senderToken : created.recipientToken
+    const url = createDeliveryShareUrl(webUrl, created.publicId, token, role)
+    if (!url) return
+
+    setCopying(true)
+    setCopiedLink(null)
+    setError('')
+    try {
+      const copied = await Clipboard.setStringAsync(url)
+      if (!copied) throw new Error('Clipboard unavailable')
+      setCopiedLink(role)
+    } catch {
+      setError('Não foi possível copiar automaticamente. Abra o link completo abaixo para selecionar e copiar.')
+      setExpandedLink(role)
+    } finally {
+      setCopying(false)
     }
   }
 
@@ -227,15 +270,47 @@ export default function CreateScreen() {
                 <Text style={styles.sectionDescription}>
                   Compartilhe este link para que a pessoa acompanhe e abra a carta quando ela chegar.
                 </Text>
-                <Text selectable style={styles.shareUrl}>{recipientUrl}</Text>
+                <View style={styles.linkPreview}>
+                  <Text style={styles.linkPreviewRole}>PARA QUEM RECEBE</Text>
+                  <Text numberOfLines={1} style={styles.linkPreviewText}>
+                    {previewDeliveryShareUrl(recipientUrl)}
+                  </Text>
+                </View>
+                <View style={styles.linkActions}>
+                  <Pressable
+                    accessibilityLabel="Compartilhar link do destinatário"
+                    accessibilityRole="button"
+                    disabled={sharing}
+                    onPress={() => void shareLink('recipient')}
+                    style={styles.linkPrimaryButton}
+                  >
+                    <Text style={styles.linkPrimaryText}>Compartilhar</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="Copiar link do destinatário"
+                    accessibilityRole="button"
+                    disabled={copying}
+                    onPress={() => void copyLink('recipient')}
+                    style={styles.linkSecondaryButton}
+                  >
+                    <Text style={styles.linkSecondaryText}>Copiar link</Text>
+                  </Pressable>
+                </View>
+                {copiedLink === 'recipient' ? (
+                  <Text accessibilityRole="alert" style={styles.copiedText}>Link completo copiado.</Text>
+                ) : null}
                 <Pressable
                   accessibilityRole="button"
-                  disabled={sharing}
-                  onPress={() => void shareLink('recipient')}
-                  style={styles.submitButton}
+                  onPress={() => setExpandedLink(expandedLink === 'recipient' ? null : 'recipient')}
+                  style={styles.revealLinkButton}
                 >
-                  <Text style={styles.submitText}>Compartilhar com o destinatário</Text>
+                  <Text style={styles.revealLinkText}>
+                    {expandedLink === 'recipient' ? 'Ocultar link completo' : 'Ver link completo'}
+                  </Text>
                 </Pressable>
+                {expandedLink === 'recipient' ? (
+                  <Text selectable style={styles.shareUrl}>{recipientUrl}</Text>
+                ) : null}
               </View>
 
               <View style={styles.successCard}>
@@ -243,20 +318,62 @@ export default function CreateScreen() {
                 <Text style={styles.sectionDescription}>
                   Guarde este link. Ele dá acesso ao acompanhamento do remetente.
                 </Text>
-                <Text selectable style={styles.shareUrl}>{senderUrl}</Text>
+                <View style={styles.linkPreview}>
+                  <Text style={styles.linkPreviewRole}>PARA VOCÊ</Text>
+                  <Text numberOfLines={1} style={styles.linkPreviewText}>
+                    {previewDeliveryShareUrl(senderUrl)}
+                  </Text>
+                </View>
+                <View style={styles.linkActions}>
+                  <Pressable
+                    accessibilityLabel="Copiar meu link de remetente"
+                    accessibilityRole="button"
+                    disabled={copying}
+                    onPress={() => void copyLink('sender')}
+                    style={styles.linkPrimaryButton}
+                  >
+                    <Text style={styles.linkPrimaryText}>Copiar link</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="Compartilhar meu link de remetente"
+                    accessibilityRole="button"
+                    disabled={sharing}
+                    onPress={() => void shareLink('sender')}
+                    style={styles.linkSecondaryButton}
+                  >
+                    <Text style={styles.linkSecondaryText}>Compartilhar</Text>
+                  </Pressable>
+                </View>
+                {copiedLink === 'sender' ? (
+                  <Text accessibilityRole="alert" style={styles.copiedText}>Link completo copiado.</Text>
+                ) : null}
                 <Pressable
                   accessibilityRole="button"
-                  disabled={sharing}
-                  onPress={() => void shareLink('sender')}
-                  style={styles.secondaryButton}
+                  onPress={() => setExpandedLink(expandedLink === 'sender' ? null : 'sender')}
+                  style={styles.revealLinkButton}
                 >
-                  <Text style={styles.secondaryButtonText}>Guardar ou compartilhar meu link</Text>
+                  <Text style={styles.revealLinkText}>
+                    {expandedLink === 'sender' ? 'Ocultar link completo' : 'Ver link completo'}
+                  </Text>
                 </Pressable>
+                {expandedLink === 'sender' ? (
+                  <Text selectable style={styles.shareUrl}>{senderUrl}</Text>
+                ) : null}
               </View>
             </>
           )}
 
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+          {recentSaveState === 'saved' ? (
+            <Text style={styles.localSaveNote}>
+              Esta entrega está em Recentes neste celular, na tela inicial. Guarde seu link para acessar em outro aparelho.
+            </Text>
+          ) : null}
+          {recentSaveState === 'failed' ? (
+            <Text accessibilityRole="alert" style={styles.localSaveError}>
+              A entrega foi criada, mas não pôde ser salva neste celular. Guarde seu link de remetente.
+            </Text>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             onPress={() => router.replace({
@@ -630,7 +747,96 @@ const styles = StyleSheet.create({
   submitButton: { alignItems: 'center', backgroundColor: '#7c3aed', borderRadius: 12, marginTop: 24, padding: 16 },
   submitText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   successCard: { backgroundColor: '#ffffff', borderRadius: 20, marginBottom: 16, padding: 18 },
-  shareUrl: { color: '#554766', fontSize: 13, lineHeight: 20, marginTop: 16 },
+  linkPreview: {
+    backgroundColor: '#f7f2ff',
+    borderRadius: 12,
+    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  linkPreviewText: {
+    color: '#4b2782',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  linkPreviewRole: {
+    color: '#7c3aed',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  linkActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  linkPrimaryButton: {
+    alignItems: 'center',
+    backgroundColor: '#7c3aed',
+    borderRadius: 12,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 8,
+  },
+  linkPrimaryText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  linkSecondaryButton: {
+    alignItems: 'center',
+    borderColor: '#d7c6f1',
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 8,
+  },
+  linkSecondaryText: {
+    color: '#7c3aed',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  copiedText: {
+    color: '#24724b',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 10,
+  },
+  revealLinkButton: {
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    minHeight: 44,
+    marginTop: 4,
+  },
+  revealLinkText: {
+    color: '#7c3aed',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  shareUrl: {
+    color: '#554766',
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  localSaveNote: {
+    color: '#24724b',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 4,
+    marginTop: 10,
+  },
+  localSaveError: {
+    color: '#b42318',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 4,
+    marginTop: 10,
+  },
   secondaryButton: { alignItems: 'center', borderColor: '#e5dcef', borderRadius: 12, borderWidth: 1, marginTop: 16, padding: 16 },
   secondaryButtonText: { color: '#7c3aed', fontSize: 16, fontWeight: '700' },
   backHome: { color: '#7c3aed', fontSize: 16, marginBottom: 24, marginTop: 28, textAlign: 'center' },

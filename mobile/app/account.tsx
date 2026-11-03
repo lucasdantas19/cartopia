@@ -12,6 +12,7 @@ import {
 import { ApiError, fetchAccountDeliveries, fetchIncomingDeliveries, fetchIncomingDeliveryToken } from '../src/api'
 import { useSession } from '../src/context/SessionContext'
 import type { AccountDelivery } from '../src/domain'
+import { deliveryProgressPercent } from '../src/trackingDisplay'
 
 function statusLabel(status: AccountDelivery['status']) {
   return {
@@ -33,7 +34,7 @@ function DeliveryCard({ delivery, action }: { delivery: AccountDelivery; action?
         {delivery.origin} → {delivery.destination}
       </Text>
       <View style={styles.progressTrack}>
-        <View style={[styles.progressValue, { width: `${Math.round(delivery.progress * 100)}%` }]} />
+        <View style={[styles.progressValue, { width: `${deliveryProgressPercent(delivery.progress)}%` }]} />
       </View>
       {action ? (
         <Pressable onPress={action} style={styles.cardButton}>

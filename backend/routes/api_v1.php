@@ -34,5 +34,7 @@ Route::post('/deliveries', [DeliveryController::class, 'store'])
     ->middleware(['throttle:delivery-creation', 'user.optional']);
 Route::get('/deliveries/{publicId}', [DeliveryController::class, 'show'])
     ->middleware('throttle:delivery-tracking');
+Route::get('/deliveries/{publicId}/recipient-share-link', [DeliveryController::class, 'recipientShareLink'])
+    ->middleware('throttle:delivery-tracking');
 Route::get('/deliveries/{publicId}/message', [DeliveryController::class, 'message'])
     ->middleware('throttle:message-opening');
