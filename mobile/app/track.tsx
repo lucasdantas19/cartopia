@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import * as Linking from 'expo-linking'
@@ -16,13 +16,28 @@ export default function TrackScreen() {
   const [messageError, setMessageError] = useState('')
   const [openingMessage, setOpeningMessage] = useState(false)
   const [loading, setLoading] = useState(false)
+  const requestId = useRef(0)
+  const messageRequestId = useRef(0)
 
   useEffect(() => {
     const publicId = typeof params.publicId === 'string' ? params.publicId : undefined
     const token = typeof params.token === 'string' ? params.token : undefined
-    if (!publicId || !token) return
-    void load(publicId, token)
+    requestId.current += 1
+    messageRequestId.current += 1
+    setDelivery(null)
+    setMessage(null)
+    setMessageError('')
+    setOpeningMessage(false)
+    setError('')
+    setLoading(false)
+
+    if (publicId && token) void load(publicId, token, true)
   }, [params.publicId, params.token])
+
+  useEffect(() => () => {
+    requestId.current += 1
+    messageRequestId.current += 1
+  }, [])
 
   useEffect(() => {
     const publicId = typeof params.publicId === 'string' ? params.publicId : undefined
@@ -37,15 +52,6 @@ export default function TrackScreen() {
   }, [delivery?.status, params.publicId, params.token])
 
   useEffect(() => {
-    async function openIncomingLink() {
-      const url = await Linking.getInitialURL()
-      if (!url) return
-
-      const parsed = parseDeliveryLink(url)
-      if (parsed) router.setParams({ publicId: parsed.publicId, token: parsed.token })
-    }
-
-    void openIncomingLink()
     const subscription = Linking.addEventListener('url', ({ url }) => {
       const parsed = parseDeliveryLink(url)
       if (parsed) router.setParams({ publicId: parsed.publicId, token: parsed.token })
@@ -54,15 +60,19 @@ export default function TrackScreen() {
     return () => subscription.remove()
   }, [router])
 
-  async function load(publicId: string, token: string) {
-    setLoading(true)
+  async function load(publicId: string, token: string, showLoading = false) {
+    const currentRequest = ++requestId.current
+    if (showLoading) setLoading(true)
     setError('')
     try {
-      setDelivery((await fetchDelivery(publicId, token)).data)
+      const response = await fetchDelivery(publicId, token)
+      if (requestId.current === currentRequest) setDelivery(response.data)
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : 'Não foi possível carregar esta entrega.')
+      if (requestId.current === currentRequest) {
+        setError(caught instanceof ApiError ? caught.message : 'Não foi possível carregar esta entrega.')
+      }
     } finally {
-      setLoading(false)
+      if (requestId.current === currentRequest && showLoading) setLoading(false)
     }
   }
 
@@ -80,15 +90,18 @@ export default function TrackScreen() {
     const token = typeof params.token === 'string' ? params.token : undefined
     if (!publicId || !token) return
 
+    const currentRequest = ++messageRequestId.current
     setOpeningMessage(true)
     setMessageError('')
     try {
       const response = await openDeliveryMessage(publicId, token)
-      setMessage(response.data.message)
+      if (messageRequestId.current === currentRequest) setMessage(response.data.message)
     } catch (caught) {
-      setMessageError(caught instanceof ApiError ? caught.message : 'Não foi possível abrir a mensagem agora.')
+      if (messageRequestId.current === currentRequest) {
+        setMessageError(caught instanceof ApiError ? caught.message : 'Não foi possível abrir a mensagem agora.')
+      }
     } finally {
-      setOpeningMessage(false)
+      if (messageRequestId.current === currentRequest) setOpeningMessage(false)
     }
   }
 
@@ -106,9 +119,25 @@ export default function TrackScreen() {
           <Pressable onPress={submit} style={styles.button}>
             <Text style={styles.buttonText}>Abrir viagem</Text>
           </Pressable>
+          {error && params.publicId && params.token ? (
+            <Pressable
+              onPress={() => void load(String(params.publicId), String(params.token), true)}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryButtonText}>Tentar novamente</Text>
+            </Pressable>
+          ) : null}
         </>
       ) : (
         <>
+          {error ? (
+            <View style={styles.refreshError}>
+              <Text style={styles.error}>{error}</Text>
+              <Pressable onPress={() => void load(String(params.publicId), String(params.token))}>
+                <Text style={styles.retryButtonText}>Tentar novamente</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={styles.card}>
             <Text style={styles.status}>{delivery.status === 'DELIVERED' ? 'Chegou ao destino' : 'A caminho'}</Text>
             <Text style={styles.recipient}>{delivery.recipient_name}</Text>
@@ -156,6 +185,9 @@ const styles = StyleSheet.create({
   error: { color: '#b42318', marginBottom: 12 },
   button: { alignItems: 'center', backgroundColor: '#7c3aed', borderRadius: 12, padding: 16 },
   buttonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
+  retryButton: { alignItems: 'center', marginTop: 18, padding: 12 },
+  retryButtonText: { color: '#7c3aed', fontSize: 15, fontWeight: '700' },
+  refreshError: { backgroundColor: '#fff3d6', borderRadius: 12, marginBottom: 16, padding: 16 },
   card: { backgroundColor: '#ffffff', borderRadius: 20, padding: 22 },
   status: { color: '#7c3aed', fontSize: 14, fontWeight: '800', marginBottom: 14 },
   recipient: { color: '#241b35', fontSize: 28, fontWeight: '800', marginBottom: 8 },
