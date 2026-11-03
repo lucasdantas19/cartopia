@@ -1,11 +1,12 @@
 import { apiUrl } from './config'
-import type { AccountDelivery, Delivery, DeliveryMessage, Session, User } from './domain'
+import type { AccountDelivery, Delivery, DeliveryLocation, DeliveryMessage, Session, User } from './domain'
 
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
     readonly code: string | null = null,
+    readonly errors: Record<string, string[]> | null = null,
   ) {
     super(message)
   }
@@ -32,9 +33,10 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
 
   if (!response.ok) {
     throw new ApiError(
-      body?.error?.message ?? 'Não foi possível concluir a solicitação.',
+      body?.error?.message ?? body?.message ?? 'Não foi possível concluir a solicitação.',
       response.status,
       body?.error?.code ?? null,
+      body?.errors ?? null,
     )
   }
 
@@ -91,7 +93,9 @@ export type CreateDeliveryPayload = {
   recipient_name: string
   recipient_email?: string
   origin: string
+  origin_location: DeliveryLocation
   destination: string
+  destination_location: DeliveryLocation
   courier: string
   duration_minutes: number
 }

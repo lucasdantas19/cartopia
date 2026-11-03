@@ -42,3 +42,9 @@ export type AccountDelivery = {
   starts_at?: string | null
   arrives_at: string | null
 }
+
+export type DeliveryLocation = {
+  label: string
+  latitude: number
+  longitude: number
+}

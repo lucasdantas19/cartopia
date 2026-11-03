@@ -29,3 +29,18 @@ export function deliveryPath(publicId: string, token: string, role: 'sender' | '
   const roleQuery = role === 'sender' ? '&role=sender' : ''
   return `/d/${encodeURIComponent(publicId)}#token=${encodeURIComponent(token)}${roleQuery}`
 }
+
+export function createDeliveryShareUrl(
+  baseUrl: string,
+  publicId: string,
+  token: string,
+  role: 'sender' | 'recipient',
+): string | null {
+  try {
+    const url = new URL(baseUrl)
+    if (!['http:', 'https:'].includes(url.protocol)) return null
+    return `${url.origin}${deliveryPath(publicId, token, role)}`
+  } catch {
+    return null
+  }
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { deliveryPath, parseDeliveryLink } from '../src/deepLinks.ts'
+import { createDeliveryShareUrl, deliveryPath, parseDeliveryLink } from '../src/deepLinks.ts'
 
 test('parses recipient delivery links', () => {
   assert.deepEqual(parseDeliveryLink('https://cartopia.test/d/abc-123#token=secret'), {
@@ -21,4 +21,16 @@ test('parses sender role and preserves encoded values', () => {
 
 test('rejects links without an access token', () => {
   assert.equal(parseDeliveryLink('https://cartopia.test/d/abc-123'), null)
+})
+
+test('creates different web links for recipient and sender', () => {
+  assert.equal(
+    createDeliveryShareUrl('https://cartopia.test/', 'abc/123', 'recipient token', 'recipient'),
+    'https://cartopia.test/d/abc%2F123#token=recipient%20token',
+  )
+  assert.equal(
+    createDeliveryShareUrl('https://cartopia.test/', 'abc/123', 'sender token', 'sender'),
+    'https://cartopia.test/d/abc%2F123#token=sender%20token&role=sender',
+  )
+  assert.equal(createDeliveryShareUrl('', 'abc', 'token', 'recipient'), null)
 })
