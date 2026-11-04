@@ -1,12 +1,13 @@
 import { accountSections, type AccountSection } from '../utils/accountNavigation'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, deleteLocation, deleteRecipient, deleteTrackedDelivery, fetchAccount, fetchActiveMapDeliveries, fetchIncomingDeliveryToken, fetchTrackedDeliveryToken, getAuthToken, logout, openDeliveryMessage, saveLocation, saveRecipient, saveTrackedDelivery, setAuthToken, setDefaultLocation, type AccountDelivery, type ActiveMapDelivery, type AuthUser, type IncomingDelivery, type SavedLocation, type SavedRecipient, type TrackedDelivery } from '../services/api'
+import { ApiError, deleteDeliveryPreference, deleteLocation, deleteRecipient, deleteTrackedDelivery, fetchAccount, fetchActiveMapDeliveries, fetchIncomingDeliveryToken, fetchSentDeliveryToken, fetchTrackedDeliveryToken, getAuthToken, logout, openDeliveryMessage, saveDeliveryPreference, saveLocation, saveRecipient, saveTrackedDelivery, setAuthToken, setDefaultLocation, updateDeliverySettings, type AccountDelivery, type ActiveMapDelivery, type AuthUser, type DeliveryPreference, type DeliverySettings, type IncomingDelivery, type SavedLocation, type SavedRecipient, type TrackedDelivery } from '../services/api'
 import { Shell } from '../components/layout/Shell'
 import { LocationPicker } from '../components/delivery/LocationPicker'
 import { parseDeliveryLink } from '../services/accessToken'
 import { ActiveDeliveriesMap } from '../components/account/ActiveDeliveriesMap'
 import { activeMapColors, activeMapRoute } from '../components/account/activeMapRoutes'
+import { deliveriesForRecipient } from '../utils/recipientDeliveries'
 
 interface AccountPageProps {
   section: AccountSection
@@ -28,7 +29,7 @@ function statusLabel(status: string): string {
 }
 
 export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, onTrack }: AccountPageProps) {
-  const [account, setAccount] = useState<{ user: AuthUser; deliveries: AccountDelivery[]; locations: SavedLocation[]; recipients: SavedRecipient[]; trackedDeliveries: TrackedDelivery[]; incomingDeliveries: IncomingDelivery[] } | null>(null)
+  const [account, setAccount] = useState<{ user: AuthUser; deliveries: AccountDelivery[]; locations: SavedLocation[]; recipients: SavedRecipient[]; trackedDeliveries: TrackedDelivery[]; incomingDeliveries: IncomingDelivery[]; deliverySettings: DeliverySettings; deliveryPreferences: DeliveryPreference[] } | null>(null)
   const letterRef = useRef<HTMLDialogElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const [busy, setBusy] = useState(false)
@@ -42,6 +43,8 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
   const [savingTracked, setSavingTracked] = useState(false)
   const [location, setLocation] = useState({ name: '', label: '', latitude: '', longitude: '' })
   const [recipient, setRecipient] = useState({ name: '', email: '', nickname: '' })
+  const [preference, setPreference] = useState({ senderEmail: '', locationId: '' })
+  const [selectedRecipient, setSelectedRecipient] = useState<SavedRecipient | null>(null)
   const [letterModal, setLetterModal] = useState<{ sender: string | null; message: string } | null>(null)
   const [letterLoading, setLetterLoading] = useState(false)
   useEffect(() => {
@@ -61,6 +64,8 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
         recipients: data.recipients,
         trackedDeliveries: data.trackedDeliveries,
         incomingDeliveries: data.incomingDeliveries,
+        deliverySettings: data.deliverySettings,
+        deliveryPreferences: data.deliveryPreferences,
       })
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Não foi possível carregar sua conta.')
@@ -165,10 +170,26 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
       setSavingTracked(false)
     }
   }
+  async function addDeliveryPreference(event: FormEvent) {
+    event.preventDefault()
+    await mutate(async () => {
+      await saveDeliveryPreference({ sender_email: preference.senderEmail.trim(), location_id: Number(preference.locationId) })
+      setPreference({ senderEmail: '', locationId: '' })
+    })
+  }
   async function openTrackedDelivery(item: TrackedDelivery) {
     try {
       const response = await fetchTrackedDeliveryToken(item.id)
       onTrack(response.data.public_id, response.data.access_token, response.data.role)
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Não foi possível abrir essa entrega.')
+    }
+  }
+
+  async function openSentDelivery(item: AccountDelivery) {
+    try {
+      const response = await fetchSentDeliveryToken(item.public_id)
+      onTrack(response.data.public_id, response.data.access_token, 'sender')
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Não foi possível abrir essa entrega.')
     }
@@ -205,6 +226,9 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
   const firstName = account?.user.name.split(' ')[0] ?? 'por aqui'
   const currentSection = accountSections.find((item) => item.id === section)!
   const readyLetters = unopenedDeliveries.filter((item) => item.status === 'DELIVERED')
+  const selectedRecipientDeliveries = account && selectedRecipient
+    ? deliveriesForRecipient(account.deliveries, selectedRecipient)
+    : []
   return (
     <Shell
       eyebrow="Meu correio"
@@ -305,6 +329,22 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                 <dd>{account.user.email}</dd>
               </dl>
               <p>Mensagens enviadas para este e-mail aparecem na sua caixa de cartas.</p>
+              <div className="account-preference-setting">
+                <h2>Receber entregas de contatos</h2>
+                <p>Quando ativado, pessoas com uma conta poderão enviar cartas para seu endereço padrão ou para uma preferência específica.</p>
+                <label className="save-new-option">
+                  <input
+                    type="checkbox"
+                    checked={account.deliverySettings.allow_contact_delivery}
+                    onChange={(event) => {
+                      void mutate(async () => {
+                        const response = await updateDeliverySettings(event.target.checked)
+                        setAccount((current) => current ? { ...current, deliverySettings: response.data } : current)
+                      })
+                    }} />
+                  <span>Permitir entregas de contatos</span>
+                </label>
+              </div>
               <button
                 className="button secondary"
                 type="button"
@@ -621,6 +661,30 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                       disabled={busy}>Salvar lugar</button>
                   </form>
                 </details>
+                <div className="account-add-item">
+                  <h3>Preferências para contatos</h3>
+                  <p className="muted-copy">Escolha qual dos seus lugares cada contato poderá usar ao enviar uma carta.</p>
+                  {account.deliveryPreferences.map((item) => (
+                    <article className="saved-item" key={item.id}>
+                      <span className="saved-item-icon" aria-hidden="true">⌂</span>
+                      <div>
+                        <strong>{item.sender.name}</strong>
+                        <span>{item.location.name}</span>
+                      </div>
+                      <button className="text-button danger" type="button" onClick={() => { void mutate(() => deleteDeliveryPreference(item.id)) }}>Apagar</button>
+                    </article>
+                  ))}
+                  <form className="account-form compact" onSubmit={addDeliveryPreference}>
+                    <label htmlFor="preference-sender-email">E-mail do contato</label>
+                    <input id="preference-sender-email" type="email" required value={preference.senderEmail} onChange={(event) => setPreference({ ...preference, senderEmail: event.target.value })} placeholder="contato@exemplo.com" />
+                    <label htmlFor="preference-location">Lugar permitido</label>
+                    <select id="preference-location" required value={preference.locationId} onChange={(event) => setPreference({ ...preference, locationId: event.target.value })}>
+                      <option value="">Escolha um lugar salvo…</option>
+                      {account.locations.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.label}</option>)}
+                    </select>
+                    <button className="button secondary" type="submit" disabled={busy || account.locations.length === 0}>Salvar preferência</button>
+                  </form>
+                </div>
               </section>
               <section className="account-section">
                 <div className="account-section-heading">
@@ -638,6 +702,13 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                       <strong>{item.name}</strong>
                       <span>{item.nickname || 'Sem apelido'}</span>
                     </div>
+                    <button
+                      className="text-button"
+                      type="button"
+                      aria-pressed={selectedRecipient?.id === item.id}
+                      onClick={() => setSelectedRecipient(selectedRecipient?.id === item.id ? null : item)}>
+                      Ver cartas
+                    </button>
                     <button
                       className="text-button danger"
                       type="button"
@@ -674,6 +745,36 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                   </form>
                 </details>
               </section>
+              {selectedRecipient && (
+                <section className="account-section recipient-deliveries-section" aria-labelledby="recipient-deliveries-title">
+                  <div className="account-section-heading">
+                    <div>
+                      <p className="account-section-kicker">Histórico filtrado</p>
+                      <h2 id="recipient-deliveries-title">Cartas para {selectedRecipient.nickname || selectedRecipient.name}</h2>
+                    </div>
+                    <span>{selectedRecipientDeliveries.length}</span>
+                  </div>
+                  {selectedRecipientDeliveries.length === 0 ? (
+                    <p className="muted-copy">Nenhuma carta enviada para este destinatário ainda.</p>
+                  ) : selectedRecipientDeliveries.map((delivery) => (
+                    <article className="delivery-history-card" key={delivery.public_id}>
+                      <div className="delivery-history-topline">
+                        <span className={'delivery-status ' + delivery.status.toLowerCase()}>{statusLabel(delivery.status)}</span>
+                        <small>{delivery.progress}% concluído</small>
+                      </div>
+                      <h3>{delivery.origin} <span aria-hidden="true">→</span> {delivery.destination}</h3>
+                      <div className="delivery-progress" aria-label={delivery.progress + '% da entrega concluída'}>
+                        <span style={{ width: delivery.progress + '%' }} />
+                      </div>
+                      <div className="delivery-history-footer">
+                        <small>Chegada prevista</small>
+                        <strong>{new Date(delivery.arrives_at).toLocaleDateString('pt-BR')}</strong>
+                      </div>
+                      <button className="button secondary" type="button" onClick={() => { void openSentDelivery(delivery) }}>Abrir entrega</button>
+                    </article>
+                  ))}
+                </section>
+              )}
             </div>
           )}
         </div>

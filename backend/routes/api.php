@@ -17,10 +17,17 @@ Route::middleware('user.auth')->group(function (): void {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::get('/account/deliveries', [AccountController::class, 'deliveries']);
+    Route::get('/account/deliveries/{publicId}/token', [AccountController::class, 'sentDeliveryToken']);
     Route::get('/account/active-map-deliveries', [AccountController::class, 'activeMapDeliveries']);
     Route::get('/account/incoming-deliveries', [AccountController::class, 'incomingDeliveries']);
     Route::get('/account/incoming-deliveries/{publicId}/token', [AccountController::class, 'incomingDeliveryToken']);
     Route::get('/account/locations', [AccountController::class, 'locations']);
+    Route::get('/account/delivery-settings', [AccountController::class, 'deliverySettings']);
+    Route::put('/account/delivery-settings', [AccountController::class, 'updateDeliverySettings']);
+    Route::get('/account/recipient-delivery-options', [AccountController::class, 'recipientDeliveryOptions']);
+    Route::get('/account/delivery-preferences', [AccountController::class, 'deliveryPreferences']);
+    Route::post('/account/delivery-preferences', [AccountController::class, 'storeDeliveryPreference']);
+    Route::delete('/account/delivery-preferences/{preference}', [AccountController::class, 'deleteDeliveryPreference']);
     Route::post('/account/locations', [AccountController::class, 'storeLocation']);
     Route::put('/account/locations/{location}/default', [AccountController::class, 'setDefaultLocation']);
     Route::delete('/account/locations/{location}', [AccountController::class, 'deleteLocation']);

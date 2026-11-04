@@ -15,10 +15,12 @@ class Delivery extends Model
         'sender_name',
         'recipient_name',
         'recipient_email',
+        'recipient_user_id',
         'origin',
         'origin_location',
         'destination',
         'destination_location',
+        'destination_source',
         'route_legs',
         'route_steps',
         'route_visibility',
@@ -29,6 +31,7 @@ class Delivery extends Model
         'access_token_hash',
         'recipient_access_token_encrypted',
         'sender_access_token_hash',
+        'sender_access_token_encrypted',
         'opened_at',
     ];
 

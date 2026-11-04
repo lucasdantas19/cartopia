@@ -19,12 +19,13 @@ class StoreDeliveryRequest extends FormRequest
             'sender_name' => ['nullable', 'string', 'max:120'],
             'recipient_name' => ['required', 'string', 'max:120'],
             'recipient_email' => ['nullable', 'email', 'max:255'],
+            'destination_source' => ['sometimes', 'string', Rule::in(['specific', 'recipient_default', 'contact_preference'])],
             'origin' => ['required', 'string', 'max:160'],
             'origin_location' => ['sometimes', 'array'],
             'origin_location.label' => ['required_with:origin_location', 'string', 'max:160'],
             'origin_location.latitude' => ['required_with:origin_location', 'numeric', 'between:-90,90'],
             'origin_location.longitude' => ['required_with:origin_location', 'numeric', 'between:-180,180'],
-            'destination' => ['required', 'string', 'max:160'],
+            'destination' => ['nullable', 'string', 'max:160', 'required_if:destination_source,specific'],
             'destination_location' => ['sometimes', 'array'],
             'destination_location.label' => ['required_with:destination_location', 'string', 'max:160'],
             'destination_location.latitude' => ['required_with:destination_location', 'numeric', 'between:-90,90'],
@@ -52,21 +53,29 @@ class StoreDeliveryRequest extends FormRequest
         ];
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'destination_source' => $this->input('destination_source', 'specific'),
+        ]);
+    }
+
     public function withValidator($validator): void
     {
         $validator->after(function ($validator): void {
             $originLocation = $this->input('origin_location');
             $destinationLocation = $this->input('destination_location');
+            $source = $this->input('destination_source', 'specific');
             $sameCoordinates = is_array($originLocation)
                 && is_array($destinationLocation)
                 && (float) ($originLocation['latitude'] ?? null) === (float) ($destinationLocation['latitude'] ?? null)
                 && (float) ($originLocation['longitude'] ?? null) === (float) ($destinationLocation['longitude'] ?? null);
-            $sameEndpointLabels = $this->input('origin') === $this->input('destination');
+            $sameEndpointLabels = $source === 'specific' && $this->input('origin') === $this->input('destination');
             $hasDifferentCustomEndpoints = is_array($originLocation)
                 && is_array($destinationLocation)
                 && ! $sameCoordinates;
 
-            if (($sameEndpointLabels && ! $hasDifferentCustomEndpoints) || $sameCoordinates) {
+            if (($sameEndpointLabels && ! $hasDifferentCustomEndpoints) || ($source === 'specific' && $sameCoordinates)) {
                 $validator->errors()->add('destination', 'A origem e o destino devem ser diferentes.');
             }
             $steps = $this->input('steps');

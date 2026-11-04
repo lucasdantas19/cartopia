@@ -66,9 +66,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export interface AuthUser { id: number; name: string; email: string }
+export interface DeliverySettings { allow_contact_delivery: boolean }
+export interface DeliveryPreference { id: number; sender: { id: number; name: string; email: string }; location: { id: number; name: string; label: string } }
+export interface RecipientDeliveryOptions { available: boolean; recipient_name: string | null; recipient_default_available: boolean; contact_preference_available: boolean }
 export interface SavedLocation { id: number; name: string; label: string; latitude: number; longitude: number; is_default: boolean }
 export interface SavedRecipient { id: number; name: string; email: string | null; nickname: string | null }
-export interface AccountDelivery { public_id: string; recipient_name: string; origin: string; destination: string; status: string; progress: number; starts_at: string; arrives_at: string }
+export interface AccountDelivery { public_id: string; recipient_name: string; recipient_email: string | null; origin: string; destination: string; status: string; progress: number; starts_at: string; arrives_at: string }
 export interface IncomingDelivery { public_id: string; sender_name: string | null; recipient_name: string; origin: string; destination: string; status: string; progress: number; arrives_at: string; opened_at: string | null }
 export interface TrackedDelivery { id: number; public_id: string; label: string | null; role: 'sender' | 'recipient'; recipient_name: string; origin: string; destination: string; status: string; progress: number; arrives_at: string }
 export interface ActiveMapDelivery {
@@ -105,7 +108,9 @@ export function fetchAccount() {
     request<{ data: SavedRecipient[] }>('/account/recipients'),
     request<{ data: TrackedDelivery[] }>('/account/tracked-deliveries'),
     request<{ data: IncomingDelivery[] }>('/account/incoming-deliveries'),
-  ]).then(([user, deliveries, locations, recipients, trackedDeliveries, incomingDeliveries]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data, trackedDeliveries: trackedDeliveries.data, incomingDeliveries: incomingDeliveries.data }))
+    request<{ data: DeliverySettings }>('/account/delivery-settings'),
+    request<{ data: DeliveryPreference[] }>('/account/delivery-preferences'),
+  ]).then(([user, deliveries, locations, recipients, trackedDeliveries, incomingDeliveries, deliverySettings, deliveryPreferences]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data, trackedDeliveries: trackedDeliveries.data, incomingDeliveries: incomingDeliveries.data, deliverySettings: deliverySettings.data, deliveryPreferences: deliveryPreferences.data }))
 }
 
 export function fetchActiveMapDeliveries() {
@@ -117,6 +122,28 @@ export function fetchSavedItems() {
     request<{ data: SavedLocation[] }>('/account/locations'),
     request<{ data: SavedRecipient[] }>('/account/recipients'),
   ]).then(([locations, recipients]) => ({ locations: locations.data, recipients: recipients.data }))
+}
+
+export function fetchRecipientDeliveryOptions(recipientEmail: string) {
+  return request<{ data: RecipientDeliveryOptions }>('/account/recipient-delivery-options?recipient_email=' + encodeURIComponent(recipientEmail))
+}
+
+export function updateDeliverySettings(allowContactDelivery: boolean) {
+  return request<{ data: DeliverySettings }>('/account/delivery-settings', {
+    method: 'PUT',
+    body: JSON.stringify({ allow_contact_delivery: allowContactDelivery }),
+  })
+}
+
+export function saveDeliveryPreference(input: { sender_email: string; location_id: number }) {
+  return request<{ data: DeliveryPreference }>('/account/delivery-preferences', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteDeliveryPreference(id: number) {
+  return request('/account/delivery-preferences/' + id, { method: 'DELETE' })
 }
 
 export function saveLocation(input: Omit<SavedLocation, 'id' | 'is_default'> & { is_default?: boolean }) {
@@ -141,6 +168,10 @@ export function fetchIncomingDeliveryToken(publicId: string) {
 
 export function deleteRecipient(id: number) {
   return request(`/account/recipients/${id}`, { method: 'DELETE' })
+}
+
+export function fetchSentDeliveryToken(publicId: string) {
+  return request<{ data: { public_id: string; role: 'sender'; access_token: string } }>('/account/deliveries/' + encodeURIComponent(publicId) + '/token')
 }
 
 export function saveTrackedDelivery(input: { public_id: string; access_token: string; role: 'sender' | 'recipient'; label?: string }) {

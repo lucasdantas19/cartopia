@@ -6,6 +6,7 @@ use App\Models\Delivery;
 use App\Models\SavedLocation;
 use App\Models\SavedRecipient;
 use App\Models\TrackedDelivery;
+use App\Models\DeliveryPreference;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class AccountController extends Controller
             ->where('arrives_at', '>', $now)
             ->where(function ($query) use ($user): void {
                 $query->where('user_id', $user->id)
+                    ->orWhere('recipient_user_id', $user->id)
                     ->orWhereRaw('LOWER(recipient_email) = ?', [strtolower($user->email)])
                     ->orWhereHas('trackedByUsers', fn ($tracked) => $tracked->where('user_id', $user->id));
             })
@@ -48,6 +50,7 @@ class AccountController extends Controller
     {
         return response()->json(['data' => Delivery::where('user_id', $request->user()->id)->latest()->get()->map(fn (Delivery $delivery) => [
             'public_id' => $delivery->public_id, 'recipient_name' => $delivery->recipient_name,
+            'recipient_email' => $delivery->recipient_email,
             'origin' => $delivery->origin, 'destination' => $delivery->destination, 'status' => $delivery->status(),
             'progress' => $delivery->progress(), 'starts_at' => $delivery->starts_at?->toISOString(),
             'arrives_at' => $delivery->arrives_at?->toISOString(),
@@ -56,7 +59,12 @@ class AccountController extends Controller
 
     public function incomingDeliveries(Request $request): JsonResponse
     {
-        return response()->json(['data' => Delivery::whereRaw('LOWER(recipient_email) = ?', [strtolower($request->user()->email)])->latest()->get()->map(fn (Delivery $delivery): array => [
+        $user = $request->user();
+
+        return response()->json(['data' => Delivery::where(function ($query) use ($user): void {
+            $query->where('recipient_user_id', $user->id)
+                ->orWhereRaw('LOWER(recipient_email) = ?', [strtolower($user->email)]);
+        })->latest()->get()->map(fn (Delivery $delivery): array => [
             'public_id' => $delivery->public_id,
             'sender_name' => $delivery->sender_name,
             'recipient_name' => $delivery->recipient_name,
@@ -72,7 +80,10 @@ class AccountController extends Controller
     public function incomingDeliveryToken(Request $request, string $publicId): JsonResponse
     {
         $delivery = Delivery::where('public_id', $publicId)
-            ->whereRaw('LOWER(recipient_email) = ?', [strtolower($request->user()->email)])
+            ->where(function ($query) use ($request): void {
+                $query->where('recipient_user_id', $request->user()->id)
+                    ->orWhereRaw('LOWER(recipient_email) = ?', [strtolower($request->user()->email)]);
+            })
             ->firstOrFail();
 
         return response()->json(['data' => [
@@ -82,9 +93,101 @@ class AccountController extends Controller
         ]]);
     }
 
+    public function sentDeliveryToken(Request $request, string $publicId): JsonResponse
+    {
+        $delivery = $request->user()->deliveries()->where('public_id', $publicId)->firstOrFail();
+
+        return response()->json(['data' => [
+            'public_id' => $delivery->public_id,
+            'role' => 'sender',
+            'access_token' => $request->bearerToken(),
+        ]]);
+    }
+
     public function locations(Request $request): JsonResponse
     {
         return response()->json(['data' => $request->user()->savedLocations()->latest()->get()]);
+    }
+
+    public function deliverySettings(Request $request): JsonResponse
+    {
+        return response()->json(['data' => [
+            'allow_contact_delivery' => (bool) $request->user()->allow_contact_delivery,
+        ]]);
+    }
+
+    public function recipientDeliveryOptions(Request $request): JsonResponse
+    {
+        $data = $request->validate(['recipient_email' => ['required', 'email', 'max:255']]);
+        $recipient = \App\Models\User::whereRaw('LOWER(email) = ?', [strtolower($data['recipient_email'])])->first();
+
+        if ($recipient === null || ! $recipient->allow_contact_delivery) {
+            return response()->json(['data' => [
+                'available' => false,
+                'recipient_name' => null,
+                'recipient_default_available' => false,
+                'contact_preference_available' => false,
+            ]]);
+        }
+
+        return response()->json(['data' => [
+            'available' => true,
+            'recipient_name' => $recipient->name,
+            'recipient_default_available' => $recipient->savedLocations()->where('is_default', true)->exists(),
+            'contact_preference_available' => DeliveryPreference::query()
+                ->where('recipient_user_id', $recipient->id)
+                ->where('sender_user_id', $request->user()->id)
+                ->exists(),
+        ]]);
+    }
+
+    public function updateDeliverySettings(Request $request): JsonResponse
+    {
+        $data = $request->validate(['allow_contact_delivery' => ['required', 'boolean']]);
+        $request->user()->update($data);
+
+        return $this->deliverySettings($request);
+    }
+
+    public function deliveryPreferences(Request $request): JsonResponse
+    {
+        $preferences = $request->user()->deliveryPreferences()->with(['senderUser:id,name,email', 'savedLocation:id,name,label'])->latest()->get();
+
+        return response()->json(['data' => $preferences->map(fn (DeliveryPreference $preference): array => [
+            'id' => $preference->id,
+            'sender' => $preference->senderUser,
+            'location' => $preference->savedLocation,
+        ])]);
+    }
+
+    public function storeDeliveryPreference(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'sender_email' => ['required', 'email', 'max:255'],
+            'location_id' => ['required', 'integer'],
+        ]);
+        $user = $request->user();
+        $sender = \App\Models\User::whereRaw('LOWER(email) = ?', [strtolower($data['sender_email'])])->firstOrFail();
+        $location = $user->savedLocations()->findOrFail($data['location_id']);
+
+        if ($sender->id === $user->id) {
+            return response()->json(['error' => ['message' => 'Escolha outro usuário para criar uma preferência.']], 422);
+        }
+
+        $preference = DeliveryPreference::updateOrCreate(
+            ['recipient_user_id' => $user->id, 'sender_user_id' => $sender->id],
+            ['saved_location_id' => $location->id],
+        );
+
+        return response()->json(['data' => $preference->load(['senderUser:id,name,email', 'savedLocation:id,name,label'])], 201);
+    }
+
+    public function deleteDeliveryPreference(Request $request, DeliveryPreference $preference): JsonResponse
+    {
+        abort_unless($preference->recipient_user_id === $request->user()->id, 404);
+        $preference->delete();
+
+        return response()->json(['data' => ['deleted' => true]]);
     }
 
     public function storeLocation(Request $request): JsonResponse

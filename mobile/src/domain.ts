@@ -2,7 +2,10 @@ export type User = {
   id: number
   name: string
   email: string
+  allow_contact_delivery?: boolean
 }
+
+export type DestinationSource = 'specific' | 'recipient_default' | 'contact_preference'
 
 export type Session = {
   token: string

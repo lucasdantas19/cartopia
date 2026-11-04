@@ -1,5 +1,6 @@
 import { colors } from '../../src/theme'
 import { Link, useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -10,10 +11,20 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useSession } from '../../src/context/SessionContext'
+import { fetchDeliverySettings, updateDeliverySettings } from '../../src/api'
 
 export default function AccountScreen() {
   const router = useRouter()
   const { session, loading, sessionExpired, signOut } = useSession()
+  const [allowContactDelivery, setAllowContactDelivery] = useState(false)
+  const [settingsLoading, setSettingsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!session?.token) return
+    void fetchDeliverySettings(session.token).then((response) => {
+      setAllowContactDelivery(response.data.allow_contact_delivery)
+    }).catch(() => undefined)
+  }, [session?.token])
 
   async function exit() {
     await signOut()
@@ -69,6 +80,31 @@ export default function AccountScreen() {
                 A aba Viagens reúne as mensagens enviadas para este e-mail
                 e os envios associados à sua conta.
               </Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Entregas de contatos</Text>
+              <Text style={styles.body}>
+                Permita que contatos com conta usem seu endereço padrão ou uma preferência que você definir.
+              </Text>
+              <Pressable
+                accessibilityRole="switch"
+                accessibilityState={{ checked: allowContactDelivery }}
+                disabled={settingsLoading}
+                onPress={() => {
+                  if (!session?.token) return
+                  const nextValue = !allowContactDelivery
+                  setSettingsLoading(true)
+                  void updateDeliverySettings(nextValue, session.token).then((response) => {
+                    setAllowContactDelivery(response.data.allow_contact_delivery)
+                  }).catch(() => undefined).finally(() => setSettingsLoading(false))
+                }}
+                style={styles.primaryButton}
+              >
+                <Text style={styles.primaryButtonText}>
+                  {settingsLoading ? 'Salvando…' : allowContactDelivery ? 'Entregas de contatos ativadas' : 'Ativar entregas de contatos'}
+                </Text>
+              </Pressable>
             </View>
 
             <Pressable

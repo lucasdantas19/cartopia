@@ -230,6 +230,12 @@ input::placeholder, textarea::placeholder { color: #8a96a3; }
 .saved-location-map { margin: .35rem 0 .4rem; }
 .saved-location-map .location-picker { margin-top: .25rem; }
 .saved-location-select, .saved-recipient-select { height: 2.5rem; margin-top: .55rem; padding: 0 .7rem; font-size: .78rem; }
+.recipient-destination-options { margin: .8rem 0 0; padding: .75rem; border: 1px solid var(--line); border-radius: .8rem; background: rgba(255,255,255,.55); }
+.recipient-destination-options legend { padding: 0 .3rem; color: var(--muted); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.recipient-destination-options .journey-choice-option { margin-top: .45rem; padding: .55rem; }
+.recipient-destination-confirmation { display: flex; min-height: 10rem; flex-direction: column; justify-content: center; padding: 1rem; border: 1px dashed var(--peach); border-radius: .8rem; background: #fff9ed; }
+.recipient-destination-confirmation strong { color: var(--ink); font: 700 1rem var(--display); }
+.recipient-destination-confirmation p { margin: .35rem 0 0; color: var(--muted); font-size: .75rem; line-height: 1.4; }
 .save-new-option { display: flex; align-items: center; gap: .45rem; margin: .55rem 0 0; color: var(--coral); font-size: .72rem; font-weight: 700; }
 .save-new-option input { width: auto; height: auto; accent-color: var(--coral); }
 .recipient-email-field { margin-top: .6rem; }

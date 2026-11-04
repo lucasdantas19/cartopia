@@ -7,8 +7,8 @@ import { EndpointLocationField } from './EndpointLocationField'
 import { JourneyPreview } from './JourneyPreview'
 import { couriers } from '../../domain/delivery/couriers'
 import { locations } from '../../domain/delivery/locations'
-import type { CreateDeliveryInput, CreateDeliveryStep } from '../../domain/delivery/types'
-import type { SavedLocation, SavedRecipient } from '../../services/api'
+import type { CreateDeliveryInput, CreateDeliveryStep, DestinationSource } from '../../domain/delivery/types'
+import type { RecipientDeliveryOptions, SavedLocation, SavedRecipient } from '../../services/api'
 import { toggleFormSection, type FormSectionState } from '../../utils/formSections'
 
 interface CreateDeliveryFormProps {
@@ -28,6 +28,9 @@ interface CreateDeliveryFormProps {
   onMoveStep: (index: number, direction: -1 | 1) => void
   savedLocations: SavedLocation[]
   savedRecipients: SavedRecipient[]
+  recipientOptions: RecipientDeliveryOptions | null
+  onCheckRecipientOptions: () => void
+  onDestinationSourceChange: (source: DestinationSource) => void
   canSaveNewItems: boolean
   saveNewRecipient: boolean
   onSaveNewRecipientChange: (shouldSave: boolean) => void
@@ -37,7 +40,7 @@ interface CreateDeliveryFormProps {
   onSaveNewDestinationChange: (shouldSave: boolean) => void
 }
 
-export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors, submitting, onSubmit, onFieldChange, onEndpointChange, onAdventureChange, onStepChange, onStepLocationChange, onAddStep, onRemoveStep, onMoveStep, savedLocations, savedRecipients, canSaveNewItems, saveNewRecipient, onSaveNewRecipientChange, saveNewOrigin, onSaveNewOriginChange, saveNewDestination, onSaveNewDestinationChange }: CreateDeliveryFormProps) {
+export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors, submitting, onSubmit, onFieldChange, onEndpointChange, onAdventureChange, onStepChange, onStepLocationChange, onAddStep, onRemoveStep, onMoveStep, savedLocations, savedRecipients, recipientOptions, onCheckRecipientOptions, onDestinationSourceChange, canSaveNewItems, saveNewRecipient, onSaveNewRecipientChange, saveNewOrigin, onSaveNewOriginChange, saveNewDestination, onSaveNewDestinationChange }: CreateDeliveryFormProps) {
   const formRef = useRef<HTMLFormElement>(null)
   const [openSections, setOpenSections] = useState<FormSectionState>({ message: true, courier: false, adventure: false })
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
@@ -110,7 +113,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
     ?? (touchedFields.message && !form.message.trim() ? 'Escreva uma mensagem antes de continuar.' : undefined)
   const routeComplete = Boolean(
     form.origin_location &&
-    form.destination_location &&
+    (form.destination_source !== 'specific' || form.destination_location) &&
     Number(form.duration_minutes) > 0 &&
     Number(form.final_duration_minutes) > 0 &&
     (!adventureEnabled || stepsComplete),
@@ -164,7 +167,28 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
             <input id="recipient_name" required maxLength={120} value={form.recipient_name} aria-invalid={recipientError ? true : undefined} aria-describedby={recipientError ? 'recipient-name-error' : undefined} onBlur={() => touchField('recipient_name')} onChange={(event) => onFieldChange('recipient_name', event.target.value)} placeholder="Quem receberá?" />
             {savedRecipients.length > 0 && <select className="saved-recipient-select" aria-label="Usar destinatário salvo" defaultValue="" onChange={(event) => { const recipient = savedRecipients.find((item) => String(item.id) === event.target.value); if (recipient) { onFieldChange('recipient_name', recipient.name); onFieldChange('recipient_email', recipient.email ?? ''); onSaveNewRecipientChange(false) } event.currentTarget.value = '' }}><option value="">Usar destinatário salvo…</option>{savedRecipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.nickname ? `${recipient.nickname} · ${recipient.name}` : recipient.name}</option>)}</select>}
             <label className="recipient-email-field" htmlFor="recipient_email">E-mail <small>(opcional, para aparecer na conta da pessoa)</small></label>
-            <input id="recipient_email" type="email" maxLength={255} value={form.recipient_email ?? ''} onChange={(event) => onFieldChange('recipient_email', event.target.value)} placeholder="nome@exemplo.com" />
+            <input id="recipient_email" type="email" maxLength={255} value={form.recipient_email ?? ''} onBlur={onCheckRecipientOptions} onChange={(event) => { onFieldChange('recipient_email', event.target.value); onDestinationSourceChange('specific') }} placeholder="nome@exemplo.com" />
+            {recipientOptions?.available && (
+              <fieldset className="recipient-destination-options">
+                <legend>Destino para este destinatário</legend>
+                <label className={form.destination_source === 'specific' ? 'journey-choice-option selected' : 'journey-choice-option'}>
+                  <input type="radio" name="destination_source" checked={form.destination_source === 'specific'} onChange={() => onDestinationSourceChange('specific')} />
+                  <span><strong>Escolher um lugar específico</strong><small>Defina o destino desta carta agora.</small></span>
+                </label>
+                {recipientOptions.recipient_default_available && (
+                  <label className={form.destination_source === 'recipient_default' ? 'journey-choice-option selected' : 'journey-choice-option'}>
+                    <input type="radio" name="destination_source" checked={form.destination_source === 'recipient_default'} onChange={() => onDestinationSourceChange('recipient_default')} />
+                    <span><strong>Endereço padrão do destinatário</strong><small>O endereço fica protegido e é resolvido pela conta.</small></span>
+                  </label>
+                )}
+                {recipientOptions.contact_preference_available && (
+                  <label className={form.destination_source === 'contact_preference' ? 'journey-choice-option selected' : 'journey-choice-option'}>
+                    <input type="radio" name="destination_source" checked={form.destination_source === 'contact_preference'} onChange={() => onDestinationSourceChange('contact_preference')} />
+                    <span><strong>Preferência salva para você</strong><small>Usar a configuração que esta pessoa deixou para seu contato.</small></span>
+                  </label>
+                )}
+              </fieldset>
+            )}
             {canSaveNewItems && !savedRecipients.some((recipient) => recipient.name.toLowerCase() === form.recipient_name.trim().toLowerCase() && (recipient.email ?? '').toLowerCase() === (form.recipient_email ?? '').trim().toLowerCase()) && form.recipient_name.trim() && <label className="save-new-option"><input type="checkbox" checked={saveNewRecipient} onChange={(event) => onSaveNewRecipientChange(event.target.checked)} /><span>Salvar esta pessoa na minha conta</span></label>}
             {recipientError && <FieldError id="recipient-name-error" messages={[recipientError]} />}
           </div>
@@ -244,7 +268,15 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
         <div className="route-fields">
           <EndpointLocationField label="De" location={form.origin_location} fallback={locations[0]} savedLocations={savedLocations} onSavedLocation={(location) => selectSavedLocation('origin', location)} onChange={(location) => onEndpointChange('origin', location)} canSave={canSaveNewItems} saveNewLocation={saveNewOrigin} onSaveNewLocationChange={onSaveNewOriginChange} />
           <span className="route-arrow" aria-hidden="true">→</span>
-          <EndpointLocationField label="Para" location={form.destination_location} fallback={locations[1]} savedLocations={savedLocations} onSavedLocation={(location) => selectSavedLocation('destination', location)} onChange={(location) => onEndpointChange('destination', location)} canSave={canSaveNewItems} saveNewLocation={saveNewDestination} onSaveNewLocationChange={onSaveNewDestinationChange} />
+          {form.destination_source === 'specific' ? (
+            <EndpointLocationField label="Para" location={form.destination_location} fallback={locations[1]} savedLocations={savedLocations} onSavedLocation={(location) => selectSavedLocation('destination', location)} onChange={(location) => onEndpointChange('destination', location)} canSave={canSaveNewItems} saveNewLocation={saveNewDestination} onSaveNewLocationChange={onSaveNewDestinationChange} />
+          ) : (
+            <div className="endpoint-location-field recipient-destination-confirmation">
+              <label>Para</label>
+              <strong>Endereço protegido do destinatário</strong>
+              <p>O local será resolvido no momento do envio e não será exibido aqui.</p>
+            </div>
+          )}
         </div>
         {!adventureEnabled && (
           <div className="duration-field">
@@ -275,7 +307,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
           {(form.steps ?? []).map((step, index) => <article className="step-editor" key={step.id ?? index}><div className="step-editor-number">{String(index + 1).padStart(2, '0')}</div><div className="step-editor-fields"><div className="step-editor-heading-row"><strong>Parada {index + 1}</strong><div className="step-reorder"><button type="button" className="step-order-button" disabled={index === 0} aria-label={`Mover parada ${index + 1} para cima`} onClick={() => onMoveStep(index, -1)}>↑ subir</button><button type="button" className="step-order-button" disabled={index === (form.steps ?? []).length - 1} aria-label={`Mover parada ${index + 1} para baixo`} onClick={() => onMoveStep(index, 1)}>↓ descer</button></div></div><input required maxLength={120} aria-label={`Título da etapa ${index + 1}`} value={step.title} onChange={(event) => onStepChange(index, 'title', event.target.value)} placeholder="Ex.: Uma pausa para um croissant" /><textarea maxLength={500} aria-label={`Descrição da etapa ${index + 1}`} value={step.description ?? ''} onChange={(event) => onStepChange(index, 'description', event.target.value)} placeholder="Descreva esse momento da jornada (opcional)." rows={2} /><div className="step-duration"><label htmlFor={`step-duration-${index}`}>Tempo até esta parada</label><input id={`step-duration-${index}`} required type="number" min={1} max={1440} value={step.duration_minutes} onChange={(event) => onStepChange(index, 'duration_minutes', Number(event.target.value))} /><span>minutos</span>{<button type="button" className="text-button" onClick={() => onRemoveStep(index)}>remover</button>}</div><LocationPicker center={form.origin_location ? [form.origin_location.longitude, form.origin_location.latitude] : locations[0].coordinates} location={step.location} onChange={(location) => onStepLocationChange(index, location)} onClear={() => onStepLocationChange(index, undefined)} /></div></article>)}
           <button type="button" className="text-button" onClick={onAddStep}>+ adicionar parada</button>
           <div className="final-destination-duration"><label htmlFor="final_duration_minutes">Tempo da última parada até o destino final</label><div className="duration-input"><input id="final_duration_minutes" type="number" required min={1} max={1440} value={form.final_duration_minutes} onChange={(event) => onFieldChange('final_duration_minutes', Number(event.target.value))} /><span>minutos</span></div></div>
-          {form.origin_location && form.destination_location ? <JourneyPreview origin={form.origin_location} destination={form.destination_location} steps={form.steps ?? []} finalDurationMinutes={form.final_duration_minutes} /> : <p className="steps-empty">Escolha a origem e o destino para visualizar a prévia do percurso.</p>}
+          {form.origin_location && form.destination_location ? <JourneyPreview origin={form.origin_location} destination={form.destination_location} steps={form.steps ?? []} finalDurationMinutes={form.final_duration_minutes} /> : <p className="steps-empty">O mapa da prévia aparece quando os dois pontos forem escolhidos diretamente.</p>}
         </div>}
         {error && <p className="error-message" role="alert">{error}</p>}
         {fieldErrors.origin && <FieldError messages={fieldErrors.origin} />}

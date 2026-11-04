@@ -1,4 +1,4 @@
-import type { DeliveryLocation } from './domain'
+import type { DeliveryLocation, DestinationSource } from './domain'
 
 export type DeliveryDraft = {
   senderName: string
@@ -7,6 +7,7 @@ export type DeliveryDraft = {
   message: string
   originLocation: DeliveryLocation | null
   destinationLocation: DeliveryLocation | null
+  destinationSource?: DestinationSource
   courier: string
   duration: string
   stage: number
@@ -40,6 +41,7 @@ export function parseDraft(value: string): DeliveryDraft | null {
     }
     if (!['paper-swallow', 'postal-cat', 'little-dragon'].includes(draft.courier)
       || ![0, 1, 2].includes(draft.stage)
+      || (draft.destinationSource !== undefined && !['specific', 'recipient_default', 'contact_preference'].includes(draft.destinationSource))
       || !validLocation(draft.originLocation) || !validLocation(draft.destinationLocation)) return null
     return draft
   } catch {

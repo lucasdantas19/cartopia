@@ -1,5 +1,5 @@
 import { apiUrl } from './config'
-import type { AccountDelivery, ActiveMapDelivery, Delivery, DeliveryLocation, DeliveryMessage, Session, User } from './domain'
+import type { AccountDelivery, ActiveMapDelivery, Delivery, DeliveryLocation, DeliveryMessage, DestinationSource, Session, User } from './domain'
 
 export class ApiError extends Error {
   constructor(
@@ -153,6 +153,33 @@ export function fetchIncomingDeliveryToken(publicId: string, token: string) {
   )
 }
 
+export type RecipientDeliveryOptions = {
+  available: boolean
+  recipient_name: string | null
+  recipient_default_available: boolean
+  contact_preference_available: boolean
+}
+
+export function fetchRecipientDeliveryOptions(email: string, token: string) {
+  return request<{ data: RecipientDeliveryOptions }>(
+    '/account/recipient-delivery-options?recipient_email=' + encodeURIComponent(email),
+    {},
+    token,
+    true,
+  )
+}
+
+export function fetchDeliverySettings(token: string) {
+  return request<{ data: { allow_contact_delivery: boolean } }>('/account/delivery-settings', {}, token, true)
+}
+
+export function updateDeliverySettings(allowContactDelivery: boolean, token: string) {
+  return request<{ data: { allow_contact_delivery: boolean } }>('/account/delivery-settings', {
+    method: 'PUT',
+    body: JSON.stringify({ allow_contact_delivery: allowContactDelivery }),
+  }, token, true)
+}
+
 export type CreateDeliveryPayload = {
   message: string
   sender_name?: string
@@ -162,6 +189,7 @@ export type CreateDeliveryPayload = {
   origin_location: DeliveryLocation
   destination: string
   destination_location: DeliveryLocation
+  destination_source?: DestinationSource
   courier: string
   duration_minutes: number
 }

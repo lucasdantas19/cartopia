@@ -3,6 +3,7 @@ export type DeliveryStatus = 'SCHEDULED' | 'IN_TRANSIT' | 'DELIVERED'
 export type AccessRole = 'sender' | 'recipient'
 export type CourierCode = 'paper-swallow' | 'postal-cat' | 'little-dragon'
 export type RouteVisibility = 'full' | 'progressive'
+export type DestinationSource = 'specific' | 'recipient_default' | 'contact_preference'
 export interface DeliveryLocationValue {
   label: string
   latitude: number
@@ -46,6 +47,7 @@ export interface Delivery {
   origin_location: DeliveryLocationValue | null
   destination: string
   destination_location: DeliveryLocationValue | null
+  destination_source?: DestinationSource
   route_legs: DeliveryRouteLeg[]
   steps: DeliveryStep[]
   route_visibility: RouteVisibility
@@ -70,6 +72,7 @@ export interface CreateDeliveryInput {
   origin_location: DeliveryLocationValue | null
   destination: string
   destination_location: DeliveryLocationValue | null
+  destination_source: DestinationSource
   duration_minutes: number
   final_duration_minutes: number
   legs?: CreateDeliveryLeg[]

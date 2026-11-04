@@ -19,12 +19,12 @@ import {
   type ScrollViewInstance,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { ApiError, createDelivery } from '../src/api'
+import { ApiError, createDelivery, fetchRecipientDeliveryOptions, type RecipientDeliveryOptions } from '../src/api'
 import { webUrl } from '../src/config'
 import { RealLocationPicker } from '../src/components/RealLocationPicker'
 import { useSession } from '../src/context/SessionContext'
 import { createDeliveryShareUrl, previewDeliveryShareUrl } from '../src/deepLinks'
-import type { DeliveryLocation } from '../src/domain'
+import type { DeliveryLocation, DestinationSource } from '../src/domain'
 import { saveRecentDelivery } from '../src/recentDeliveries'
 import {
   validateCreateDelivery,
@@ -65,6 +65,8 @@ export default function CreateScreen() {
   const [senderName, setSenderName] = useState('')
   const [recipientName, setRecipientName] = useState('')
   const [recipientEmail, setRecipientEmail] = useState('')
+  const [recipientOptions, setRecipientOptions] = useState<RecipientDeliveryOptions | null>(null)
+  const [destinationSource, setDestinationSource] = useState<DestinationSource>('specific')
   const [message, setMessage] = useState('')
   const [originLocation, setOriginLocation] = useState<DeliveryLocation | null>(null)
   const [destinationLocation, setDestinationLocation] = useState<DeliveryLocation | null>(null)
@@ -102,6 +104,7 @@ export default function CreateScreen() {
       setMessage(draft.message)
       setOriginLocation(draft.originLocation)
       setDestinationLocation(draft.destinationLocation)
+      setDestinationSource(draft.destinationSource ?? 'specific')
       setCourier(draft.courier)
       setDuration(draft.duration)
       setStage(draft.stage)
@@ -117,12 +120,12 @@ export default function CreateScreen() {
   useEffect(() => {
     if (!draftReady || created || draftStopped.current) return
     const operation = hasDraft
-      ? deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, courier, duration, stage })
+      ? deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, destinationSource, courier, duration, stage })
       : deliveryDraftStore.clear()
     void operation.then(() => setDraftNotice(hasDraft ? 'Rascunho salvo neste dispositivo.' : '')).catch(() => {
       setDraftNotice('Não foi possível salvar o rascunho. Mantenha esta tela aberta para não perder o texto.')
     })
-  }, [draftReady, created, hasDraft, senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, courier, duration, stage])
+  }, [draftReady, created, hasDraft, senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, destinationSource, courier, duration, stage])
 
   const disablePrevention = usePreventRemove(hasDraft && !created, ({ repeat }) => {
     Alert.alert(
@@ -133,7 +136,7 @@ export default function CreateScreen() {
         {
           text: 'Guardar e sair',
           onPress: () => {
-            void deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, courier, duration, stage }).then(() => {
+            void deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, destinationSource, courier, duration, stage }).then(() => {
               draftStopped.current = true
               disablePrevention()
               repeat()
@@ -157,6 +160,38 @@ export default function CreateScreen() {
       ],
     )
   })
+
+  async function checkRecipientOptions() {
+    if (!session?.token || !recipientEmail.trim()) {
+      setRecipientOptions(null)
+      return
+    }
+    try {
+      setRecipientOptions((await fetchRecipientDeliveryOptions(recipientEmail.trim(), session.token)).data)
+    } catch {
+      setRecipientOptions(null)
+    }
+  }
+
+  async function clearDraft() {
+    draftStopped.current = true
+    await deliveryDraftStore.clear()
+    setSenderName('')
+    setRecipientName('')
+    setRecipientEmail('')
+    setRecipientOptions(null)
+    setDestinationSource('specific')
+    setMessage('')
+    setOriginLocation(null)
+    setDestinationLocation(null)
+    setCourier(couriers[0].code)
+    setDuration('30')
+    setStage(0)
+    setDraftNotice('')
+    setFieldErrors({})
+    setError('')
+    draftStopped.current = false
+  }
 
   function clearFieldError(field: CreateDeliveryField) {
     setFieldErrors((current) => ({ ...current, [field]: undefined }))
@@ -189,6 +224,7 @@ export default function CreateScreen() {
       destination,
       originLocation,
       destinationLocation,
+      destinationSource,
       duration,
     })
     if (Object.keys(validationErrors).length) {
@@ -196,7 +232,7 @@ export default function CreateScreen() {
       setError('Revise os campos indicados antes de criar a entrega.')
       return
     }
-    if (!originLocation || !destinationLocation) {
+    if (!originLocation || (destinationSource === 'specific' && !destinationLocation)) {
       setError('Escolha a origem e o destino no mapa antes de criar a entrega.')
       return
     }
@@ -214,7 +250,8 @@ export default function CreateScreen() {
         origin,
         origin_location: originLocation,
         destination,
-        destination_location: destinationLocation,
+        destination_location: destinationLocation ?? { label: '', latitude: 0, longitude: 0 },
+        destination_source: destinationSource,
         courier,
         duration_minutes: durationMinutes,
       }, session?.token)
@@ -499,6 +536,15 @@ export default function CreateScreen() {
           {draftNotice ? (
             <Text accessibilityLiveRegion="polite" style={styles.fieldHint}>{draftNotice}</Text>
           ) : null}
+          {hasDraft ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void clearDraft()}
+              style={styles.clearDraftButton}
+            >
+              <Text style={styles.clearDraftText}>Limpar formulário</Text>
+            </Pressable>
+          ) : null}
           <Text style={styles.eyebrow}>NOVA ENTREGA</Text>
           <Text style={styles.title}>Prepare uma surpresa.</Text>
           <Text style={styles.body}>
@@ -584,13 +630,38 @@ export default function CreateScreen() {
                   maxLength={255}
                   placeholder="nome@exemplo.com"
                   value={recipientEmail}
+                  onBlur={() => void checkRecipientOptions()}
                   onChangeText={(value) => {
                     setRecipientEmail(value)
+                    setRecipientOptions(null)
+                    setDestinationSource('specific')
                     clearFieldError('recipientEmail')
                   }}
                   style={styles.input}
                 />
                 {fieldErrors.recipientEmail ? <Text style={styles.fieldError}>{fieldErrors.recipientEmail}</Text> : null}
+                {recipientOptions?.available ? (
+                  <View style={styles.destinationOptions}>
+                    <Text style={styles.label}>Destino para este destinatário</Text>
+                    <Pressable style={styles.destinationOption} onPress={() => setDestinationSource('specific')}>
+                      <Text style={styles.destinationOptionTitle}>Escolher um lugar específico</Text>
+                      <Text style={styles.fieldHint}>Defina o destino desta carta agora.</Text>
+                    </Pressable>
+                    {recipientOptions.recipient_default_available ? (
+                      <Pressable style={styles.destinationOption} onPress={() => setDestinationSource('recipient_default')}>
+                        <Text style={styles.destinationOptionTitle}>Endereço padrão do destinatário</Text>
+                        <Text style={styles.fieldHint}>O endereço fica protegido e é resolvido pela conta.</Text>
+                      </Pressable>
+                    ) : null}
+                    {recipientOptions.contact_preference_available ? (
+                      <Pressable style={styles.destinationOption} onPress={() => setDestinationSource('contact_preference')}>
+                        <Text style={styles.destinationOptionTitle}>Preferência salva para você</Text>
+                        <Text style={styles.fieldHint}>Usar a configuração deixada para seu contato.</Text>
+                      </Pressable>
+                    ) : null}
+                    <Text style={styles.fieldHint}>Opção selecionada: {destinationSource === 'specific' ? 'lugar específico' : destinationSource === 'recipient_default' ? 'endereço padrão' : 'preferência salva'}</Text>
+                  </View>
+                ) : null}
               </View>
             </View>
 
@@ -713,8 +784,8 @@ export default function CreateScreen() {
                 }}
               >
                 <Text style={styles.label}>Destino</Text>
-                <Text style={styles.fieldHint}>Escolha no mapa onde a carta vai chegar.</Text>
-                <Pressable
+                <Text style={styles.fieldHint}>{destinationSource === 'specific' ? 'Escolha no mapa onde a carta vai chegar.' : 'O destino protegido será resolvido pela conta do destinatário.'}</Text>
+                {destinationSource === 'specific' ? <Pressable
                   accessibilityRole="button"
                   onPress={() => setMapPickerOpen('destination')}
                   style={[
@@ -732,7 +803,7 @@ export default function CreateScreen() {
                     </Text>
                   </View>
                   <Text style={styles.mapChoiceArrow}>›</Text>
-                </Pressable>
+                </Pressable> : null}
                 {fieldErrors.destination ? <Text style={styles.fieldError}>{fieldErrors.destination}</Text> : null}
               </View>
               <View
@@ -855,6 +926,11 @@ const styles = StyleSheet.create({
   messageInput: { minHeight: 130 },
   characterCount: { color: '#8a8193', fontSize: 14, marginTop: 8, textAlign: 'right' },
   courierOptions: { flexDirection: 'row', gap: 8 },
+  clearDraftButton: { alignSelf: 'flex-start', marginBottom: 12, paddingVertical: 6 },
+  clearDraftText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  destinationOptions: { marginTop: 12 },
+  destinationOption: { backgroundColor: '#fffdfb', borderColor: colors.line, borderRadius: 14, borderWidth: 1, marginTop: 8, padding: 12 },
+  destinationOptionTitle: { color: colors.ink, fontSize: 14, fontWeight: '800', marginBottom: 3 },
   courierOption: { alignItems: 'center', borderColor: colors.line, borderRadius: 16, borderWidth: 1, flex: 1, minWidth: 0, paddingHorizontal: 4, paddingVertical: 10 },
   selectedCourierOption: { backgroundColor: colors.sand, borderColor: colors.primary },
   courierImageRing: { alignItems: 'center', borderColor: 'transparent', borderRadius: 32, borderWidth: 3, height: 64, justifyContent: 'center', width: 64 },

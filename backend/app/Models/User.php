@@ -22,6 +22,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'allow_contact_delivery',
     ];
 
     public function deliveries()
@@ -42,6 +43,11 @@ class User extends Authenticatable
     public function trackedDeliveries()
     {
         return $this->hasMany(TrackedDelivery::class);
+    }
+
+    public function deliveryPreferences()
+    {
+        return $this->hasMany(DeliveryPreference::class, 'recipient_user_id');
     }
 
     /**
@@ -65,6 +71,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'allow_contact_delivery' => 'boolean',
         ];
     }
 }

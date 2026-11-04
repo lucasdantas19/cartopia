@@ -1,4 +1,4 @@
-import type { DeliveryLocation } from './domain'
+import type { DeliveryLocation, DestinationSource } from './domain'
 
 export type CreateDeliveryForm = {
   senderName: string
@@ -10,6 +10,7 @@ export type CreateDeliveryForm = {
   originLocation: DeliveryLocation | null
   destinationLocation: DeliveryLocation | null
   duration: string
+  destinationSource?: DestinationSource
 }
 
 export type CreateDeliveryField = Exclude<keyof CreateDeliveryForm, 'originLocation' | 'destinationLocation'>
@@ -48,7 +49,7 @@ export function validateCreateDelivery(form: CreateDeliveryForm): CreateDelivery
   else if (message.length > 10000) errors.message = 'A mensagem pode ter até 10.000 caracteres.'
 
   if (!validLocation(form.originLocation)) errors.origin = 'Escolha uma origem real no mapa.'
-  if (!validLocation(form.destinationLocation)) errors.destination = 'Escolha um destino real no mapa.'
+  if ((form.destinationSource ?? 'specific') === 'specific' && !validLocation(form.destinationLocation)) errors.destination = 'Escolha um destino real no mapa.'
   if (form.originLocation && form.destinationLocation &&
     form.originLocation.latitude === form.destinationLocation.latitude &&
     form.originLocation.longitude === form.destinationLocation.longitude) {

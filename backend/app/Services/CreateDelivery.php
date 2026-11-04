@@ -13,6 +13,8 @@ class CreateDelivery
      */
     public function handle(array $attributes, ?int $userId = null): array
     {
+        $destination = app(ResolveRecipientDestination::class)->handle($attributes, $userId);
+        $attributes = [...$attributes, ...$destination];
         $startsAt = CarbonImmutable::now('UTC');
         $recipientAccessToken = bin2hex(random_bytes(32));
         $senderAccessToken = bin2hex(random_bytes(32));
@@ -98,6 +100,7 @@ class CreateDelivery
             'access_token_hash' => hash('sha256', $recipientAccessToken),
             'recipient_access_token_encrypted' => Crypt::encryptString($recipientAccessToken),
             'sender_access_token_hash' => hash('sha256', $senderAccessToken),
+            'sender_access_token_encrypted' => Crypt::encryptString($senderAccessToken),
         ]);
 
         return [

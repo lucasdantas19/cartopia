@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, createDelivery, fetchSavedItems, getAuthToken, saveLocation, saveRecipient, type SavedLocation, type SavedRecipient } from '../services/api'
+import { ApiError, createDelivery, fetchRecipientDeliveryOptions, fetchSavedItems, getAuthToken, saveLocation, saveRecipient, type RecipientDeliveryOptions, type SavedLocation, type SavedRecipient } from '../services/api'
 import { createShareUrl } from '../services/accessToken'
 import { copyText } from '../utils/clipboard'
 import { CreateDeliveryForm } from '../components/delivery/CreateDeliveryForm'
 import { DeliverySummary } from '../components/delivery/DeliverySummary'
 import { DeliveryCreationSuccess } from '../components/delivery/DeliveryCreationSuccess'
 import { Shell } from '../components/layout/Shell'
-import type { AccessRole, CreateDeliveryInput, CreateDeliveryStep } from '../domain/delivery/types'
+import type { AccessRole, CreateDeliveryInput, CreateDeliveryStep, DestinationSource } from '../domain/delivery/types'
 
 interface CreatePageProps {
   onTrack: (publicId: string, token: string, role?: AccessRole) => void
@@ -50,7 +50,7 @@ function readCreatedDelivery(): CreatedDelivery | null {
 
 const initialForm: CreateDeliveryInput = {
   message: '', sender_name: '', recipient_name: '', origin: '', origin_location: null,
-  destination: '', destination_location: null, duration_minutes: 60, courier: 'paper-swallow',
+  destination: '', destination_location: null, destination_source: 'specific', duration_minutes: 60, courier: 'paper-swallow',
   final_duration_minutes: 30, steps: [], route_visibility: 'full',
 }
 
@@ -118,9 +118,10 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
   const [created, setCreated] = useState<CreatedDelivery | null>(readCreatedDelivery)
   const [copied, setCopied] = useState<AccessRole | null>(null)
   const [copyError, setCopyError] = useState<AccessRole | null>(null)
-  const [draftRecovered] = useState(() => readDeliveryDraft() !== null)
+  const [draftRecovered, setDraftRecovered] = useState(() => readDeliveryDraft() !== null)
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([])
   const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>([])
+  const [recipientOptions, setRecipientOptions] = useState<RecipientDeliveryOptions | null>(null)
   const [saveNewRecipient, setSaveNewRecipient] = useState(false)
   const [saveNewOrigin, setSaveNewOrigin] = useState(false)
   const [saveNewDestination, setSaveNewDestination] = useState(false)
@@ -159,6 +160,16 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
     setFieldErrors((current) => ({ ...current, [field]: [] }))
   }
 
+  function clearDraft() {
+    window.sessionStorage.removeItem(draftStorageKey)
+    setForm(initialForm)
+    setAdventureEnabled(false)
+    setRecipientOptions(null)
+    setFieldErrors({})
+    setError('')
+    setDraftRecovered(false)
+  }
+
   function updateStep(index: number, field: 'title' | 'description' | 'duration_minutes', value: string | number) {
     setForm((current) => {
       const steps = [...(current.steps ?? [])]
@@ -179,6 +190,28 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
   function updateEndpoint(kind: 'origin' | 'destination', location: { label: string; latitude: number; longitude: number }) {
     setForm((current) => ({ ...current, [kind]: location.label, [`${kind}_location`]: location }))
     setFieldErrors((current) => ({ ...current, [kind]: [], [`${kind}_location`]: [] }))
+  }
+
+  function updateDestinationSource(source: DestinationSource) {
+    setForm((current) => ({
+      ...current,
+      destination_source: source,
+      ...(source === 'specific' ? {} : { destination: '', destination_location: null }),
+    }))
+    setFieldErrors((current) => ({ ...current, destination: [], destination_source: [] }))
+  }
+
+  async function checkRecipientOptions() {
+    const email = form.recipient_email?.trim()
+    if (!getAuthToken() || !email) {
+      setRecipientOptions(null)
+      return
+    }
+    try {
+      setRecipientOptions((await fetchRecipientDeliveryOptions(email)).data)
+    } catch {
+      setRecipientOptions(null)
+    }
   }
 
   function addStep() {
@@ -209,8 +242,8 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(''); setFieldErrors({})
-    if (!form.origin_location || !form.destination_location) { setError('Escolha a origem e o destino da entrega para continuar.'); return }
-    if (form.origin_location.latitude === form.destination_location.latitude && form.origin_location.longitude === form.destination_location.longitude) { setError('Escolha localidades diferentes para a partida e o destino.'); return }
+    if (!form.origin_location || (form.destination_source === 'specific' && !form.destination_location)) { setError('Escolha a origem e o destino da entrega para continuar.'); return }
+    if (form.destination_source === 'specific' && form.origin_location && form.destination_location && form.origin_location.latitude === form.destination_location.latitude && form.origin_location.longitude === form.destination_location.longitude) { setError('Escolha localidades diferentes para a partida e o destino.'); return }
     if (adventureEnabled && !form.steps?.length) { setError('Adicione pelo menos uma parada para criar uma aventura.'); return }
     setSubmitting(true)
     try {
@@ -277,7 +310,12 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
   return (
     <Shell onHome={onHome} onPrivacy={onPrivacy} onAccount={onAccount}>
       <section className="intro create-intro">
-        {draftRecovered && <p className="draft-restored" role="status">Rascunho recuperado desta sessão.</p>}
+        {draftRecovered && (
+          <div className="draft-restored" role="status">
+            <span>Rascunho recuperado desta sessão.</span>
+            <button className="text-button" type="button" onClick={clearDraft}>Limpar formulário</button>
+          </div>
+        )}
         <div className="intro-copy">
           <h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1>
           <p className="lead">Escreva uma mensagem, trace uma rota e deixe a Cartopia transformar carinho em aventura.</p>
@@ -314,6 +352,9 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
           onMoveStep={moveStep}
           savedLocations={savedLocations}
           savedRecipients={savedRecipients}
+          recipientOptions={recipientOptions}
+          onCheckRecipientOptions={() => void checkRecipientOptions()}
+          onDestinationSourceChange={updateDestinationSource}
           canSaveNewItems={Boolean(getAuthToken())}
           saveNewRecipient={saveNewRecipient}
           onSaveNewRecipientChange={setSaveNewRecipient}

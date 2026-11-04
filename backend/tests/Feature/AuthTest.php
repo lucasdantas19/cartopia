@@ -2,6 +2,7 @@
 
 use App\Models\Delivery;
 use App\Models\User;
+use App\Models\SavedLocation;
 use Carbon\CarbonImmutable;
 
 it('registers and authenticates a user without exposing the token hash', function () {
@@ -14,6 +15,95 @@ it('registers and authenticates a user without exposing the token hash', functio
     expect(User::first()->api_token_hash)->toBe(hash('sha256', $token));
 
     $this->withToken($token)->getJson('/api/auth/me')->assertOk()->assertJsonPath('data.name', 'Lucas');
+});
+
+it('resolves a recipient account address according to the selected delivery source', function () {
+    $sender = User::factory()->create();
+    $recipient = User::factory()->create(['email' => 'ana@example.com', 'allow_contact_delivery' => true]);
+    $senderToken = $this->postJson('/api/auth/login', ['email' => $sender->email, 'password' => 'password'])->json('token');
+    $default = $recipient->savedLocations()->create([
+        'name' => 'Casa', 'label' => 'Casa da Ana', 'latitude' => -8.05, 'longitude' => -34.9, 'is_default' => true,
+    ]);
+
+    $this->withToken($senderToken)->getJson('/api/account/recipient-delivery-options?recipient_email=ana%40example.com')
+        ->assertOk()
+        ->assertJsonPath('data.available', true)
+        ->assertJsonPath('data.recipient_default_available', true);
+
+    $response = $this->withToken($senderToken)->postJson('/api/deliveries', deliveryPayload([
+        'recipient_email' => 'ANA@example.com',
+        'destination_source' => 'recipient_default',
+        'destination' => null,
+    ]))->assertCreated();
+
+    $delivery = Delivery::where('public_id', $response->json('data.public_id'))->firstOrFail();
+    expect($delivery->recipient_user_id)->toBe($recipient->id)
+        ->and($delivery->destination_source)->toBe('recipient_default')
+        ->and($delivery->destination)->toBe($default->label)
+        ->and($delivery->destination_location['latitude'])->toBe($default->latitude);
+});
+
+it('uses a recipient preference for a specific sender and protects it from other users', function () {
+    $sender = User::factory()->create(['email' => 'sender@example.com']);
+    $other = User::factory()->create();
+    $recipient = User::factory()->create(['email' => 'ana@example.com', 'allow_contact_delivery' => true]);
+    $senderToken = $this->postJson('/api/auth/login', ['email' => $sender->email, 'password' => 'password'])->json('token');
+    $otherToken = $this->postJson('/api/auth/login', ['email' => $other->email, 'password' => 'password'])->json('token');
+    $location = $recipient->savedLocations()->create([
+        'name' => 'Trabalho', 'label' => 'Escritório da Ana', 'latitude' => -8.1, 'longitude' => -34.95,
+    ]);
+    $recipientToken = $this->postJson('/api/auth/login', ['email' => $recipient->email, 'password' => 'password'])->json('token');
+
+    $this->withToken($recipientToken)->postJson('/api/account/delivery-preferences', [
+        'sender_email' => $sender->email, 'location_id' => $location->id,
+    ])->assertCreated();
+    $this->withToken($otherToken)->deleteJson('/api/account/delivery-preferences/1')->assertNotFound();
+
+    $response = $this->withToken($senderToken)->postJson('/api/deliveries', deliveryPayload([
+        'recipient_email' => $recipient->email,
+        'destination_source' => 'contact_preference',
+        'destination' => null,
+    ]))->assertCreated();
+
+    expect(Delivery::where('public_id', $response->json('data.public_id'))->firstOrFail()->destination)
+        ->toBe($location->label);
+});
+
+it('shows deliveries addressed to the account in its received messages', function () {
+    $recipient = User::factory()->create(['email' => 'recipient@example.com']);
+    $sender = User::factory()->create();
+    $senderToken = $this->postJson('/api/auth/login', ['email' => $sender->email, 'password' => 'password'])->json('token');
+    $recipientToken = $this->postJson('/api/auth/login', ['email' => $recipient->email, 'password' => 'password'])->json('token');
+
+    $created = $this->withToken($senderToken)->postJson('/api/deliveries', deliveryPayload([
+        'recipient_email' => 'RECIPIENT@example.com',
+        'recipient_name' => $recipient->name,
+    ]))->assertCreated();
+
+    $this->withToken($recipientToken)->getJson('/api/account/incoming-deliveries')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.public_id', $created->json('data.public_id'));
+    $this->withToken($recipientToken)->getJson('/api/account/incoming-deliveries/'.$created->json('data.public_id').'/token')
+        ->assertOk()
+        ->assertJsonPath('data.role', 'recipient');
+});
+
+it('returns a sender token only to the owner of a sent delivery', function () {
+    $owner = User::factory()->create();
+    $other = User::factory()->create();
+    $ownerToken = $this->postJson('/api/auth/login', ['email' => $owner->email, 'password' => 'password'])->json('token');
+    $otherToken = $this->postJson('/api/auth/login', ['email' => $other->email, 'password' => 'password'])->json('token');
+    $created = $this->withToken($ownerToken)->postJson('/api/deliveries', deliveryPayload())->assertCreated();
+    Delivery::where('public_id', $created->json('data.public_id'))->update(['sender_access_token_encrypted' => null]);
+
+    $this->withToken($ownerToken)
+        ->getJson('/api/account/deliveries/'.$created->json('data.public_id').'/token')
+        ->assertOk()
+        ->assertJsonPath('data.role', 'sender');
+    $this->withToken($otherToken)
+        ->getJson('/api/account/deliveries/'.$created->json('data.public_id').'/token')
+        ->assertNotFound();
 });
 
 it('keeps account data private and allows anonymous deliveries', function () {
