@@ -52,7 +52,7 @@ const couriers = [
 
 export default function CreateScreen() {
   const router = useRouter()
-  const { session } = useSession()
+  const { session, sessionExpired } = useSession()
   const scrollRef = useRef<ScrollViewInstance>(null)
   const fieldOffsets = useRef<Partial<Record<CreateDeliveryField, number>>>({})
   const sectionOffsets = useRef({ recipient: 0, message: 0, route: 0 })
@@ -121,6 +121,11 @@ export default function CreateScreen() {
   }
 
   async function submit() {
+    if (sessionExpired) {
+      setError('Sua sessão terminou. Entre novamente antes de criar a entrega.')
+      return
+    }
+
     const validationErrors = validateCreateDelivery({
       senderName,
       recipientName,
@@ -164,7 +169,8 @@ export default function CreateScreen() {
         try {
           await saveRecentDelivery({
             publicId: response.data.public_id,
-            senderToken: response.sender_access_token,
+            accessToken: response.sender_access_token,
+            role: 'sender',
             recipientName: recipientName.trim(),
             origin,
             destination,
@@ -681,6 +687,9 @@ export default function CreateScreen() {
           </View>
 
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+          {sessionExpired ? (
+            <Link href="/auth" style={styles.back}>Entrar novamente</Link>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             disabled={submitting}

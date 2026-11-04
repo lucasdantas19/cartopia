@@ -25,8 +25,18 @@ class AuthorizeDelivery
             ? 'recipient'
             : ($delivery->sender_access_token_hash !== null && hash_equals($delivery->sender_access_token_hash, $hash) ? 'sender' : null);
 
-        if ($role === null && $delivery->user_id !== null) {
-            if (User::whereKey($delivery->user_id)->where('api_token_hash', $hash)->exists()) {
+        if ($role === null) {
+            $user = User::where('api_token_hash', $hash)->first();
+            $isRecipient = $user !== null && $delivery->recipient_email !== null
+                && strcasecmp($delivery->recipient_email, $user->email) === 0;
+            $isSender = $user !== null && $delivery->user_id === $user->id;
+            $requestedRole = $requiredRole ?? $request->query('role');
+
+            if ($isSender && $requestedRole === 'sender') {
+                $role = 'sender';
+            } elseif ($isRecipient) {
+                $role = 'recipient';
+            } elseif ($isSender) {
                 $role = 'sender';
             }
         }

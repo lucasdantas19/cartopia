@@ -16,7 +16,6 @@ import {
   ApiError,
   fetchAccountDeliveries,
   fetchIncomingDeliveries,
-  fetchIncomingDeliveryToken,
 } from '../../src/api'
 import { useSession } from '../../src/context/SessionContext'
 import type { AccountDelivery } from '../../src/domain'
@@ -34,12 +33,10 @@ import {
 type DeliveryCardProps = {
   delivery: AccountDelivery
   kind: 'incoming' | 'sent'
-  opening: boolean
-  openError?: string
   onOpen: () => void
 }
 
-function DeliveryCard({ delivery, kind, opening, openError, onOpen }: DeliveryCardProps) {
+function DeliveryCard({ delivery, kind, onOpen }: DeliveryCardProps) {
   const progress = deliveryProgressPercent(delivery.progress)
   const arrival = arrivalLabel(delivery.arrives_at)
   const title = kind === 'incoming'
@@ -73,21 +70,59 @@ function DeliveryCard({ delivery, kind, opening, openError, onOpen }: DeliveryCa
           {arrival}
         </Text>
       ) : null}
-      {openError ? (
-        <Text accessibilityRole="alert" style={styles.cardError}>{openError}</Text>
-      ) : null}
       <Pressable
         accessibilityLabel={`Acompanhar viagem ${title.toLowerCase()}`}
         accessibilityRole="button"
-        disabled={opening}
         onPress={onOpen}
-        style={[styles.cardButton, opening && styles.disabledButton]}
+        style={styles.cardButton}
       >
-        {opening ? <ActivityIndicator color="#7c3aed" size="small" /> : null}
-        <Text style={styles.cardButtonText}>
-          {opening ? 'Abrindo viagem…' : openError ? 'Tentar abrir novamente' : 'Acompanhar viagem'}
-        </Text>
+        <Text style={styles.cardButtonText}>Acompanhar viagem</Text>
       </Pressable>
+    </View>
+  )
+}
+
+type LocalDeliveriesProps = {
+  deliveries: RecentDelivery[]
+  onOpen: (delivery: RecentDelivery) => void
+  onRemove: (delivery: RecentDelivery) => void
+}
+
+function LocalDeliveries({ deliveries, onOpen, onRemove }: LocalDeliveriesProps) {
+  if (Platform.OS === 'web' || deliveries.length === 0) return null
+
+  return (
+    <View style={styles.localSection}>
+      <Text style={styles.localTitle}>Salvas neste celular</Text>
+      <Text style={styles.localDescription}>
+        Estas viagens ficam disponíveis neste aparelho mesmo depois de fechar o aplicativo.
+      </Text>
+      {deliveries.map((delivery) => (
+        <View key={delivery.publicId} style={styles.localCard}>
+          <Text style={styles.cardTitle}>Para {delivery.recipientName}</Text>
+          <Text style={styles.cardRoute}>
+            {delivery.origin} → {delivery.destination}
+          </Text>
+          <View style={styles.localActions}>
+            <Pressable
+              accessibilityLabel={`Acompanhar entrega para ${delivery.recipientName}`}
+              accessibilityRole="button"
+              onPress={() => onOpen(delivery)}
+              style={styles.localOpenButton}
+            >
+              <Text style={styles.localOpenText}>Acompanhar</Text>
+            </Pressable>
+            <Pressable
+              accessibilityLabel={`Remover entrega para ${delivery.recipientName} deste celular`}
+              accessibilityRole="button"
+              onPress={() => onRemove(delivery)}
+              style={styles.localRemoveButton}
+            >
+              <Text style={styles.localRemoveText}>Remover</Text>
+            </Pressable>
+          </View>
+        </View>
+      ))}
     </View>
   )
 }
@@ -95,7 +130,7 @@ function DeliveryCard({ delivery, kind, opening, openError, onOpen }: DeliveryCa
 export default function JourneysScreen() {
   const router = useRouter()
   const params = useLocalSearchParams<{ section?: string }>()
-  const { session, loading: sessionLoading } = useSession()
+  const { session, loading: sessionLoading, sessionExpired } = useSession()
   const [selected, setSelected] = useState<'incoming' | 'sent'>('incoming')
   const [deliveries, setDeliveries] = useState<AccountDelivery[]>([])
   const [incoming, setIncoming] = useState<AccountDelivery[]>([])
@@ -104,8 +139,6 @@ export default function JourneysScreen() {
   const [recentError, setRecentError] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [openingId, setOpeningId] = useState<string | null>(null)
-  const [openingError, setOpeningError] = useState<{ publicId: string; message: string } | null>(null)
   const [error, setError] = useState('')
   const loadedToken = useRef<string | null>(null)
   const requestId = useRef(0)
@@ -173,25 +206,11 @@ export default function JourneysScreen() {
     void loadRecent()
   }, [loadRecent]))
 
-  async function openIncoming(publicId: string) {
-    if (!session || openingId) return
-
-    setOpeningId(publicId)
-    setOpeningError(null)
-    try {
-      const response = await fetchIncomingDeliveryToken(publicId, session.token)
-      router.push({
-        pathname: '/track',
-        params: { publicId: response.data.public_id, token: response.data.access_token },
-      })
-    } catch (caught) {
-      setOpeningError({
-        publicId,
-        message: caught instanceof ApiError ? caught.message : 'Não foi possível abrir esta entrega.',
-      })
-    } finally {
-      setOpeningId(null)
-    }
+  function openIncoming(publicId: string) {
+    router.push({
+      pathname: '/track',
+      params: { publicId, fromAccount: 'recipient' },
+    })
   }
 
   function openSent(publicId: string) {
@@ -204,14 +223,14 @@ export default function JourneysScreen() {
   function openRecent(delivery: RecentDelivery) {
     router.push({
       pathname: '/track',
-      params: { publicId: delivery.publicId, token: delivery.senderToken },
+      params: { publicId: delivery.publicId, token: delivery.accessToken },
     })
   }
 
   function confirmRemoval(delivery: RecentDelivery) {
     Alert.alert(
       'Remover deste celular?',
-      'O acesso salvo a esta entrega será apagado. Guarde seu link de remetente se quiser abri-la depois.',
+      'O acesso salvo a esta entrega será apagado. Guarde o link para abri-la depois.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -229,8 +248,13 @@ export default function JourneysScreen() {
 
   const showContent = loadedToken.current === session?.token
   const localOnlyRecent = session && showContent
-    ? recent.filter((item) => !deliveries.some((delivery) => delivery.public_id === item.publicId))
+    ? recent.filter((item) => {
+      const accountDeliveries = item.role === 'recipient' ? incoming : deliveries
+      return !accountDeliveries.some((delivery) => delivery.public_id === item.publicId)
+    })
     : recent
+  const localIncoming = localOnlyRecent.filter((item) => item.role === 'recipient')
+  const localSent = localOnlyRecent.filter((item) => item.role === 'sender')
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
@@ -253,6 +277,15 @@ export default function JourneysScreen() {
           Acompanhe as mensagens que chegaram e as cartas que você enviou.
         </Text>
 
+        {sessionExpired ? (
+          <View style={styles.errorPanel}>
+            <Text accessibilityRole="alert" style={styles.error}>
+              Sua sessão terminou. Entre novamente para ver suas viagens e mensagens.
+            </Text>
+            <Link href="/auth" style={styles.retryText}>Entrar novamente</Link>
+          </View>
+        ) : null}
+
         <View accessibilityRole="tablist" style={styles.segment}>
           <Pressable
             accessibilityRole="tab"
@@ -261,7 +294,7 @@ export default function JourneysScreen() {
             style={[styles.segmentButton, selected === 'incoming' && styles.segmentSelected]}
           >
             <Text style={[styles.segmentText, selected === 'incoming' && styles.segmentTextSelected]}>
-              Recebidas{session && showContent ? ` (${incoming.length})` : ''}
+              Recebidas ({(session && showContent ? incoming.length : 0) + localIncoming.length})
             </Text>
           </Pressable>
           <Pressable
@@ -271,7 +304,7 @@ export default function JourneysScreen() {
             style={[styles.segmentButton, selected === 'sent' && styles.segmentSelected]}
           >
             <Text style={[styles.segmentText, selected === 'sent' && styles.segmentTextSelected]}>
-              Enviadas{session && showContent ? ` (${deliveries.length + localOnlyRecent.length})` : ''}
+              Enviadas ({(session && showContent ? deliveries.length : 0) + localSent.length})
             </Text>
           </Pressable>
         </View>
@@ -282,9 +315,13 @@ export default function JourneysScreen() {
               <ActivityIndicator color="#7c3aed" style={styles.loading} />
             ) : !session ? (
               <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>Entre para ver suas mensagens</Text>
+                <Text style={styles.emptyTitle}>
+                  {sessionExpired ? 'Sua sessão terminou' : 'Entre para ver suas mensagens'}
+                </Text>
                 <Text style={styles.empty}>
-                  As entregas enviadas para o seu e-mail aparecem aqui depois que você entra.
+                  {sessionExpired
+                    ? 'Entre novamente para ver as mensagens enviadas ao seu e-mail.'
+                    : 'As entregas enviadas para o seu e-mail aparecem aqui depois que você entra.'}
                 </Text>
                 <Link href="/auth" asChild>
                   <Pressable accessibilityRole="button" style={styles.primaryButton}>
@@ -308,7 +345,7 @@ export default function JourneysScreen() {
                 ) : null}
                 {loading ? (
                   <ActivityIndicator color="#7c3aed" style={styles.loading} />
-                ) : showContent && incoming.length === 0 ? (
+                ) : showContent && incoming.length === 0 && localIncoming.length === 0 ? (
                   <View style={styles.emptyCard}>
                     <Text style={styles.emptyTitle}>Nenhuma entrega por aqui ainda</Text>
                     <Text style={styles.empty}>
@@ -320,17 +357,16 @@ export default function JourneysScreen() {
                     key={delivery.public_id}
                     delivery={delivery}
                     kind="incoming"
-                    opening={openingId === delivery.public_id}
-                    openError={
-                      openingError?.publicId === delivery.public_id
-                        ? openingError.message
-                        : undefined
-                    }
-                    onOpen={() => void openIncoming(delivery.public_id)}
+                    onOpen={() => openIncoming(delivery.public_id)}
                   />
                 )) : null}
               </>
             )}
+            <LocalDeliveries
+              deliveries={localIncoming}
+              onOpen={openRecent}
+              onRemove={confirmRemoval}
+            />
             <Link href="/track" asChild>
               <Pressable accessibilityRole="button" style={styles.secondaryButton}>
                 <Text style={styles.secondaryButtonText}>Acompanhar pelo link</Text>
@@ -358,60 +394,17 @@ export default function JourneysScreen() {
                 key={delivery.public_id}
                 delivery={delivery}
                 kind="sent"
-                opening={false}
                 onOpen={() => openSent(delivery.public_id)}
               />
             )) : null}
 
-            {Platform.OS !== 'web' && localOnlyRecent.length > 0 ? (
-              <View style={styles.localSection}>
-                <Text style={styles.localTitle}>Salvas neste celular</Text>
-                <Text style={styles.localDescription}>
-                  Estas viagens ficam neste aparelho e podem incluir envios feitos sem entrar.
-                </Text>
-                {localOnlyRecent.map((delivery) => (
-                  <View key={delivery.publicId} style={styles.localCard}>
-                    <Text style={styles.cardTitle}>Para {delivery.recipientName}</Text>
-                    <Text style={styles.cardRoute}>
-                      {delivery.origin} → {delivery.destination}
-                    </Text>
-                    <View style={styles.localActions}>
-                      <Pressable
-                        accessibilityLabel={`Acompanhar entrega para ${delivery.recipientName}`}
-                        accessibilityRole="button"
-                        onPress={() => openRecent(delivery)}
-                        style={styles.localOpenButton}
-                      >
-                        <Text style={styles.localOpenText}>Acompanhar</Text>
-                      </Pressable>
-                      <Pressable
-                        accessibilityLabel={`Remover entrega para ${delivery.recipientName} deste celular`}
-                        accessibilityRole="button"
-                        onPress={() => confirmRemoval(delivery)}
-                        style={styles.localRemoveButton}
-                      >
-                        <Text style={styles.localRemoveText}>Remover</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-            {recentLoading ? <ActivityIndicator color="#7c3aed" style={styles.loading} /> : null}
-            {recentError ? (
-              <View style={styles.errorPanel}>
-                <Text accessibilityRole="alert" style={styles.error}>{recentError}</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => void loadRecent()}
-                  style={styles.retryButton}
-                >
-                  <Text style={styles.retryText}>Tentar novamente</Text>
-                </Pressable>
-              </View>
-            ) : null}
+            <LocalDeliveries
+              deliveries={localSent}
+              onOpen={openRecent}
+              onRemove={confirmRemoval}
+            />
             {!sessionLoading && !loading && !error && showContent && deliveries.length === 0
-              && !recentLoading && localOnlyRecent.length === 0 ? (
+              && !recentLoading && localSent.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Text style={styles.emptyTitle}>Sua próxima aventura começa aqui</Text>
                   <Text style={styles.empty}>
@@ -420,11 +413,11 @@ export default function JourneysScreen() {
                 </View>
               ) : null}
             {!sessionLoading && !session && !recentLoading && !recentError
-              && localOnlyRecent.length === 0 ? (
+              && localSent.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <Text style={styles.emptyTitle}>Nenhuma viagem salva neste celular</Text>
                   <Text style={styles.empty}>
-                    As entregas que você criar aqui poderão ser acompanhadas depois.
+                    As entregas que você criar ou abrir por link poderão ser acompanhadas depois.
                   </Text>
                 </View>
               ) : null}
@@ -435,6 +428,19 @@ export default function JourneysScreen() {
             </Link>
           </>
         )}
+        {recentLoading ? <ActivityIndicator color="#7c3aed" style={styles.loading} /> : null}
+        {recentError ? (
+          <View style={styles.errorPanel}>
+            <Text accessibilityRole="alert" style={styles.error}>{recentError}</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void loadRecent()}
+              style={styles.retryButton}
+            >
+              <Text style={styles.retryText}>Tentar novamente</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   )
@@ -502,8 +508,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   cardButtonText: { color: '#7c3aed', fontSize: 15, fontWeight: '700' },
-  cardError: { color: '#b42318', fontSize: 14, lineHeight: 20, marginTop: 12 },
-  disabledButton: { opacity: 0.65 },
   emptyCard: {
     backgroundColor: '#ffffff',
     borderColor: '#e5dcef',

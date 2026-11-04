@@ -12,7 +12,7 @@ import { useSession } from '../../src/context/SessionContext'
 
 export default function AccountScreen() {
   const router = useRouter()
-  const { session, loading, signOut } = useSession()
+  const { session, loading, sessionExpired, signOut } = useSession()
 
   async function exit() {
     await signOut()
@@ -34,14 +34,19 @@ export default function AccountScreen() {
           </View>
         ) : !session ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Sua aventura também pode ser sem conta</Text>
+            <Text style={styles.cardTitle}>
+              {sessionExpired ? 'Sua sessão terminou' : 'Sua aventura também pode ser sem conta'}
+            </Text>
             <Text style={styles.body}>
-              Entre para encontrar as mensagens enviadas ao seu e-mail e acompanhar
-              seus envios em outros aparelhos.
+              {sessionExpired
+                ? 'Entre novamente para acessar suas mensagens e viagens.'
+                : 'Entre para encontrar as mensagens enviadas ao seu e-mail e acompanhar seus envios em outros aparelhos.'}
             </Text>
             <Link href="/auth" asChild>
               <Pressable accessibilityRole="button" style={styles.primaryButton}>
-                <Text style={styles.primaryButtonText}>Entrar ou criar conta</Text>
+                <Text style={styles.primaryButtonText}>
+                  {sessionExpired ? 'Entrar novamente' : 'Entrar ou criar conta'}
+                </Text>
               </Pressable>
             </Link>
           </View>

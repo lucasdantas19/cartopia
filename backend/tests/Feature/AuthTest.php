@@ -2,6 +2,7 @@
 
 use App\Models\Delivery;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 
 it('registers and authenticates a user without exposing the token hash', function () {
     $response = $this->postJson('/api/auth/register', [
@@ -29,6 +30,18 @@ it('keeps account data private and allows anonymous deliveries', function () {
     $this->withToken($token)->postJson('/api/deliveries', deliveryPayload(['recipient_name' => 'Pessoa autenticada']))->assertCreated();
     expect(Delivery::where('user_id', $user->id)->count())->toBe(1);
     $this->withToken($token)->getJson('/api/account/deliveries')->assertJsonCount(1, 'data');
+});
+
+it('rejects an expired account token when creating a delivery', function () {
+    $user = User::factory()->create();
+    $token = $this->postJson('/api/v1/auth/login', [
+        'email' => $user->email, 'password' => 'password',
+    ])->json('token');
+    $this->withToken($token)->postJson('/api/v1/auth/logout')->assertOk();
+
+    $this->withToken($token)->postJson('/api/v1/deliveries', deliveryPayload())
+        ->assertUnauthorized()->assertJsonPath('error.code', 'UNAUTHENTICATED');
+    expect(Delivery::count())->toBe(0);
 });
 
 it('lets an account owner follow their sent delivery without exposing recipient content', function () {
@@ -100,4 +113,52 @@ it('shows deliveries addressed to a registered recipient in their account', func
         ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.recipient_name', 'Ana');
     $this->withToken($recipientToken)->getJson('/api/account/incoming-deliveries/'.Delivery::first()->public_id.'/token')
         ->assertOk()->assertJsonPath('data.role', 'recipient');
+});
+
+it('lets the email recipient open an arrived message with their account session', function () {
+    $recipient = User::factory()->create(['email' => 'ana@example.com']);
+    $other = User::factory()->create();
+    $recipientToken = $this->postJson('/api/v1/auth/login', [
+        'email' => $recipient->email, 'password' => 'password',
+    ])->json('token');
+    $otherToken = $this->postJson('/api/v1/auth/login', [
+        'email' => $other->email, 'password' => 'password',
+    ])->json('token');
+    $created = $this->postJson('/api/v1/deliveries', deliveryPayload([
+        'recipient_email' => 'ANA@example.com',
+        'message' => 'Mensagem privada para Ana',
+        'duration_minutes' => 1,
+    ]))->assertCreated();
+    $publicId = $created->json('data.public_id');
+
+    $this->withToken($recipientToken)->getJson('/api/v1/deliveries/'.$publicId)
+        ->assertOk()->assertJsonPath('data.access_role', 'recipient')->assertDontSee('Mensagem privada para Ana');
+    $this->withToken($recipientToken)->getJson('/api/v1/deliveries/'.$publicId.'/message')
+        ->assertForbidden()->assertJsonPath('error.code', 'DELIVERY_NOT_ARRIVED');
+    $this->withToken($otherToken)->getJson('/api/v1/deliveries/'.$publicId)->assertNotFound();
+    $this->withToken($otherToken)->getJson('/api/v1/deliveries/'.$publicId.'/message')->assertNotFound();
+
+    CarbonImmutable::setTestNow(CarbonImmutable::now()->addMinutes(2));
+
+    $this->withToken($recipientToken)->getJson('/api/v1/deliveries/'.$publicId.'/message')
+        ->assertOk()->assertJsonPath('data.message', 'Mensagem privada para Ana');
+    $this->withToken($recipientToken)->postJson('/api/v1/auth/logout')->assertOk();
+    $this->withToken($recipientToken)->getJson('/api/v1/deliveries/'.$publicId.'/message')->assertNotFound();
+});
+
+it('gives a matching account the recipient role when sending to their own email', function () {
+    $user = User::factory()->create(['email' => 'ana@example.com']);
+    $token = $this->postJson('/api/v1/auth/login', [
+        'email' => $user->email, 'password' => 'password',
+    ])->json('token');
+    $created = $this->withToken($token)->postJson('/api/v1/deliveries', deliveryPayload([
+        'recipient_email' => 'ANA@example.com',
+    ]))->assertCreated();
+
+    $this->withToken($token)->getJson('/api/v1/deliveries/'.$created->json('data.public_id'))
+        ->assertOk()->assertJsonPath('data.access_role', 'recipient');
+    $this->withToken($token)->getJson('/api/v1/deliveries/'.$created->json('data.public_id').'?role=sender')
+        ->assertOk()->assertJsonPath('data.access_role', 'sender');
+    $this->withToken($token)->getJson('/api/v1/deliveries/'.$created->json('data.public_id').'/recipient-share-link')
+        ->assertOk();
 });

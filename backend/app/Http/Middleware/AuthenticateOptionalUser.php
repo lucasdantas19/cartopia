@@ -13,7 +13,14 @@ class AuthenticateOptionalUser
     {
         if ($token = $request->bearerToken()) {
             $user = User::where('api_token_hash', hash('sha256', $token))->first();
-            if ($user) $request->setUserResolver(fn () => $user);
+            if (! $user) {
+                return response()->json(['error' => [
+                    'code' => 'UNAUTHENTICATED',
+                    'message' => 'Faça login para continuar.',
+                ]], 401);
+            }
+
+            $request->setUserResolver(fn () => $user);
         }
 
         return $next($request);

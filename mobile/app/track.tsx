@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Linking from 'expo-linking'
 import { ApiError, fetchDelivery, fetchRecipientShareLink, openDeliveryMessage } from '../src/api'
 import { createDeliveryShareUrl, parseDeliveryLink, previewDeliveryShareUrl } from '../src/deepLinks'
+import { saveRecentDelivery } from '../src/recentDeliveries'
 import { webUrl } from '../src/config'
 import type { Delivery } from '../src/domain'
 import { DeliveryJourneyMap } from '../src/components/DeliveryJourneyMap'
@@ -43,8 +44,8 @@ const couriers = {
 export default function TrackScreen() {
   const params = useLocalSearchParams<{ publicId?: string; token?: string; fromAccount?: string }>()
   const router = useRouter()
-  const { session } = useSession()
-  const accessToken = params.fromAccount === 'sender'
+  const { session, sessionExpired } = useSession()
+  const accessToken = params.fromAccount === 'sender' || params.fromAccount === 'recipient'
     ? session?.token
     : typeof params.token === 'string' ? params.token : undefined
   const [link, setLink] = useState('')
@@ -52,6 +53,7 @@ export default function TrackScreen() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [messageError, setMessageError] = useState('')
+  const [recentSaveError, setRecentSaveError] = useState('')
   const [openingMessage, setOpeningMessage] = useState(false)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -76,6 +78,7 @@ export default function TrackScreen() {
     setDelivery(null)
     setMessage(null)
     setMessageError('')
+    setRecentSaveError('')
     setOpeningMessage(false)
     setError('')
     setLoading(false)
@@ -124,10 +127,30 @@ export default function TrackScreen() {
     if (showRefreshing) setRefreshing(true)
     setError('')
     try {
-      const response = await fetchDelivery(publicId, token)
+      const role = params.fromAccount === 'sender' || params.fromAccount === 'recipient'
+        ? params.fromAccount
+        : undefined
+      const response = await fetchDelivery(publicId, token, role)
       if (requestId.current === currentRequest) {
         setDelivery(response.data)
         setFetchedAt(Date.now())
+        if (showLoading && Platform.OS !== 'web' && !params.fromAccount && response.data.access_role) {
+          try {
+            await saveRecentDelivery({
+              publicId: response.data.public_id,
+              accessToken: token,
+              role: response.data.access_role,
+              recipientName: response.data.recipient_name,
+              origin: response.data.origin,
+              destination: response.data.destination,
+              createdAt: new Date().toISOString(),
+            })
+          } catch {
+            if (requestId.current === currentRequest) {
+              setRecentSaveError('Não foi possível salvar esta viagem neste celular. Guarde o link para abri-la novamente.')
+            }
+          }
+        }
       }
     } catch (caught) {
       if (requestId.current === currentRequest) {
@@ -159,7 +182,7 @@ export default function TrackScreen() {
     setOpeningMessage(true)
     setMessageError('')
     try {
-      const response = await openDeliveryMessage(publicId, token)
+      const response = await openDeliveryMessage(publicId, token, Boolean(params.fromAccount))
       if (messageRequestId.current === currentRequest) setMessage(response.data.message)
     } catch (caught) {
       if (messageRequestId.current === currentRequest) {
@@ -180,7 +203,7 @@ export default function TrackScreen() {
     setShareLinkError('')
 
     try {
-      const response = await fetchRecipientShareLink(publicId, senderToken)
+      const response = await fetchRecipientShareLink(publicId, senderToken, Boolean(params.fromAccount))
       const url = createDeliveryShareUrl(
         webUrl,
         response.data.public_id,
@@ -269,10 +292,23 @@ export default function TrackScreen() {
               </View>
             ) : (
               <>
-                <Text style={styles.emptyTitle}>Abra uma viagem pelo link</Text>
-                <Text style={styles.body}>
-                  Cole o link completo que você recebeu para acompanhar a entrega sem entrar na sua conta.
+                <Text style={styles.emptyTitle}>
+                  {params.fromAccount && !session ? 'Entre para continuar' : 'Abra uma viagem pelo link'}
                 </Text>
+                <Text style={styles.body}>
+                  {params.fromAccount && !session
+                    ? sessionExpired
+                      ? 'Sua sessão terminou. Entre novamente para abrir esta viagem.'
+                      : 'Esta viagem precisa da sua conta para ser aberta.'
+                    : 'Cole o link completo que você recebeu para acompanhar a entrega sem entrar na sua conta.'}
+                </Text>
+                {params.fromAccount && !session ? (
+                  <Link href="/auth" asChild>
+                    <Pressable accessibilityRole="button" style={styles.button}>
+                      <Text style={styles.buttonText}>Entrar novamente</Text>
+                    </Pressable>
+                  </Link>
+                ) : null}
                 <Text style={styles.inputLabel}>Link de acompanhamento</Text>
                 <TextInput
                   accessibilityLabel="Link de acompanhamento"
@@ -302,6 +338,9 @@ export default function TrackScreen() {
           </View>
         ) : (
           <>
+            {recentSaveError ? (
+              <Text accessibilityRole="alert" style={styles.error}>{recentSaveError}</Text>
+            ) : null}
             {error ? (
               <View style={styles.refreshError}>
                 <Text accessibilityRole="alert" style={styles.error}>{error}</Text>

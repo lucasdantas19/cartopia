@@ -1,6 +1,7 @@
 export type RecentDelivery = {
   publicId: string
-  senderToken: string
+  accessToken: string
+  role: 'sender' | 'recipient'
   recipientName: string
   origin: string
   destination: string
@@ -43,14 +44,28 @@ function parseDelivery(value: string | null): RecentDelivery | null {
     const item = parsed as Record<string, unknown>
     if (
       typeof item.publicId !== 'string' || !publicIdPattern.test(item.publicId) ||
-      typeof item.senderToken !== 'string' || !item.senderToken ||
       typeof item.recipientName !== 'string' ||
       typeof item.origin !== 'string' ||
       typeof item.destination !== 'string' ||
       typeof item.createdAt !== 'string'
     ) return null
 
-    return item as RecentDelivery
+    const accessToken = typeof item.accessToken === 'string'
+      ? item.accessToken
+      : item.senderToken
+    const role = item.role ?? 'sender'
+    if (typeof accessToken !== 'string' || !accessToken) return null
+    if (role !== 'sender' && role !== 'recipient') return null
+
+    return {
+      publicId: item.publicId,
+      accessToken,
+      role,
+      recipientName: item.recipientName,
+      origin: item.origin,
+      destination: item.destination,
+      createdAt: item.createdAt,
+    } as RecentDelivery
   } catch {
     return null
   }
@@ -68,6 +83,9 @@ export async function listRecentDeliveries(storage: RecentDeliveryStorage): Prom
 
 export async function saveRecentDelivery(storage: RecentDeliveryStorage, item: RecentDelivery) {
   if (!publicIdPattern.test(item.publicId)) throw new Error('Invalid delivery ID')
+  if (!item.accessToken || !['sender', 'recipient'].includes(item.role)) {
+    throw new Error('Invalid delivery access')
+  }
 
   const previous = await listRecentDeliveries(storage)
   const next = [item, ...previous.filter((entry) => entry.publicId !== item.publicId)]

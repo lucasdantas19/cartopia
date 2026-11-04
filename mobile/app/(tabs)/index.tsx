@@ -15,7 +15,6 @@ import {
   ApiError,
   fetchAccountDeliveries,
   fetchIncomingDeliveries,
-  fetchIncomingDeliveryToken,
 } from '../../src/api'
 import { useSession } from '../../src/context/SessionContext'
 import type { AccountDelivery } from '../../src/domain'
@@ -28,12 +27,10 @@ import {
 type ActivityCardProps = {
   delivery: AccountDelivery
   kind: 'incoming' | 'sent'
-  opening: boolean
-  error?: string
   onOpen: () => void
 }
 
-function ActivityCard({ delivery, kind, opening, error, onOpen }: ActivityCardProps) {
+function ActivityCard({ delivery, kind, onOpen }: ActivityCardProps) {
   const title = kind === 'incoming'
     ? delivery.sender_name
       ? `De ${delivery.sender_name} para você`
@@ -52,17 +49,13 @@ function ActivityCard({ delivery, kind, opening, error, onOpen }: ActivityCardPr
       <Text numberOfLines={2} style={styles.activityRoute}>
         {delivery.origin} → {delivery.destination}
       </Text>
-      {error ? <Text accessibilityRole="alert" style={styles.activityError}>{error}</Text> : null}
       <Pressable
         accessibilityLabel={`Acompanhar viagem ${title.toLowerCase()}`}
         accessibilityRole="button"
-        disabled={opening}
         onPress={onOpen}
         style={styles.activityOpen}
       >
-        <Text style={styles.activityOpenText}>
-          {opening ? 'Abrindo…' : error ? 'Tentar abrir novamente' : 'Acompanhar viagem'}
-        </Text>
+        <Text style={styles.activityOpenText}>Acompanhar viagem</Text>
       </Pressable>
     </View>
   )
@@ -70,7 +63,7 @@ function ActivityCard({ delivery, kind, opening, error, onOpen }: ActivityCardPr
 
 export default function HomeScreen() {
   const router = useRouter()
-  const { session, loading } = useSession()
+  const { session, loading, sessionExpired } = useSession()
   const [recent, setRecent] = useState<RecentDelivery[]>([])
   const [recentLoading, setRecentLoading] = useState(Platform.OS !== 'web')
   const [recentError, setRecentError] = useState('')
@@ -79,8 +72,6 @@ export default function HomeScreen() {
   const [accountLoading, setAccountLoading] = useState(true)
   const [accountRefreshing, setAccountRefreshing] = useState(false)
   const [accountError, setAccountError] = useState('')
-  const [openingId, setOpeningId] = useState<string | null>(null)
-  const [openingError, setOpeningError] = useState<{ publicId: string; message: string } | null>(null)
   const loadedToken = useRef<string | null>(null)
   const accountRequestId = useRef(0)
 
@@ -139,25 +130,11 @@ export default function HomeScreen() {
     }
   }, [loadAccount]))
 
-  async function openIncoming(publicId: string) {
-    if (!session || openingId) return
-
-    setOpeningId(publicId)
-    setOpeningError(null)
-    try {
-      const response = await fetchIncomingDeliveryToken(publicId, session.token)
-      router.push({
-        pathname: '/track',
-        params: { publicId: response.data.public_id, token: response.data.access_token },
-      })
-    } catch (caught) {
-      setOpeningError({
-        publicId,
-        message: caught instanceof ApiError ? caught.message : 'Não foi possível abrir esta entrega.',
-      })
-    } finally {
-      setOpeningId(null)
-    }
+  function openIncoming(publicId: string) {
+    router.push({
+      pathname: '/track',
+      params: { publicId, fromAccount: 'recipient' },
+    })
   }
 
   function openSent(publicId: string) {
@@ -170,7 +147,7 @@ export default function HomeScreen() {
   function openRecent(delivery: RecentDelivery) {
     router.push({
       pathname: '/track',
-      params: { publicId: delivery.publicId, token: delivery.senderToken },
+      params: { publicId: delivery.publicId, token: delivery.accessToken },
     })
   }
 
@@ -179,7 +156,10 @@ export default function HomeScreen() {
   const firstName = session?.user.name.trim().split(/\s+/)[0] || 'por aqui'
   const showAccountContent = loadedToken.current === session?.token
   const localOnlyRecent = session && showAccountContent
-    ? recent.filter((delivery) => !sent.some((item) => item.public_id === delivery.publicId))
+    ? recent.filter((delivery) => {
+      const accountDeliveries = delivery.role === 'recipient' ? incoming : sent
+      return !accountDeliveries.some((item) => item.public_id === delivery.publicId)
+    })
     : recent
 
   return (
@@ -206,6 +186,15 @@ export default function HomeScreen() {
             ? 'Suas viagens e mensagens recebidas, sempre por perto.'
             : 'Crie uma surpresa ou acompanhe uma entrega pelo link que você recebeu.'}
         </Text>
+
+        {sessionExpired ? (
+          <View style={styles.errorPanel}>
+            <Text accessibilityRole="alert" style={styles.errorText}>
+              Sua sessão terminou. Entre novamente para ver suas viagens e mensagens.
+            </Text>
+            <Link href="/auth" style={styles.retryText}>Entrar novamente</Link>
+          </View>
+        ) : null}
 
         <Link href="/create" asChild>
           <Pressable accessibilityRole="button" style={styles.primaryButton}>
@@ -273,9 +262,7 @@ export default function HomeScreen() {
                     key={delivery.public_id}
                     delivery={delivery}
                     kind="incoming"
-                    opening={openingId === delivery.public_id}
-                    error={openingError?.publicId === delivery.public_id ? openingError.message : undefined}
-                    onOpen={() => void openIncoming(delivery.public_id)}
+                    onOpen={() => openIncoming(delivery.public_id)}
                   />
                 ))}
 
@@ -297,7 +284,6 @@ export default function HomeScreen() {
                     key={delivery.public_id}
                     delivery={delivery}
                     kind="sent"
-                    opening={false}
                     onOpen={() => openSent(delivery.public_id)}
                   />
                 ))}
@@ -313,16 +299,17 @@ export default function HomeScreen() {
             <View style={styles.sectionHeading}>
               <Text style={styles.sectionTitle}>Neste celular</Text>
               <Link
-                href={{ pathname: '/journeys', params: { section: 'sent' } }}
+                href={{
+                  pathname: '/journeys',
+                  params: { section: localOnlyRecent[0]?.role === 'recipient' ? 'incoming' : 'sent' },
+                }}
                 style={styles.viewAll}
               >
                 Ver todas →
               </Link>
             </View>
             <Text style={styles.sectionDescription}>
-              {session
-                ? 'Estas entregas ficam neste aparelho, mesmo que você tenha criado alguma sem entrar.'
-                : 'As cinco últimas entregas criadas aqui ficam disponíveis mesmo após fechar o aplicativo.'}
+              As últimas cinco entregas criadas ou abertas por link ficam salvas neste aparelho.
             </Text>
 
             {recentLoading ? (
@@ -338,8 +325,12 @@ export default function HomeScreen() {
             ) : null}
             {localOnlyRecent.slice(0, 2).map((delivery) => (
               <View key={delivery.publicId} style={styles.recentCard}>
-                <Text style={styles.recentEyebrow}>CARTA PARA</Text>
-                <Text numberOfLines={2} style={styles.recentName}>{delivery.recipientName}</Text>
+                <Text style={styles.recentEyebrow}>
+                  {delivery.role === 'recipient' ? 'CARTA RECEBIDA' : 'CARTA PARA'}
+                </Text>
+                <Text numberOfLines={2} style={styles.recentName}>
+                  {delivery.role === 'recipient' ? `Para você, ${delivery.recipientName}` : delivery.recipientName}
+                </Text>
                 <Text numberOfLines={2} style={styles.recentRoute}>
                   {delivery.origin} → {delivery.destination}
                 </Text>
@@ -502,12 +493,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginTop: 6,
-  },
-  activityError: {
-    color: '#b42318',
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 10,
   },
   activityOpen: {
     alignItems: 'center',
