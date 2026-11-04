@@ -1,4 +1,6 @@
-import { useRef, useState } from 'react'
+import { colors, displayFont } from '../src/theme'
+import { useEffect, useRef, useState } from 'react'
+import { deliveryDraftStore } from '../src/deliveryDraft'
 import * as Clipboard from 'expo-clipboard'
 import { Link, usePreventRemove, useRouter } from 'expo-router'
 import {
@@ -56,6 +58,10 @@ export default function CreateScreen() {
   const scrollRef = useRef<ScrollViewInstance>(null)
   const fieldOffsets = useRef<Partial<Record<CreateDeliveryField, number>>>({})
   const sectionOffsets = useRef({ recipient: 0, message: 0, route: 0 })
+  const [draftReady, setDraftReady] = useState(false)
+  const [draftNotice, setDraftNotice] = useState('')
+  const draftStopped = useRef(false)
+  const [stage, setStage] = useState(0)
   const [senderName, setSenderName] = useState('')
   const [recipientName, setRecipientName] = useState('')
   const [recipientEmail, setRecipientEmail] = useState('')
@@ -86,18 +92,66 @@ export default function CreateScreen() {
     senderName || recipientName || recipientEmail || message ||
     originLocation || destinationLocation || courier !== couriers[0].code || duration !== '30',
   )
+  useEffect(() => {
+    let active = true
+    void deliveryDraftStore.read().then((draft) => {
+      if (!active || !draft) return
+      setSenderName(draft.senderName)
+      setRecipientName(draft.recipientName)
+      setRecipientEmail(draft.recipientEmail)
+      setMessage(draft.message)
+      setOriginLocation(draft.originLocation)
+      setDestinationLocation(draft.destinationLocation)
+      setCourier(draft.courier)
+      setDuration(draft.duration)
+      setStage(draft.stage)
+      setDraftNotice('Rascunho recuperado neste dispositivo.')
+    }).catch(() => {
+      if (active) setDraftNotice('Não foi possível recuperar o rascunho.')
+    }).finally(() => {
+      if (active) setDraftReady(true)
+    })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (!draftReady || created || draftStopped.current) return
+    const operation = hasDraft
+      ? deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, courier, duration, stage })
+      : deliveryDraftStore.clear()
+    void operation.then(() => setDraftNotice(hasDraft ? 'Rascunho salvo neste dispositivo.' : '')).catch(() => {
+      setDraftNotice('Não foi possível salvar o rascunho. Mantenha esta tela aberta para não perder o texto.')
+    })
+  }, [draftReady, created, hasDraft, senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, courier, duration, stage])
+
   const disablePrevention = usePreventRemove(hasDraft && !created, ({ repeat }) => {
     Alert.alert(
-      'Descartar mensagem?',
-      'O texto e as escolhas desta entrega serão perdidos.',
+      'Sair da criação?',
+      'Você pode guardar o rascunho neste dispositivo ou descartá-lo.',
       [
         { text: 'Continuar editando', style: 'cancel' },
+        {
+          text: 'Guardar e sair',
+          onPress: () => {
+            void deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, courier, duration, stage }).then(() => {
+              draftStopped.current = true
+              disablePrevention()
+              repeat()
+            }).catch(() => setDraftNotice('Não foi possível salvar. Tente novamente antes de sair.'))
+          },
+        },
         {
           text: 'Descartar',
           style: 'destructive',
           onPress: () => {
-            disablePrevention()
-            repeat()
+            draftStopped.current = true
+            void deliveryDraftStore.clear().then(() => {
+              disablePrevention()
+              repeat()
+            }).catch(() => {
+              draftStopped.current = false
+              setDraftNotice('Não foi possível descartar o rascunho. Tente novamente.')
+            })
           },
         },
       ],
@@ -115,8 +169,8 @@ export default function CreateScreen() {
       const section = firstField === 'message'
         ? 'message'
         : ['origin', 'destination', 'duration'].includes(firstField) ? 'route' : 'recipient'
-      const y = sectionOffsets.current[section] + (fieldOffsets.current[firstField] ?? 0)
-      scrollRef.current?.scrollTo({ y: Math.max(0, y - 24), animated: true })
+      setStage(section === 'recipient' || section === 'message' ? 0 : 1)
+      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: false }))
     }
   }
 
@@ -182,6 +236,10 @@ export default function CreateScreen() {
         }
       }
 
+      draftStopped.current = true
+      void deliveryDraftStore.clear().catch(() => {
+        setDraftNotice('Carta enviada, mas não foi possível apagar o rascunho deste dispositivo.')
+      })
       setCreated({
         publicId: response.data.public_id,
         recipientToken: response.recipient_access_token,
@@ -250,6 +308,14 @@ export default function CreateScreen() {
     } finally {
       setCopying(false)
     }
+  }
+
+  if (!draftReady) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ActivityIndicator accessibilityLabel="Recuperando rascunho" />
+      </SafeAreaView>
+    )
   }
 
   if (created) {
@@ -390,6 +456,9 @@ export default function CreateScreen() {
           >
             <Text style={styles.secondaryButtonText}>Acompanhar como remetente</Text>
           </Pressable>
+          {draftNotice.includes('não foi possível apagar') ? (
+            <Text accessibilityRole="alert" style={styles.fieldHint}>{draftNotice}</Text>
+          ) : null}
           <Link href="/" style={styles.backHome}>Voltar ao início</Link>
         </ScrollView>
       </SafeAreaView>
@@ -427,279 +496,335 @@ export default function CreateScreen() {
           ref={scrollRef}
         >
           <Link href="/" style={styles.back}>← Início</Link>
+          {draftNotice ? (
+            <Text accessibilityLiveRegion="polite" style={styles.fieldHint}>{draftNotice}</Text>
+          ) : null}
           <Text style={styles.eyebrow}>NOVA ENTREGA</Text>
           <Text style={styles.title}>Prepare uma surpresa.</Text>
           <Text style={styles.body}>
             Uma carta simples, uma viagem inteira. Você pode criar sem login.
           </Text>
 
-          <View
-            onLayout={(event) => {
-              sectionOffsets.current.recipient = event.nativeEvent.layout.y
-            }}
-            style={styles.sectionCard}
-          >
-            <Text style={styles.sectionNumber}>01</Text>
-            <Text style={styles.sectionTitle}>Quem vai receber?</Text>
-            <Text style={styles.sectionDescription}>Conte-nos para quem essa surpresa vai viajar.</Text>
-            <View
-              onLayout={(event) => {
-                fieldOffsets.current.senderName = event.nativeEvent.layout.y
-              }}
-            >
-              <Text style={styles.label}>Seu nome <Text style={styles.optional}>(opcional)</Text></Text>
-              <TextInput
-                accessibilityLabel="Seu nome, opcional"
-                autoComplete="name"
-                maxLength={120}
-                placeholder="Como devemos assinar?"
-                value={senderName}
-                onChangeText={(value) => {
-                  setSenderName(value)
-                  clearFieldError('senderName')
-                }}
-                style={styles.input}
-              />
-              {fieldErrors.senderName ? <Text style={styles.fieldError}>{fieldErrors.senderName}</Text> : null}
-            </View>
-            <View
-              onLayout={(event) => {
-                fieldOffsets.current.recipientName = event.nativeEvent.layout.y
-              }}
-            >
-              <Text style={styles.label}>Nome do destinatário</Text>
-              <TextInput
-                accessibilityLabel="Nome do destinatário"
-                maxLength={120}
-                placeholder="Quem vai receber?"
-                value={recipientName}
-                onChangeText={(value) => {
-                  setRecipientName(value)
-                  clearFieldError('recipientName')
-                }}
-                style={styles.input}
-              />
-              {fieldErrors.recipientName ? <Text style={styles.fieldError}>{fieldErrors.recipientName}</Text> : null}
-            </View>
-            <View
-              onLayout={(event) => {
-                fieldOffsets.current.recipientEmail = event.nativeEvent.layout.y
-              }}
-            >
-              <Text style={styles.label}>E-mail do destinatário <Text style={styles.optional}>(opcional)</Text></Text>
-              <Text style={styles.fieldHint}>
-                Ajuda a associar a entrega à conta da pessoa. Você ainda precisará enviar o link após criar.
-              </Text>
-              <TextInput
-                accessibilityLabel="E-mail do destinatário, opcional"
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                maxLength={255}
-                placeholder="nome@exemplo.com"
-                value={recipientEmail}
-                onChangeText={(value) => {
-                  setRecipientEmail(value)
-                  clearFieldError('recipientEmail')
-                }}
-                style={styles.input}
-              />
-              {fieldErrors.recipientEmail ? <Text style={styles.fieldError}>{fieldErrors.recipientEmail}</Text> : null}
-            </View>
+          <View style={styles.durationPresets}>
+            {['Mensagem', 'Rota', 'Revisão'].map((label, index) => (
+              <Pressable
+                key={label}
+                accessibilityRole="button"
+                accessibilityState={{ selected: stage === index }}
+                onPress={() => setStage(index)}
+                style={styles.durationPreset}
+              >
+                <Text>{index + 1}. {label}{stage === index ? ' •' : ''}</Text>
+              </Pressable>
+            ))}
           </View>
-
-          <View
-            onLayout={(event) => {
-              sectionOffsets.current.message = event.nativeEvent.layout.y
-            }}
-            style={styles.sectionCard}
-          >
-            <Text style={styles.sectionNumber}>02</Text>
-            <Text style={styles.sectionTitle}>Escreva a mensagem</Text>
-            <Text style={styles.sectionDescription}>É ela que dá sentido à aventura.</Text>
+          <View style={{ display: stage === 0 ? 'flex' : 'none' }}>
             <View
               onLayout={(event) => {
-                fieldOffsets.current.message = event.nativeEvent.layout.y
+                sectionOffsets.current.recipient = event.nativeEvent.layout.y
               }}
+              style={styles.sectionCard}
             >
-              <TextInput
-                accessibilityLabel="Mensagem da entrega"
-                multiline
-                maxLength={10000}
-                numberOfLines={6}
-                placeholder="Era uma vez uma mensagem..."
-                value={message}
-                onChangeText={(value) => {
-                  setMessage(value)
-                  clearFieldError('message')
+              <Text style={styles.sectionNumber}>01</Text>
+              <Text style={styles.sectionTitle}>Quem vai receber?</Text>
+              <Text style={styles.sectionDescription}>Conte-nos para quem essa surpresa vai viajar.</Text>
+              <View
+                onLayout={(event) => {
+                  fieldOffsets.current.senderName = event.nativeEvent.layout.y
                 }}
-                style={[styles.input, styles.messageInput]}
-                textAlignVertical="top"
-              />
-              {fieldErrors.message ? <Text style={styles.fieldError}>{fieldErrors.message}</Text> : null}
-              <Text style={styles.characterCount}>{message.length}/10.000 caracteres</Text>
+              >
+                <Text style={styles.label}>Seu nome <Text style={styles.optional}>(opcional)</Text></Text>
+                <TextInput
+                  accessibilityLabel="Seu nome, opcional"
+                  autoComplete="name"
+                  maxLength={120}
+                  placeholder="Como devemos assinar?"
+                  value={senderName}
+                  onChangeText={(value) => {
+                    setSenderName(value)
+                    clearFieldError('senderName')
+                  }}
+                  style={styles.input}
+                />
+                {fieldErrors.senderName ? <Text style={styles.fieldError}>{fieldErrors.senderName}</Text> : null}
+              </View>
+              <View
+                onLayout={(event) => {
+                  fieldOffsets.current.recipientName = event.nativeEvent.layout.y
+                }}
+              >
+                <Text style={styles.label}>Nome do destinatário</Text>
+                <TextInput
+                  accessibilityLabel="Nome do destinatário"
+                  maxLength={120}
+                  placeholder="Quem vai receber?"
+                  value={recipientName}
+                  onChangeText={(value) => {
+                    setRecipientName(value)
+                    clearFieldError('recipientName')
+                  }}
+                  style={styles.input}
+                />
+                {fieldErrors.recipientName ? <Text style={styles.fieldError}>{fieldErrors.recipientName}</Text> : null}
+              </View>
+              <View
+                onLayout={(event) => {
+                  fieldOffsets.current.recipientEmail = event.nativeEvent.layout.y
+                }}
+              >
+                <Text style={styles.label}>E-mail do destinatário <Text style={styles.optional}>(opcional)</Text></Text>
+                <Text style={styles.fieldHint}>
+                  Ajuda a associar a entrega à conta da pessoa. Você ainda precisará enviar o link após criar.
+                </Text>
+                <TextInput
+                  accessibilityLabel="E-mail do destinatário, opcional"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  maxLength={255}
+                  placeholder="nome@exemplo.com"
+                  value={recipientEmail}
+                  onChangeText={(value) => {
+                    setRecipientEmail(value)
+                    clearFieldError('recipientEmail')
+                  }}
+                  style={styles.input}
+                />
+                {fieldErrors.recipientEmail ? <Text style={styles.fieldError}>{fieldErrors.recipientEmail}</Text> : null}
+              </View>
             </View>
-          </View>
 
-          <View
-            onLayout={(event) => {
-              sectionOffsets.current.route = event.nativeEvent.layout.y
-            }}
-            style={styles.sectionCard}
-          >
-            <Text style={styles.sectionNumber}>03</Text>
-            <Text style={styles.sectionTitle}>Trace a rota</Text>
-            <Text style={styles.sectionDescription}>Escolha quem leva e por onde a carta passa.</Text>
-            <Text style={styles.label}>Entregador</Text>
-            <View style={styles.courierOptions}>
-              {couriers.map((item) => (
+            <View
+              onLayout={(event) => {
+                sectionOffsets.current.message = event.nativeEvent.layout.y
+              }}
+              style={styles.sectionCard}
+            >
+              <Text style={styles.sectionNumber}>02</Text>
+              <Text style={styles.sectionTitle}>Escreva a mensagem</Text>
+              <Text style={styles.sectionDescription}>É ela que dá sentido à aventura.</Text>
+              <View
+                onLayout={(event) => {
+                  fieldOffsets.current.message = event.nativeEvent.layout.y
+                }}
+              >
+                <TextInput
+                  accessibilityLabel="Mensagem da entrega"
+                  multiline
+                  maxLength={10000}
+                  numberOfLines={6}
+                  placeholder="Era uma vez uma mensagem..."
+                  value={message}
+                  onChangeText={(value) => {
+                    setMessage(value)
+                    clearFieldError('message')
+                  }}
+                  style={[styles.input, styles.messageInput]}
+                  textAlignVertical="top"
+                />
+                {fieldErrors.message ? <Text style={styles.fieldError}>{fieldErrors.message}</Text> : null}
+                <Text style={styles.characterCount}>{message.length}/10.000 caracteres</Text>
+              </View>
+            </View>
+
+          </View>
+          <View style={{ display: stage === 1 ? 'flex' : 'none' }}>
+            <View
+              onLayout={(event) => {
+                sectionOffsets.current.route = event.nativeEvent.layout.y
+              }}
+              style={styles.sectionCard}
+            >
+              <Text style={styles.sectionNumber}>03</Text>
+              <Text style={styles.sectionTitle}>Trace a rota</Text>
+              <Text style={styles.sectionDescription}>Escolha quem leva e por onde a carta passa.</Text>
+              <Text style={styles.label}>Entregador</Text>
+              <View style={styles.courierOptions}>
+                {couriers.map((item) => (
+                  <Pressable
+                    accessibilityLabel={item.label}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: courier === item.code }}
+                    key={item.code}
+                    onPress={() => setCourier(item.code)}
+                    style={[
+                      styles.courierOption,
+                      courier === item.code ? styles.selectedCourierOption : undefined,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.courierImageRing,
+                        courier === item.code ? styles.selectedCourierImageRing : undefined,
+                      ]}
+                    >
+                      <Image
+                        accessible={false}
+                        source={item.image}
+                        style={styles.courierImage}
+                      />
+                    </View>
+                    <Text
+                      numberOfLines={2}
+                      style={[
+                        styles.courierLabel,
+                        courier === item.code ? styles.selectedCourierLabel : undefined,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                    {courier === item.code ? (
+                      <Text style={styles.courierSelectedText}>Selecionado</Text>
+                    ) : null}
+                  </Pressable>
+                ))}
+              </View>
+              <View
+                onLayout={(event) => {
+                  fieldOffsets.current.origin = event.nativeEvent.layout.y
+                }}
+              >
+                <Text style={styles.label}>Origem</Text>
+                <Text style={styles.fieldHint}>Escolha no mapa de onde a carta vai partir.</Text>
                 <Pressable
-                  accessibilityLabel={item.label}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: courier === item.code }}
-                  key={item.code}
-                  onPress={() => setCourier(item.code)}
+                  accessibilityRole="button"
+                  onPress={() => setMapPickerOpen('origin')}
                   style={[
-                    styles.courierOption,
-                    courier === item.code ? styles.selectedCourierOption : undefined,
+                    styles.mapChoice,
+                    originLocation ? styles.selectedMapChoice : undefined,
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.courierImageRing,
-                      courier === item.code ? styles.selectedCourierImageRing : undefined,
-                    ]}
-                  >
-                    <Image
-                      accessible={false}
-                      source={item.image}
-                      style={styles.courierImage}
-                    />
+                  <Text style={styles.mapChoiceIcon}>⌖</Text>
+                  <View style={styles.locationChoiceText}>
+                    <Text style={styles.locationChoiceName}>
+                      {origin || 'Escolher origem no mapa'}
+                    </Text>
+                    <Text style={styles.locationChoiceDescription}>
+                      {originLocation ? 'Toque para alterar este lugar' : 'Pesquise um endereço ou marque um ponto.'}
+                    </Text>
                   </View>
-                  <Text
-                    numberOfLines={2}
-                    style={[
-                      styles.courierLabel,
-                      courier === item.code ? styles.selectedCourierLabel : undefined,
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                  {courier === item.code ? (
-                    <Text style={styles.courierSelectedText}>Selecionado</Text>
-                  ) : null}
+                  <Text style={styles.mapChoiceArrow}>›</Text>
                 </Pressable>
-              ))}
-            </View>
-            <View
-              onLayout={(event) => {
-                fieldOffsets.current.origin = event.nativeEvent.layout.y
-              }}
-            >
-              <Text style={styles.label}>Origem</Text>
-              <Text style={styles.fieldHint}>Escolha no mapa de onde a carta vai partir.</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setMapPickerOpen('origin')}
-                style={[
-                  styles.mapChoice,
-                  originLocation ? styles.selectedMapChoice : undefined,
-                ]}
-              >
-                <Text style={styles.mapChoiceIcon}>⌖</Text>
-                <View style={styles.locationChoiceText}>
-                  <Text style={styles.locationChoiceName}>
-                    {origin || 'Escolher origem no mapa'}
-                  </Text>
-                  <Text style={styles.locationChoiceDescription}>
-                    {originLocation ? 'Toque para alterar este lugar' : 'Pesquise um endereço ou marque um ponto.'}
-                  </Text>
-                </View>
-                <Text style={styles.mapChoiceArrow}>›</Text>
-              </Pressable>
-              {fieldErrors.origin ? <Text style={styles.fieldError}>{fieldErrors.origin}</Text> : null}
-            </View>
-            <View
-              onLayout={(event) => {
-                fieldOffsets.current.destination = event.nativeEvent.layout.y
-              }}
-            >
-              <Text style={styles.label}>Destino</Text>
-              <Text style={styles.fieldHint}>Escolha no mapa onde a carta vai chegar.</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setMapPickerOpen('destination')}
-                style={[
-                  styles.mapChoice,
-                  destinationLocation ? styles.selectedMapChoice : undefined,
-                ]}
-              >
-                <Text style={styles.mapChoiceIcon}>⌖</Text>
-                <View style={styles.locationChoiceText}>
-                  <Text style={styles.locationChoiceName}>
-                    {destination || 'Escolher destino no mapa'}
-                  </Text>
-                  <Text style={styles.locationChoiceDescription}>
-                    {destinationLocation ? 'Toque para alterar este lugar' : 'Pesquise um endereço ou marque um ponto.'}
-                  </Text>
-                </View>
-                <Text style={styles.mapChoiceArrow}>›</Text>
-              </Pressable>
-              {fieldErrors.destination ? <Text style={styles.fieldError}>{fieldErrors.destination}</Text> : null}
-            </View>
-            <View
-              onLayout={(event) => {
-                fieldOffsets.current.duration = event.nativeEvent.layout.y
-              }}
-            >
-              <Text style={styles.label}>Duração da viagem</Text>
-              <Text style={styles.fieldHint}>
-                A carta chegará ao destino após esse tempo. Escolha entre 1 minuto e 24 horas.
-              </Text>
-              <View style={styles.durationRow}>
-                <TextInput
-                  accessibilityLabel="Duração da viagem em minutos"
-                  keyboardType="number-pad"
-                  maxLength={4}
-                  value={duration}
-                  onChangeText={(value) => {
-                    setDuration(value)
-                    clearFieldError('duration')
-                  }}
-                  style={[styles.input, styles.durationInput]}
-                />
-                <Text style={styles.durationUnit}>minutos</Text>
+                {fieldErrors.origin ? <Text style={styles.fieldError}>{fieldErrors.origin}</Text> : null}
               </View>
-              {fieldErrors.duration ? <Text style={styles.fieldError}>{fieldErrors.duration}</Text> : null}
+              <View
+                onLayout={(event) => {
+                  fieldOffsets.current.destination = event.nativeEvent.layout.y
+                }}
+              >
+                <Text style={styles.label}>Destino</Text>
+                <Text style={styles.fieldHint}>Escolha no mapa onde a carta vai chegar.</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setMapPickerOpen('destination')}
+                  style={[
+                    styles.mapChoice,
+                    destinationLocation ? styles.selectedMapChoice : undefined,
+                  ]}
+                >
+                  <Text style={styles.mapChoiceIcon}>⌖</Text>
+                  <View style={styles.locationChoiceText}>
+                    <Text style={styles.locationChoiceName}>
+                      {destination || 'Escolher destino no mapa'}
+                    </Text>
+                    <Text style={styles.locationChoiceDescription}>
+                      {destinationLocation ? 'Toque para alterar este lugar' : 'Pesquise um endereço ou marque um ponto.'}
+                    </Text>
+                  </View>
+                  <Text style={styles.mapChoiceArrow}>›</Text>
+                </Pressable>
+                {fieldErrors.destination ? <Text style={styles.fieldError}>{fieldErrors.destination}</Text> : null}
+              </View>
+              <View
+                onLayout={(event) => {
+                  fieldOffsets.current.duration = event.nativeEvent.layout.y
+                }}
+              >
+                <Text style={styles.label}>Duração da viagem</Text>
+                <Text style={styles.fieldHint}>
+                  A carta chegará ao destino após esse tempo. Escolha entre 1 minuto e 24 horas.
+                </Text>
+                <View style={styles.durationPresets}>
+                  {['15', '60', '1440'].map((minutes) => (
+                    <Pressable
+                      key={minutes}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: duration === minutes }}
+                      onPress={() => {
+                        setDuration(minutes)
+                        clearFieldError('duration')
+                      }}
+                      style={styles.durationPreset}
+                    >
+                      <Text>{minutes === '15' ? '15 min' : minutes === '60' ? '1 hora' : '24 horas'}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <View style={styles.durationRow}>
+                  <TextInput
+                    accessibilityLabel="Duração da viagem em minutos"
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    value={duration}
+                    onChangeText={(value) => {
+                      setDuration(value)
+                      clearFieldError('duration')
+                    }}
+                    style={[styles.input, styles.durationInput]}
+                  />
+                  <Text style={styles.durationUnit}>minutos</Text>
+                </View>
+                {fieldErrors.duration ? <Text style={styles.fieldError}>{fieldErrors.duration}</Text> : null}
+              </View>
             </View>
-          </View>
 
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>CONFIRA ANTES DE CRIAR</Text>
-            <Text style={styles.summaryRecipient}>Para {recipientName.trim() || 'quem vai receber'}</Text>
-            <Text style={styles.summaryMessage} numberOfLines={3}>
-              {message.trim() || 'Sua mensagem aparecerá aqui.'}
-            </Text>
-            <Text style={styles.summaryRoute}>
-              {origin || 'Origem não escolhida'} → {destination || 'Destino não escolhido'}
-            </Text>
-            <Text style={styles.summaryDetail}>{selectedCourier.label} · {duration} minutos</Text>
           </View>
+          <View style={{ display: stage === 2 ? 'flex' : 'none' }}>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>CONFIRA ANTES DE ENVIAR</Text>
+              <Text style={styles.fieldHint}>A mensagem será revelada ao final da viagem. Compartilhe o link após enviar.</Text>
+              <Text style={styles.summaryRecipient}>Para {recipientName.trim() || 'quem vai receber'}</Text>
+              <Text style={styles.summaryMessage} numberOfLines={3}>
+                {message.trim() || 'Sua mensagem aparecerá aqui.'}
+              </Text>
+              <Text style={styles.summaryRoute}>
+                {origin || 'Origem não escolhida'} → {destination || 'Destino não escolhido'}
+              </Text>
+              <Text style={styles.summaryDetail}>{selectedCourier.label} · {duration} minutos</Text>
+              {Number(duration) > 0 && Number(duration) <= 1440 ? (
+                <Text style={styles.fieldHint}>
+                  Chegada estimada se enviar agora: {new Date(Date.now() + Number(duration) * 60000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.
+                </Text>
+              ) : null}
+            </View>
 
+          </View>
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+          {stage > 0 ? (
+            <Pressable accessibilityRole="button" onPress={() => setStage(stage - 1)} style={styles.durationPreset}>
+              <Text>Voltar</Text>
+            </Pressable>
+          ) : null}
           {sessionExpired ? (
             <Link href="/auth" style={styles.back}>Entrar novamente</Link>
           ) : null}
           <Pressable
             accessibilityRole="button"
             disabled={submitting}
-            onPress={() => void submit()}
+            onPress={() => {
+              if (stage < 2) {
+                setStage(stage + 1)
+                scrollRef.current?.scrollTo({ y: 0, animated: false })
+              } else {
+                void submit()
+              }
+            }}
             style={styles.submitButton}
           >
             {submitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.submitText}>Criar entrega ✦</Text>
+              <Text style={styles.submitText}>{stage < 2 ? 'Continuar' : 'Enviar carta ✦'}</Text>
             )}
           </Pressable>
         </ScrollView>
@@ -709,51 +834,53 @@ export default function CreateScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#fffaf4', flex: 1 },
+  durationPresets: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  durationPreset: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 12, backgroundColor: '#e9e4f2' },
+  safeArea: { backgroundColor: colors.background, flex: 1 },
   keyboardView: { flex: 1 },
-  container: { backgroundColor: '#fffaf4', flexGrow: 1, padding: 24, paddingBottom: 42 },
-  back: { color: '#7c3aed', fontSize: 16, marginBottom: 32, marginTop: 12 },
-  eyebrow: { color: '#7c3aed', fontWeight: '800', letterSpacing: 2, marginBottom: 12 },
-  title: { color: '#241b35', fontSize: 34, fontWeight: '800', lineHeight: 40 },
-  body: { color: '#665d70', fontSize: 16, lineHeight: 24, marginBottom: 24, marginTop: 12 },
+  container: { backgroundColor: colors.background, flexGrow: 1, padding: 24, paddingBottom: 42 },
+  back: { color: colors.primary, fontSize: 16, marginBottom: 32, marginTop: 12 },
+  eyebrow: { color: colors.primary, fontWeight: '800', letterSpacing: 2, marginBottom: 12 },
+  title: { fontFamily: displayFont, color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 40 },
+  body: { color: colors.muted, fontSize: 16, lineHeight: 24, marginBottom: 24, marginTop: 12 },
   sectionCard: { backgroundColor: '#ffffff', borderRadius: 20, marginBottom: 16, padding: 18 },
-  sectionNumber: { color: '#7c3aed', fontSize: 13, fontWeight: '800', letterSpacing: 1, marginBottom: 6 },
-  sectionTitle: { color: '#241b35', fontSize: 22, fontWeight: '800' },
-  sectionDescription: { color: '#665d70', fontSize: 14, lineHeight: 20, marginBottom: 8, marginTop: 4 },
-  label: { color: '#241b35', fontSize: 15, fontWeight: '700', marginBottom: 8, marginTop: 16 },
+  sectionNumber: { color: colors.primary, fontSize: 13, fontWeight: '800', letterSpacing: 1, marginBottom: 6 },
+  sectionTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
+  sectionDescription: { color: colors.muted, fontSize: 14, lineHeight: 20, marginBottom: 8, marginTop: 4 },
+  label: { color: colors.ink, fontSize: 15, fontWeight: '700', marginBottom: 8, marginTop: 16 },
   optional: { color: '#8a8193', fontWeight: '400' },
-  fieldHint: { color: '#665d70', fontSize: 13, lineHeight: 19, marginBottom: 10 },
+  fieldHint: { color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 10 },
   fieldError: { color: '#b42318', fontSize: 14, lineHeight: 20, marginTop: 8 },
-  input: { backgroundColor: '#fffdfb', borderColor: '#e5dcef', borderRadius: 12, borderWidth: 1, fontSize: 16, padding: 15 },
+  input: { backgroundColor: '#fffdfb', borderColor: colors.line, borderRadius: 12, borderWidth: 1, fontSize: 16, padding: 15 },
   messageInput: { minHeight: 130 },
-  characterCount: { color: '#8a8193', fontSize: 12, marginTop: 8, textAlign: 'right' },
+  characterCount: { color: '#8a8193', fontSize: 14, marginTop: 8, textAlign: 'right' },
   courierOptions: { flexDirection: 'row', gap: 8 },
-  courierOption: { alignItems: 'center', borderColor: '#e5dcef', borderRadius: 16, borderWidth: 1, flex: 1, minWidth: 0, paddingHorizontal: 4, paddingVertical: 10 },
-  selectedCourierOption: { backgroundColor: '#f1ebff', borderColor: '#7c3aed' },
+  courierOption: { alignItems: 'center', borderColor: colors.line, borderRadius: 16, borderWidth: 1, flex: 1, minWidth: 0, paddingHorizontal: 4, paddingVertical: 10 },
+  selectedCourierOption: { backgroundColor: colors.sand, borderColor: colors.primary },
   courierImageRing: { alignItems: 'center', borderColor: 'transparent', borderRadius: 32, borderWidth: 3, height: 64, justifyContent: 'center', width: 64 },
-  selectedCourierImageRing: { borderColor: '#7c3aed' },
+  selectedCourierImageRing: { borderColor: colors.primary },
   courierImage: { borderRadius: 29, height: 58, width: 58 },
-  courierLabel: { color: '#665d70', fontSize: 12, fontWeight: '700', lineHeight: 16, marginTop: 8, textAlign: 'center' },
+  courierLabel: { color: colors.muted, fontSize: 14, fontWeight: '700', lineHeight: 16, marginTop: 8, textAlign: 'center' },
   selectedCourierLabel: { color: '#4b2782' },
-  courierSelectedText: { color: '#7c3aed', fontSize: 10, fontWeight: '800', marginTop: 3 },
-  mapChoice: { alignItems: 'center', backgroundColor: '#fffdfb', borderColor: '#e5dcef', borderRadius: 14, borderWidth: 1, flexDirection: 'row', minHeight: 76, marginTop: 10, padding: 14 },
-  selectedMapChoice: { backgroundColor: '#f1ebff', borderColor: '#7c3aed' },
-  mapChoiceIcon: { color: '#7c3aed', fontSize: 28, marginRight: 12 },
+  courierSelectedText: { color: colors.primary, fontSize: 13, fontWeight: '800', marginTop: 3 },
+  mapChoice: { alignItems: 'center', backgroundColor: '#fffdfb', borderColor: colors.line, borderRadius: 14, borderWidth: 1, flexDirection: 'row', minHeight: 76, marginTop: 10, padding: 14 },
+  selectedMapChoice: { backgroundColor: colors.sand, borderColor: colors.primary },
+  mapChoiceIcon: { color: colors.primary, fontSize: 28, marginRight: 12 },
   locationChoiceText: { flex: 1, paddingRight: 10 },
-  locationChoiceName: { color: '#241b35', fontSize: 15, fontWeight: '800' },
-  locationChoiceDescription: { color: '#665d70', fontSize: 13, lineHeight: 19, marginTop: 4 },
-  mapChoiceArrow: { color: '#7c3aed', fontSize: 28 },
+  locationChoiceName: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  locationChoiceDescription: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 4 },
+  mapChoiceArrow: { color: colors.primary, fontSize: 28 },
   durationRow: { alignItems: 'center', flexDirection: 'row' },
   durationInput: { flex: 1 },
-  durationUnit: { color: '#665d70', fontSize: 15, marginLeft: 12 },
-  summaryCard: { backgroundColor: '#f1ebff', borderRadius: 18, marginBottom: 8, padding: 18 },
-  summaryLabel: { color: '#7c3aed', fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  summaryRecipient: { color: '#241b35', fontSize: 18, fontWeight: '800', marginTop: 12 },
-  summaryMessage: { color: '#665d70', fontSize: 15, lineHeight: 22, marginTop: 8 },
-  summaryRoute: { color: '#241b35', fontSize: 18, fontWeight: '800', marginTop: 8 },
-  summaryDetail: { color: '#665d70', fontSize: 14, marginTop: 6 },
+  durationUnit: { color: colors.muted, fontSize: 15, marginLeft: 12 },
+  summaryCard: { backgroundColor: colors.sand, borderRadius: 18, marginBottom: 8, padding: 18 },
+  summaryLabel: { color: colors.primary, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  summaryRecipient: { color: colors.ink, fontSize: 18, fontWeight: '800', marginTop: 12 },
+  summaryMessage: { color: colors.muted, fontSize: 15, lineHeight: 22, marginTop: 8 },
+  summaryRoute: { color: colors.ink, fontSize: 18, fontWeight: '800', marginTop: 8 },
+  summaryDetail: { color: colors.muted, fontSize: 14, marginTop: 6 },
   error: { color: '#b42318', fontSize: 15, lineHeight: 22, marginTop: 18 },
-  submitButton: { alignItems: 'center', backgroundColor: '#7c3aed', borderRadius: 12, marginTop: 24, padding: 16 },
+  submitButton: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, marginTop: 24, padding: 16 },
   submitText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   successCard: { backgroundColor: '#ffffff', borderRadius: 20, marginBottom: 16, padding: 18 },
   linkPreview: {
@@ -769,7 +896,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   linkPreviewRole: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
@@ -782,7 +909,7 @@ const styles = StyleSheet.create({
   },
   linkPrimaryButton: {
     alignItems: 'center',
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     flex: 1,
     justifyContent: 'center',
@@ -805,7 +932,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   linkSecondaryText: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -822,7 +949,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   revealLinkText: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -846,7 +973,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     marginTop: 10,
   },
-  secondaryButton: { alignItems: 'center', borderColor: '#e5dcef', borderRadius: 12, borderWidth: 1, marginTop: 16, padding: 16 },
-  secondaryButtonText: { color: '#7c3aed', fontSize: 16, fontWeight: '700' },
-  backHome: { color: '#7c3aed', fontSize: 16, marginBottom: 24, marginTop: 28, textAlign: 'center' },
+  secondaryButton: { alignItems: 'center', borderColor: colors.line, borderRadius: 12, borderWidth: 1, marginTop: 16, padding: 16 },
+  secondaryButtonText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
+  backHome: { color: colors.primary, fontSize: 16, marginBottom: 24, marginTop: 28, textAlign: 'center' },
 })

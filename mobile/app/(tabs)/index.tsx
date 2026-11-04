@@ -1,3 +1,4 @@
+import { colors, displayFont } from '../../src/theme'
 import { useCallback, useRef, useState } from 'react'
 import { Link, useFocusEffect, useRouter } from 'expo-router'
 import {
@@ -50,12 +51,14 @@ function ActivityCard({ delivery, kind, onOpen }: ActivityCardProps) {
         {delivery.origin} → {delivery.destination}
       </Text>
       <Pressable
-        accessibilityLabel={`Acompanhar viagem ${title.toLowerCase()}`}
+        accessibilityLabel={`${kind === 'incoming' && delivery.status === 'DELIVERED' ? 'Abrir carta' : 'Acompanhar viagem'} ${title.toLowerCase()}`}
         accessibilityRole="button"
         onPress={onOpen}
         style={styles.activityOpen}
       >
-        <Text style={styles.activityOpenText}>Acompanhar viagem</Text>
+        <Text style={styles.activityOpenText}>
+          {kind === 'incoming' && delivery.status === 'DELIVERED' ? 'Abrir carta' : 'Acompanhar viagem'}
+        </Text>
       </Pressable>
     </View>
   )
@@ -353,11 +356,11 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#fffaf4',
+    backgroundColor: colors.background,
     flex: 1,
   },
   container: {
-    backgroundColor: '#fffaf4',
+    backgroundColor: colors.background,
     flexGrow: 1,
     padding: 24,
     paddingBottom: 44,
@@ -366,20 +369,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   eyebrow: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontWeight: '800',
     letterSpacing: 2,
     marginBottom: 14,
     marginTop: 12,
   },
-  title: {
-    color: '#241b35',
+  title: { fontFamily: displayFont,
+    color: colors.ink,
     fontSize: 34,
     fontWeight: '800',
     lineHeight: 40,
   },
   body: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 24,
@@ -387,7 +390,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 14,
     justifyContent: 'center',
     minHeight: 50,
@@ -400,7 +403,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     alignItems: 'center',
-    borderColor: '#e5dcef',
+    borderColor: colors.line,
     borderRadius: 14,
     borderWidth: 1,
     justifyContent: 'center',
@@ -409,7 +412,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   secondaryButtonText: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -424,7 +427,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   accountLoadingText: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 15,
   },
   overviewRow: {
@@ -439,12 +442,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   overviewNumber: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 25,
     fontWeight: '800',
   },
   overviewLabel: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 14,
     marginTop: 3,
   },
@@ -456,7 +459,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   viewAll: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -473,30 +476,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   activityStatus: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '800',
   },
   activityProgress: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 12,
     fontWeight: '800',
   },
   activityTitle: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 18,
     fontWeight: '800',
     marginTop: 8,
   },
   activityRoute: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 6,
   },
   activityOpen: {
     alignItems: 'center',
-    borderColor: '#e5dcef',
+    borderColor: colors.line,
     borderRadius: 10,
     borderWidth: 1,
     justifyContent: 'center',
@@ -504,7 +507,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   activityOpenText: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -512,12 +515,12 @@ const styles = StyleSheet.create({
     marginTop: 34,
   },
   sectionTitle: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 22,
     fontWeight: '800',
   },
   sectionDescription: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 16,
@@ -542,7 +545,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   retryText: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
     marginTop: 12,
@@ -550,7 +553,7 @@ const styles = StyleSheet.create({
   emptyText: {
     backgroundColor: '#ffffff',
     borderRadius: 14,
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 14,
     lineHeight: 21,
     padding: 16,
@@ -562,26 +565,26 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   recentEyebrow: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
   },
   recentName: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 20,
     fontWeight: '800',
     marginTop: 5,
   },
   recentRoute: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 7,
   },
   openButton: {
     alignItems: 'center',
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 10,
     justifyContent: 'center',
     marginTop: 16,

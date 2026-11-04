@@ -43,7 +43,13 @@ export type AccountDelivery = {
   progress: number
   starts_at?: string | null
   arrives_at: string | null
+  opened_at?: string | null
 }
+
+export type ActiveMapDelivery = Pick<Delivery,
+  'public_id' | 'recipient_name' | 'origin' | 'destination' | 'origin_location' |
+  'destination_location' | 'starts_at' | 'arrives_at' | 'status' | 'progress' | 'courier'
+>
 
 export type DeliveryLocation = {
   label: string

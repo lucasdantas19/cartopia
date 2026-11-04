@@ -8,7 +8,6 @@ import { DeliverySummary } from '../components/delivery/DeliverySummary'
 import { DeliveryCreationSuccess } from '../components/delivery/DeliveryCreationSuccess'
 import { Shell } from '../components/layout/Shell'
 import type { AccessRole, CreateDeliveryInput, CreateDeliveryStep } from '../domain/delivery/types'
-import { firstUseGuideStorageKey, shouldShowFirstUseGuide } from '../utils/firstUseGuide'
 
 interface CreatePageProps {
   onTrack: (publicId: string, token: string, role?: AccessRole) => void
@@ -116,7 +115,6 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
   const [submitting, setSubmitting] = useState(false)
   const [adventureEnabled, setAdventureEnabled] = useState(() => readDeliveryDraft()?.adventureEnabled ?? false)
   const [showSummary, setShowSummary] = useState(true)
-  const [showFirstUseGuide, setShowFirstUseGuide] = useState(() => shouldShowFirstUseGuide(window.localStorage.getItem(firstUseGuideStorageKey)))
   const [created, setCreated] = useState<CreatedDelivery | null>(readCreatedDelivery)
   const [copied, setCopied] = useState<AccessRole | null>(null)
   const [copyError, setCopyError] = useState<AccessRole | null>(null)
@@ -132,8 +130,12 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
     void fetchSavedItems().then(({ locations, recipients }) => {
       setSavedLocations(locations)
       setSavedRecipients(recipients)
+      const defaultLocation = locations.find((location) => location.is_default)
+      if (!draftRecovered && !form.origin_location && defaultLocation) {
+        updateEndpoint('origin', defaultLocation)
+      }
     }).catch(() => undefined)
-  }, [])
+  }, [draftRecovered])
 
   useEffect(() => {
     if (created) {
@@ -188,11 +190,6 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
     if (enabled && !(form.steps?.length)) {
       setForm((current) => ({ ...current, steps: [] }))
     }
-  }
-
-  function dismissFirstUseGuide() {
-    window.localStorage.setItem(firstUseGuideStorageKey, 'true')
-    setShowFirstUseGuide(false)
   }
 
   function removeStep(index: number) {
@@ -298,29 +295,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
           </div>
           <p>toda carta começa<br />com um destino</p>
         </div>
-        <div className="create-steps" aria-label="Como funciona">
-          <strong>Como funciona</strong>
-          <span><b>01</b><small>Escreva sua mensagem</small></span>
-          <span><b>02</b><small>Escolha o tipo de rota</small></span>
-          <span><b>03</b><small>Acompanhe a entrega</small></span>
-        </div>
       </section>
-      {showFirstUseGuide && (
-        <aside className="first-use-guide" aria-labelledby="first-use-guide-title">
-          <div>
-            <span className="eyebrow">Primeira vez por aqui?</span>
-            <h2 id="first-use-guide-title">Você cria a viagem em três passos.</h2>
-            <div className="first-use-guide-steps">
-              <p><strong>1. Escreva</strong><span>Conte a história que será entregue.</span></p>
-              <p><strong>2. Escolha</strong><span>Envie direto ou adicione paradas à aventura.</span></p>
-              <p><strong>3. Acompanhe</strong><span>Compartilhe o link e veja a jornada acontecer.</span></p>
-            </div>
-          </div>
-          <button type="button" className="text-button first-use-guide-dismiss" onClick={dismissFirstUseGuide}>
-            Entendi, começar ✦
-          </button>
-        </aside>
-      )}
       <div className={`create-layout ${showSummary ? '' : 'summary-hidden'}`}>
         <CreateDeliveryForm
           form={form}
@@ -351,7 +326,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
           <button type="button" className="summary-toggle" onClick={() => setShowSummary((visible) => !visible)} aria-expanded={showSummary}>
             {showSummary ? 'Ocultar resumo −' : 'Mostrar resumo +'}
           </button>
-          {showSummary && <DeliverySummary form={form} />}
+          {showSummary && <DeliverySummary form={{ ...form, steps: adventureEnabled ? form.steps : [] }} />}
         </aside>
       </div>
     </Shell>

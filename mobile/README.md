@@ -62,3 +62,16 @@ Na tela de acompanhamento do celular, entregas com coordenadas reais podem alter
 Se o Expo Go não abrir o projeto após atualizar as dependências, confirme que o aplicativo Expo Go instalado no celular é compatível com o SDK 58 e reinicie o servidor com `npm start -- --lan --clear`. Use a versão de Node indicada no `.nvmrc` da raiz do repositório (`nvm use`).
 
 Para Android Emulator, a URL normalmente é `http://10.0.2.2:8000/api/v1`; para iOS Simulator, `http://127.0.0.1:8000/api/v1`.
+
+### Rascunho local
+
+A criação recupera automaticamente o rascunho e salva texto, locais, entregador,
+ duração e etapa no dispositivo. No app nativo, usa o SecureStore existente;
+na versão web do app, usa sessionStorage (limitado à aba/sessão).
+O rascunho pertence ao dispositivo, não é sincronizado com a conta.
+Ao sair é possível guardar ou descartar; após envio bem-sucedido ele é removido.
+Falhas de armazenamento são informadas sem impedir o envio da carta.
+
+Cartas longas são divididas em blocos pequenos. A referência do rascunho só muda
+após gravar todos os blocos, preservando a última versão completa em caso de falha.
+A paleta principal fica em `src/theme.ts`, alinhada ao frontend web.

@@ -1,3 +1,4 @@
+import { colors } from '../src/theme'
 import { useEffect, useRef, useState } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { Link, useLocalSearchParams, useRouter } from 'expo-router'
@@ -42,7 +43,7 @@ const couriers = {
 }
 
 export default function TrackScreen() {
-  const params = useLocalSearchParams<{ publicId?: string; token?: string; fromAccount?: string }>()
+  const params = useLocalSearchParams<{ publicId?: string; token?: string; fromAccount?: string; view?: string }>()
   const router = useRouter()
   const { session, sessionExpired } = useSession()
   const accessToken = params.fromAccount === 'sender' || params.fromAccount === 'recipient'
@@ -68,6 +69,7 @@ export default function TrackScreen() {
   const requestId = useRef(0)
   const messageRequestId = useRef(0)
   const shareRequestId = useRef(0)
+  const autoOpenRequested = useRef(false)
 
   useEffect(() => {
     const publicId = typeof params.publicId === 'string' ? params.publicId : undefined
@@ -75,6 +77,7 @@ export default function TrackScreen() {
     requestId.current += 1
     messageRequestId.current += 1
     shareRequestId.current += 1
+    autoOpenRequested.current = false
     setDelivery(null)
     setMessage(null)
     setMessageError('')
@@ -193,6 +196,12 @@ export default function TrackScreen() {
     }
   }
 
+  useEffect(() => {
+    if (params.view !== 'letter' || !delivery || message || delivery.status !== 'DELIVERED' || openingMessage || autoOpenRequested.current) return
+    autoOpenRequested.current = true
+    void revealMessage()
+  }, [params.view, delivery, message, openingMessage])
+
   async function loadRecipientShareLink() {
     const publicId = typeof params.publicId === 'string' ? params.publicId : undefined
     const senderToken = accessToken
@@ -266,6 +275,22 @@ export default function TrackScreen() {
   const courier = delivery ? couriers[delivery.courier as keyof typeof couriers] : undefined
   const arrival = delivery ? arrivalLabel(delivery.arrives_at) : null
   const mapAvailable = Platform.OS !== 'web' && Boolean(delivery && deliveryMapRoute(delivery))
+
+  if (params.view === 'letter' && message) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.container}>
+          <Link href="/(tabs)/journeys" style={styles.back}>← Mensagens recebidas</Link>
+          <Text style={styles.eyebrow}>MENSAGEM RECEBIDA</Text>
+          <Text style={styles.title}>Sua carta</Text>
+          <View style={styles.messageCard}>
+            <Text style={styles.messageEyebrow}>SUA CARTA</Text>
+            <Text style={styles.messageText}>{message}</Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -601,37 +626,37 @@ export default function TrackScreen() {
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#fffaf4',
+    backgroundColor: colors.background,
     flex: 1,
   },
   container: {
-    backgroundColor: '#fffaf4',
+    backgroundColor: colors.background,
     flexGrow: 1,
     padding: 24,
     paddingBottom: 44,
   },
   back: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 16,
     marginBottom: 28,
     marginTop: 8,
   },
   eyebrow: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1.6,
     marginBottom: 8,
   },
   title: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 30,
     fontWeight: '800',
     lineHeight: 36,
     marginBottom: 22,
   },
   body: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 15,
     lineHeight: 23,
     marginTop: 8,
@@ -642,7 +667,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyTitle: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 21,
     fontWeight: '800',
   },
@@ -652,11 +677,11 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   loadingText: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 15,
   },
   inputLabel: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 8,
@@ -664,7 +689,7 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: '#fffdfb',
-    borderColor: '#e5dcef',
+    borderColor: colors.line,
     borderRadius: 12,
     borderWidth: 1,
     fontSize: 15,
@@ -679,7 +704,7 @@ const styles = StyleSheet.create({
   },
   button: {
     alignItems: 'center',
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     justifyContent: 'center',
     minHeight: 50,
@@ -698,7 +723,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   retryButtonText: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -720,7 +745,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   status: {
-    color: '#7c3aed',
+    color: colors.primary,
     flexShrink: 1,
     fontSize: 14,
     fontWeight: '800',
@@ -732,13 +757,13 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   recipient: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 25,
     fontWeight: '800',
     lineHeight: 31,
   },
   heroDescription: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 15,
     lineHeight: 22,
     marginTop: 8,
@@ -751,7 +776,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 99,
     height: '100%',
   },
@@ -782,7 +807,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   viewSwitchText: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -796,7 +821,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   sectionEyebrow: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -811,7 +836,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   originDot: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 7,
     height: 14,
     width: 14,
@@ -824,7 +849,7 @@ const styles = StyleSheet.create({
   },
   destinationDot: {
     backgroundColor: '#ffffff',
-    borderColor: '#7c3aed',
+    borderColor: colors.primary,
     borderRadius: 7,
     borderWidth: 3,
     height: 14,
@@ -845,7 +870,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   placeName: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 16,
     fontWeight: '700',
     lineHeight: 22,
@@ -857,7 +882,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   arrivalLabel: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 13,
   },
   arrivalValue: {
@@ -884,30 +909,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   courierName: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 17,
     fontWeight: '800',
     marginTop: 5,
   },
   courierDescription: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 3,
   },
   revealCard: {
-    backgroundColor: '#f1ebff',
+    backgroundColor: colors.sand,
     borderRadius: 20,
     marginTop: 16,
     padding: 20,
   },
   revealTitle: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 23,
     fontWeight: '800',
   },
   revealBody: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 15,
     lineHeight: 22,
     marginTop: 8,
@@ -930,18 +955,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   senderCard: {
-    backgroundColor: '#f1ebff',
+    backgroundColor: colors.sand,
     borderRadius: 20,
     marginTop: 16,
     padding: 20,
   },
   senderTitle: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 20,
     fontWeight: '800',
   },
   senderBody: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 15,
     lineHeight: 22,
     marginTop: 8,
@@ -953,13 +978,13 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   shareTitle: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 20,
     fontWeight: '800',
     marginTop: 6,
   },
   shareDescription: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 14,
     lineHeight: 21,
     marginTop: 7,
@@ -983,7 +1008,7 @@ const styles = StyleSheet.create({
   },
   sharePrimaryButton: {
     alignItems: 'center',
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     flex: 1,
     justifyContent: 'center',
@@ -1011,7 +1036,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   shareSecondaryText: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -1028,7 +1053,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   showFullLinkText: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1040,21 +1065,21 @@ const styles = StyleSheet.create({
   },
   messageCard: {
     backgroundColor: '#ffffff',
-    borderColor: '#e5dcef',
+    borderColor: colors.line,
     borderRadius: 20,
     borderWidth: 1,
     marginTop: 16,
     padding: 24,
   },
   messageEyebrow: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1.5,
     marginBottom: 16,
   },
   messageText: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 20,
     lineHeight: 30,
   },
@@ -1065,7 +1090,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   refreshButtonText: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
   },

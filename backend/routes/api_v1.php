@@ -16,10 +16,12 @@ Route::middleware('user.auth')->group(function (): void {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::get('/account/deliveries', [AccountController::class, 'deliveries']);
+    Route::get('/account/active-map-deliveries', [AccountController::class, 'activeMapDeliveries']);
     Route::get('/account/incoming-deliveries', [AccountController::class, 'incomingDeliveries']);
     Route::get('/account/incoming-deliveries/{publicId}/token', [AccountController::class, 'incomingDeliveryToken']);
     Route::get('/account/locations', [AccountController::class, 'locations']);
     Route::post('/account/locations', [AccountController::class, 'storeLocation']);
+    Route::put('/account/locations/{location}/default', [AccountController::class, 'setDefaultLocation']);
     Route::delete('/account/locations/{location}', [AccountController::class, 'deleteLocation']);
     Route::get('/account/recipients', [AccountController::class, 'recipients']);
     Route::post('/account/recipients', [AccountController::class, 'storeRecipient']);

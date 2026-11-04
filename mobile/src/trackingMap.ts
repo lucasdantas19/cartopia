@@ -1,4 +1,4 @@
-import type { Delivery, DeliveryLocation } from './domain'
+import type { ActiveMapDelivery, DeliveryLocation } from './domain'
 
 export type MapPoint = { latitude: number; longitude: number }
 
@@ -12,7 +12,7 @@ function validPoint(location: DeliveryLocation | null | undefined): location is 
   )
 }
 
-export function deliveryMapRoute(delivery: Delivery): { origin: MapPoint; destination: MapPoint } | null {
+export function deliveryMapRoute(delivery: ActiveMapDelivery): { origin: MapPoint; destination: MapPoint } | null {
   const origin = delivery.origin_location
   const destination = delivery.destination_location
   if (!validPoint(origin) || !validPoint(destination)) return null
@@ -24,7 +24,7 @@ export function deliveryMapRoute(delivery: Delivery): { origin: MapPoint; destin
   }
 }
 
-export function estimatedMapProgress(delivery: Delivery, fetchedAt: number, now: number) {
+export function estimatedMapProgress(delivery: ActiveMapDelivery, fetchedAt: number, now: number) {
   if (delivery.status === 'DELIVERED') return 100
   if (delivery.status === 'SCHEDULED') return 0
 

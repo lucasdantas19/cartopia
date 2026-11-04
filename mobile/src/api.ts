@@ -1,5 +1,5 @@
 import { apiUrl } from './config'
-import type { AccountDelivery, Delivery, DeliveryLocation, DeliveryMessage, Session, User } from './domain'
+import type { AccountDelivery, ActiveMapDelivery, Delivery, DeliveryLocation, DeliveryMessage, Session, User } from './domain'
 
 export class ApiError extends Error {
   constructor(
@@ -134,6 +134,10 @@ export function logout(token: string) {
 
 export function fetchAccountDeliveries(token: string) {
   return request<{ data: AccountDelivery[] }>('/account/deliveries', {}, token, true)
+}
+
+export function fetchActiveMapDeliveries(token: string) {
+  return request<{ data: ActiveMapDelivery[] }>('/account/active-map-deliveries', {}, token, true)
 }
 
 export function fetchIncomingDeliveries(token: string) {

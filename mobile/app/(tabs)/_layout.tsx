@@ -1,18 +1,8 @@
+import { colors } from '../../src/theme'
+import { TabIcon } from '../../src/components/TabIcon'
 import { Tabs } from 'expo-router'
-import { Platform, Text, type ColorValue } from 'react-native'
+import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-
-function TabIcon({ symbol, color }: { symbol: string; color: ColorValue }) {
-  return (
-    <Text
-      accessibilityElementsHidden
-      importantForAccessibility="no"
-      style={{ color, fontSize: 23, fontWeight: '700' }}
-    >
-      {symbol}
-    </Text>
-  )
-}
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets()
@@ -24,15 +14,15 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#7c3aed',
-        tabBarInactiveTintColor: '#665d70',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '700',
         },
         tabBarStyle: {
-          backgroundColor: '#fffaf4',
-          borderTopColor: '#e5dcef',
+          backgroundColor: colors.background,
+          borderTopColor: colors.line,
           height: 58 + bottomInset,
           paddingBottom: bottomInset + 6,
           paddingTop: 6,
@@ -43,21 +33,21 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Início',
-          tabBarIcon: ({ color }) => <TabIcon symbol="⌂" color={color} />,
+          tabBarIcon: ({ color }) => <TabIcon name="home" color={color} />,
         }}
       />
       <Tabs.Screen
         name="journeys"
         options={{
           title: 'Viagens',
-          tabBarIcon: ({ color }) => <TabIcon symbol="✉" color={color} />,
+          tabBarIcon: ({ color }) => <TabIcon name="letter" color={color} />,
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
           title: 'Conta',
-          tabBarIcon: ({ color }) => <TabIcon symbol="◉" color={color} />,
+          tabBarIcon: ({ color }) => <TabIcon name="account" color={color} />,
         }}
       />
     </Tabs>

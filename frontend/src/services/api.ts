@@ -7,9 +7,11 @@ import type {
   AdminDeliverySummary,
 } from '../domain/delivery/types'
 import { resolveApiBaseUrl } from '../config/runtimeConfig.ts'
+import { shouldExpireAccountSession } from './accountSession.ts'
 
 const apiBaseUrl = resolveApiBaseUrl(import.meta.env)
 const authTokenStorageKey = 'cartopia.auth_token'
+export const accountSessionExpiredEvent = 'cartopia:account-session-expired'
 
 export function getAuthToken(): string | null {
   return typeof window === 'undefined' ? null : window.localStorage.getItem(authTokenStorageKey)
@@ -38,12 +40,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const accountToken = getAuthToken()
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...options,
     headers: {
       Accept: 'application/json',
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
+      ...(accountToken ? { Authorization: `Bearer ${accountToken}` } : {}),
       ...options.headers,
     },
   })
@@ -51,6 +54,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload & T
 
   if (!response.ok) {
+    if (shouldExpireAccountSession(response.status, path, accountToken, getAuthToken())) {
+      setAuthToken(null)
+      window.dispatchEvent(new Event(accountSessionExpiredEvent))
+    }
     const retryAfter = Number(response.headers.get('Retry-After'))
     throw new ApiError(response.status, payload, Number.isFinite(retryAfter) ? retryAfter : undefined)
   }
@@ -59,11 +66,24 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export interface AuthUser { id: number; name: string; email: string }
-export interface SavedLocation { id: number; name: string; label: string; latitude: number; longitude: number }
+export interface SavedLocation { id: number; name: string; label: string; latitude: number; longitude: number; is_default: boolean }
 export interface SavedRecipient { id: number; name: string; email: string | null; nickname: string | null }
 export interface AccountDelivery { public_id: string; recipient_name: string; origin: string; destination: string; status: string; progress: number; starts_at: string; arrives_at: string }
-export interface IncomingDelivery { public_id: string; sender_name: string | null; recipient_name: string; origin: string; destination: string; status: string; progress: number; arrives_at: string }
+export interface IncomingDelivery { public_id: string; sender_name: string | null; recipient_name: string; origin: string; destination: string; status: string; progress: number; arrives_at: string; opened_at: string | null }
 export interface TrackedDelivery { id: number; public_id: string; label: string | null; role: 'sender' | 'recipient'; recipient_name: string; origin: string; destination: string; status: string; progress: number; arrives_at: string }
+export interface ActiveMapDelivery {
+  public_id: string
+  recipient_name: string
+  courier: string
+  origin: string
+  destination: string
+  origin_location: { label: string; latitude: number; longitude: number } | null
+  destination_location: { label: string; latitude: number; longitude: number } | null
+  starts_at: string
+  arrives_at: string
+  status: 'IN_TRANSIT'
+  progress: number
+}
 
 export function register(input: { name: string; email: string; password: string }) {
   return request<{ data: AuthUser; token: string }>('/auth/register', { method: 'POST', body: JSON.stringify(input) })
@@ -88,6 +108,10 @@ export function fetchAccount() {
   ]).then(([user, deliveries, locations, recipients, trackedDeliveries, incomingDeliveries]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data, trackedDeliveries: trackedDeliveries.data, incomingDeliveries: incomingDeliveries.data }))
 }
 
+export function fetchActiveMapDeliveries() {
+  return request<{ data: ActiveMapDelivery[] }>('/account/active-map-deliveries')
+}
+
 export function fetchSavedItems() {
   return Promise.all([
     request<{ data: SavedLocation[] }>('/account/locations'),
@@ -95,8 +119,12 @@ export function fetchSavedItems() {
   ]).then(([locations, recipients]) => ({ locations: locations.data, recipients: recipients.data }))
 }
 
-export function saveLocation(input: Omit<SavedLocation, 'id'>) {
+export function saveLocation(input: Omit<SavedLocation, 'id' | 'is_default'> & { is_default?: boolean }) {
   return request<{ data: SavedLocation }>('/account/locations', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function setDefaultLocation(id: number) {
+  return request<{ data: SavedLocation }>(`/account/locations/${id}/default`, { method: 'PUT' })
 }
 
 export function deleteLocation(id: number) {

@@ -18,15 +18,60 @@ interface DeliveryCreationSuccessProps {
 }
 
 export function DeliveryCreationSuccess({ created, copied, copyError, onCopy, onTrack, onCreateAnother }: DeliveryCreationSuccessProps) {
-  return <section className="success-card"><span className="success-icon">✉</span><p className="success-kicker">Comprovante de despacho</p><h1>Uma carta partiu!</h1><p className="lead">A rota foi traçada. Guarde os dois links: cada um possui uma permissão diferente.</p><div className="dispatch-stamp"><span>Rota registrada</span><strong>CP-{created.publicId.slice(0, 6).toUpperCase()}</strong><small>Cartopia · correio entre mundos</small></div>
-    <div className="share-box"><div><label htmlFor="recipient-share-link"><strong>Link do destinatário</strong></label><small className="share-hint">Envie este link para quem receberá a carta.</small><input id="recipient-share-link" className="share-link" readOnly value={created.recipientUrl} onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.currentTarget.select()} /></div><button className="button secondary" type="button" onClick={() => onCopy(created.recipientUrl, 'recipient')}>{copied === 'recipient' ? 'Copiado!' : 'Copiar link'}</button></div>
-    <div className="share-box"><div><label htmlFor="sender-share-link"><strong>Link do remetente</strong></label><small className="share-hint">Guarde para acompanhar e saber quando a carta for aberta.</small><input id="sender-share-link" className="share-link" readOnly value={created.senderUrl} onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.currentTarget.select()} /></div><button className="button secondary" type="button" onClick={() => onCopy(created.senderUrl, 'sender')}>{copied === 'sender' ? 'Copiado!' : 'Copiar link'}</button></div>
-    {copied && <p className="sr-only" role="status">Link do {copied === 'sender' ? 'remetente' : 'destinatário'} copiado.</p>}
-    {copyError && <p className="error-message" role="alert">Não foi possível copiar automaticamente. Selecione o link acima e copie manualmente.</p>}
-    <div className="success-actions">
-      <button className="button primary" type="button" onClick={() => onTrack(created.publicId, created.recipientToken, 'recipient')}>Acompanhar como destinatário</button>
-      <button className="button secondary" type="button" onClick={() => onTrack(created.publicId, created.senderToken, 'sender')}>Acompanhar como remetente</button>
-      <button className="text-button" type="button" onClick={onCreateAnother}>Criar outra carta</button>
-    </div>
-  </section>
+  async function shareRecipientLink() {
+    if (!navigator.share) {
+      onCopy(created.recipientUrl, 'recipient')
+      return
+    }
+    try {
+      await navigator.share({ title: 'Uma carta para você', url: created.recipientUrl })
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        onCopy(created.recipientUrl, 'recipient')
+      }
+    }
+  }
+
+  return (
+    <section className="success-card">
+      <span className="success-icon">✉</span>
+      <h1>Uma carta partiu!</h1>
+      <p className="lead">Agora envie o link para quem receberá a surpresa.</p>
+      <button className="button primary" type="button" onClick={() => void shareRecipientLink()}>
+        Compartilhar com o destinatário
+      </button>
+      <div className="share-box">
+        <div>
+          <label htmlFor="recipient-share-link">Envie este link</label>
+          <input id="recipient-share-link" className="share-link" readOnly value={created.recipientUrl} onFocus={(event) => event.currentTarget.select()} />
+        </div>
+        <button className="button secondary" type="button" onClick={() => onCopy(created.recipientUrl, 'recipient')}>
+          {copied === 'recipient' ? 'Copiado!' : 'Copiar link'}
+        </button>
+      </div>
+      <div className="success-actions">
+        <button className="button secondary" type="button" onClick={() => onTrack(created.publicId, created.senderToken, 'sender')}>
+          Acompanhar minha entrega
+        </button>
+      </div>
+      <details>
+        <summary>Seu link de acompanhamento e outras opções</summary>
+        <p>Guarde este link para acompanhar a viagem e saber quando a carta for aberta.</p>
+        <div className="share-box">
+          <input aria-label="Seu link de acompanhamento" className="share-link" readOnly value={created.senderUrl} onFocus={(event) => event.currentTarget.select()} />
+          <button className="button secondary" type="button" onClick={() => onCopy(created.senderUrl, 'sender')}>
+            {copied === 'sender' ? 'Copiado!' : 'Copiar meu link'}
+          </button>
+        </div>
+        <button className="text-button" type="button" onClick={() => onTrack(created.publicId, created.recipientToken, 'recipient')}>
+          Ver como destinatário
+        </button>
+      </details>
+      {copied && <p role="status">Link copiado.</p>}
+      {copyError && <p className="error-message" role="alert">Selecione o link acima e copie manualmente.</p>}
+      <button className="text-button" type="button" onClick={onCreateAnother}>
+        Criar outra carta
+      </button>
+    </section>
+  )
 }

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { CreateDeliveryInput } from '../../domain/delivery/types'
 import { getCourier } from '../../domain/delivery/couriers'
 import { handleCourierImageError } from './courierImage'
@@ -18,6 +19,11 @@ function getSummaryNote(form: CreateDeliveryInput): string {
 }
 
 export function DeliverySummary({ form }: DeliverySummaryProps) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30000)
+    return () => window.clearInterval(timer)
+  }, [])
   const courier = getCourier(form.courier)
   const origin = form.origin_location ?? { label: 'Origem não definida', latitude: 0, longitude: 0 }
   const destination = form.destination_location ?? { label: 'Destino não definido', latitude: 0, longitude: 0 }
@@ -25,7 +31,7 @@ export function DeliverySummary({ form }: DeliverySummaryProps) {
   const stops = form.steps ?? []
 
   return <aside className="delivery-summary" aria-label="Resumo da entrega">
-    <div className="summary-heading"><strong>Bilhete de postagem</strong><span>Confira antes de traçar a rota.</span></div>
+    <div className="summary-heading"><strong>Bilhete de postagem</strong><span>Confira antes de enviar.</span></div>
     <div className="summary-grid">
       <div><span>Formato</span><strong>{form.steps?.length ? 'Com aventura' : 'Entrega direta'}</strong></div>
       <div><span>Para</span><strong>{form.recipient_name.trim() || 'Seu destinatário'}</strong></div>
@@ -40,6 +46,11 @@ export function DeliverySummary({ form }: DeliverySummaryProps) {
       {stops.map((step, index) => <div className="summary-route-point" key={index}><i>{step.duration_minutes || 0} min</i><span /><strong>{step.location?.label || step.title || `Parada ${index + 1}`}</strong></div>)}
       <div className="summary-route-point end"><i>{stops.length ? `${form.final_duration_minutes || 0} min` : `${form.duration_minutes || 0} min`}</i><span /> <strong>{destination.label}</strong></div>
     </div>
+    {totalDuration > 0 && (
+      <p>
+        Chegada estimada se enviar agora: {new Date(now + totalDuration * 60000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.
+      </p>
+    )}
     <p className="summary-note">{getSummaryNote(form)}</p>
   </aside>
 }

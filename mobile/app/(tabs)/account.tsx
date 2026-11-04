@@ -1,3 +1,4 @@
+import { colors } from '../../src/theme'
 import { Link, useRouter } from 'expo-router'
 import {
   ActivityIndicator,
@@ -85,21 +86,21 @@ export default function AccountScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#fffaf4', flex: 1 },
+  safeArea: { backgroundColor: colors.background, flex: 1 },
   container: {
-    backgroundColor: '#fffaf4',
+    backgroundColor: colors.background,
     flexGrow: 1,
     padding: 24,
     paddingBottom: 32,
   },
   eyebrow: {
-    color: '#7c3aed',
+    color: colors.primary,
     fontWeight: '800',
     letterSpacing: 2,
     marginBottom: 10,
   },
   title: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 32,
     fontWeight: '800',
     marginBottom: 24,
@@ -113,7 +114,7 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 18,
     height: 62,
     justifyContent: 'center',
@@ -121,9 +122,9 @@ const styles = StyleSheet.create({
     width: 62,
   },
   avatarText: { color: '#ffffff', fontSize: 27, fontWeight: '800' },
-  greeting: { color: '#241b35', fontSize: 23, fontWeight: '800' },
+  greeting: { color: colors.ink, fontSize: 23, fontWeight: '800' },
   email: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 15,
     marginTop: 6,
     textAlign: 'center',
@@ -131,19 +132,19 @@ const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderColor: '#e5dcef',
+    borderColor: colors.line,
     borderRadius: 18,
     borderWidth: 1,
     padding: 22,
   },
   cardTitle: {
-    color: '#241b35',
+    color: colors.ink,
     fontSize: 19,
     fontWeight: '800',
     textAlign: 'center',
   },
   body: {
-    color: '#665d70',
+    color: colors.muted,
     fontSize: 15,
     lineHeight: 22,
     marginTop: 10,
@@ -151,7 +152,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     justifyContent: 'center',
     marginTop: 20,
@@ -165,5 +166,5 @@ const styles = StyleSheet.create({
     marginTop: 28,
     minHeight: 48,
   },
-  signOutText: { color: '#7c3aed', fontSize: 15, fontWeight: '700' },
+  signOutText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
 })

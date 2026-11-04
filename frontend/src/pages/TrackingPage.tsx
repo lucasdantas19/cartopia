@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ApiError, fetchDelivery, openDeliveryMessage } from '../services/api'
 import { removeAccessToken, resolveAccessToken } from '../services/accessToken'
 import { DeliveryDetails } from '../components/tracking/DeliveryDetails'
@@ -52,6 +52,20 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
   const [retryNonce, setRetryNonce] = useState(0)
   const [now, setNow] = useState(initialNow)
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null)
+  const autoOpenRequested = useRef(false)
+
+  useEffect(() => {
+    autoOpenRequested.current = false
+  }, [publicId])
+
+  useEffect(() => {
+    if (!delivery || !auth.token || message !== null || autoOpenRequested.current) return
+    if (new URLSearchParams(window.location.search).get('carta') !== '1') return
+    if (delivery.status !== 'DELIVERED') return
+
+    autoOpenRequested.current = true
+    void revealMessage()
+  }, [auth.token, delivery, message])
 
   useEffect(() => {
     const resolve = window.setTimeout(() => {
@@ -134,6 +148,25 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
       : 'Atualização automática ativa.'
   const originMapLocation = mapLocation(delivery.origin, delivery.origin_location, 'origin')
   const destinationMapLocation = mapLocation(delivery.destination, delivery.destination_location, 'destination')
+
+  if (new URLSearchParams(window.location.search).get('carta') === '1' && message !== null) {
+    return (
+      <Shell eyebrow="Sua carta" onHome={onHome} onPrivacy={onPrivacy}>
+        <section className="message-only-view" aria-labelledby="message-only-title">
+          <p className="eyebrow">Mensagem recebida</p>
+          <h1 id="message-only-title">Uma carta para você</h1>
+          <LetterReveal
+            courier={delivery.courier}
+            canOpen={canOpen}
+            opening={false}
+            message={message}
+            error={messageError}
+            onOpen={() => undefined}
+          />
+        </section>
+      </Shell>
+    )
+  }
 
   return <Shell eyebrow="Acompanhamento da aventura" onHome={onHome} onPrivacy={onPrivacy}>
     <TrackingHeader recipientName={delivery.recipient_name} senderName={delivery.sender_name} accessRole={auth.role} statusClass={visualStatus.toLowerCase()} statusLabel={statusLabel(visualStatus)} />

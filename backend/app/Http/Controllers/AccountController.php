@@ -9,9 +9,41 @@ use App\Models\TrackedDelivery;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Carbon\CarbonImmutable;
 
 class AccountController extends Controller
 {
+    public function activeMapDeliveries(Request $request): JsonResponse
+    {
+        $now = CarbonImmutable::now('UTC');
+        $user = $request->user();
+        $deliveries = Delivery::query()
+            ->where('starts_at', '<=', $now)
+            ->where('arrives_at', '>', $now)
+            ->where(function ($query) use ($user): void {
+                $query->where('user_id', $user->id)
+                    ->orWhereRaw('LOWER(recipient_email) = ?', [strtolower($user->email)])
+                    ->orWhereHas('trackedByUsers', fn ($tracked) => $tracked->where('user_id', $user->id));
+            })
+            ->latest()
+            ->limit(5)
+            ->get();
+
+        return response()->json(['data' => $deliveries->map(fn (Delivery $delivery): array => [
+            'public_id' => $delivery->public_id,
+            'recipient_name' => $delivery->recipient_name,
+            'courier' => $delivery->courier,
+            'origin' => $delivery->origin,
+            'destination' => $delivery->destination,
+            'origin_location' => $delivery->origin_location,
+            'destination_location' => $delivery->destination_location,
+            'starts_at' => $delivery->starts_at?->toISOString(),
+            'arrives_at' => $delivery->arrives_at?->toISOString(),
+            'status' => $delivery->status(),
+            'progress' => $delivery->progress(),
+        ])]);
+    }
+
     public function deliveries(Request $request): JsonResponse
     {
         return response()->json(['data' => Delivery::where('user_id', $request->user()->id)->latest()->get()->map(fn (Delivery $delivery) => [
@@ -33,6 +65,7 @@ class AccountController extends Controller
             'status' => $delivery->status(),
             'progress' => $delivery->progress(),
             'arrives_at' => $delivery->arrives_at?->toISOString(),
+            'opened_at' => $delivery->opened_at?->toISOString(),
         ])]);
     }
 
@@ -56,8 +89,24 @@ class AccountController extends Controller
 
     public function storeLocation(Request $request): JsonResponse
     {
-        $data = $request->validate(['name' => ['required', 'string', 'max:80'], 'label' => ['required', 'string', 'max:255'], 'latitude' => ['required', 'numeric', 'between:-90,90'], 'longitude' => ['required', 'numeric', 'between:-180,180']]);
-        return response()->json(['data' => $request->user()->savedLocations()->create($data)], 201);
+        $data = $request->validate(['name' => ['required', 'string', 'max:80'], 'label' => ['required', 'string', 'max:255'], 'latitude' => ['required', 'numeric', 'between:-90,90'], 'longitude' => ['required', 'numeric', 'between:-180,180'], 'is_default' => ['sometimes', 'boolean']]);
+        $location = $request->user()->savedLocations()->create($data);
+
+        if ($location->is_default) {
+            $request->user()->savedLocations()->where('id', '!=', $location->id)->update(['is_default' => false]);
+        }
+
+        return response()->json(['data' => $location->fresh()], 201);
+    }
+
+    public function setDefaultLocation(Request $request, SavedLocation $location): JsonResponse
+    {
+        abort_unless($location->user_id === $request->user()->id, 404);
+
+        $request->user()->savedLocations()->update(['is_default' => false]);
+        $location->update(['is_default' => true]);
+
+        return response()->json(['data' => $location->fresh()]);
     }
 
     public function deleteLocation(Request $request, SavedLocation $location): JsonResponse

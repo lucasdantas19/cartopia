@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { DeliverySummary } from './DeliverySummary'
 import { FieldError } from './FieldError'
 import { handleCourierImageError } from './courierImage'
 import { LocationPicker } from './LocationPicker'
@@ -39,11 +40,10 @@ interface CreateDeliveryFormProps {
 export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors, submitting, onSubmit, onFieldChange, onEndpointChange, onAdventureChange, onStepChange, onStepLocationChange, onAddStep, onRemoveStep, onMoveStep, savedLocations, savedRecipients, canSaveNewItems, saveNewRecipient, onSaveNewRecipientChange, saveNewOrigin, onSaveNewOriginChange, saveNewDestination, onSaveNewDestinationChange }: CreateDeliveryFormProps) {
   const formRef = useRef<HTMLFormElement>(null)
   const [openSections, setOpenSections] = useState<FormSectionState>({ message: true, courier: false, adventure: false })
-  const [courierSelected, setCourierSelected] = useState(false)
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    if (!Object.values(fieldErrors).some((messages) => messages.length > 0)) return
+    if (!error && !Object.values(fieldErrors).some((messages) => messages.length > 0)) return
 
     const focusFirstInvalidField = () => {
       const firstInvalidField = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')
@@ -52,9 +52,16 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
       firstInvalidField?.focus()
     }
 
-    const frame = window.requestAnimationFrame(focusFirstInvalidField)
-    return () => window.cancelAnimationFrame(frame)
-  }, [fieldErrors])
+    let focusFrame = 0
+    const frame = window.requestAnimationFrame(() => {
+      setOpenSections({ message: true, courier: true, adventure: true })
+      focusFrame = window.requestAnimationFrame(focusFirstInvalidField)
+    })
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.cancelAnimationFrame(focusFrame)
+    }
+  }, [fieldErrors, error])
 
   function toggleSection(section: keyof typeof openSections) {
     setOpenSections((current) => toggleFormSection(current, section))
@@ -70,7 +77,6 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
   }
 
   function selectCourier(code: string) {
-    setCourierSelected(true)
     onFieldChange('courier', code)
     openSection('adventure')
   }
@@ -79,7 +85,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
     setTouchedFields((current) => ({ ...current, [field]: true }))
   }
 
-  function useSavedLocation(kind: 'origin' | 'destination', location: SavedLocation) {
+  function selectSavedLocation(kind: 'origin' | 'destination', location: SavedLocation) {
     onEndpointChange(kind, { label: location.label, latitude: location.latitude, longitude: location.longitude })
     if (kind === 'origin') onSaveNewOriginChange(false)
     else onSaveNewDestinationChange(false)
@@ -93,7 +99,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
   }
 
   const messageComplete = Boolean(form.message.trim() && form.recipient_name.trim())
-  const courierComplete = courierSelected
+  const courierComplete = couriers.some((courier) => courier.code === form.courier)
   const stepsComplete = Boolean(
     form.steps?.length &&
     form.steps.every((step) => step.title.trim() && Number(step.duration_minutes) > 0),
@@ -111,7 +117,16 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
   )
 
   return (
-    <form ref={formRef} className="delivery-form" onSubmit={onSubmit}>
+    <form
+      ref={formRef}
+      className="delivery-form"
+      onSubmit={onSubmit}
+      onInvalidCapture={(event) => {
+        const field = event.target as HTMLInputElement
+        setOpenSections({ message: true, courier: true, adventure: true })
+        window.requestAnimationFrame(() => field.focus())
+      }}
+    >
       <nav className="form-journey" aria-label="Etapas para preparar a entrega">
         <button type="button" className={`${messageComplete ? 'completed ' : ''}${!messageComplete ? 'active' : ''}`} aria-current={!messageComplete ? 'step' : undefined} aria-controls="message-section-content" onClick={() => openSection('message')}>
           <b>{messageComplete ? '✓' : '01'}</b>
@@ -120,7 +135,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
         <i aria-hidden="true" />
         <button type="button" className={`${courierComplete ? 'completed ' : ''}${messageComplete && !courierComplete ? 'active' : ''}`} aria-current={messageComplete && !courierComplete ? 'step' : undefined} aria-controls="courier-section-content" onClick={() => openSection('courier')}>
           <b>{courierComplete ? '✓' : '02'}</b>
-          <small>Escolha</small>
+          <small>Entregador</small>
         </button>
         <i aria-hidden="true" />
         <button type="button" className={`${routeComplete ? 'completed ' : ''}${messageComplete && courierComplete && !routeComplete ? 'active' : ''}`} aria-current={messageComplete && courierComplete && !routeComplete ? 'step' : undefined} aria-controls="adventure-section-content" onClick={() => openSection('adventure')}>
@@ -227,13 +242,26 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
           </fieldset>
         )}
         <div className="route-fields">
-          <EndpointLocationField label="De" location={form.origin_location} fallback={locations[0]} savedLocations={savedLocations} onSavedLocation={(location) => useSavedLocation('origin', location)} onChange={(location) => onEndpointChange('origin', location)} canSave={canSaveNewItems} saveNewLocation={saveNewOrigin} onSaveNewLocationChange={onSaveNewOriginChange} />
+          <EndpointLocationField label="De" location={form.origin_location} fallback={locations[0]} savedLocations={savedLocations} onSavedLocation={(location) => selectSavedLocation('origin', location)} onChange={(location) => onEndpointChange('origin', location)} canSave={canSaveNewItems} saveNewLocation={saveNewOrigin} onSaveNewLocationChange={onSaveNewOriginChange} />
           <span className="route-arrow" aria-hidden="true">→</span>
-          <EndpointLocationField label="Para" location={form.destination_location} fallback={locations[1]} savedLocations={savedLocations} onSavedLocation={(location) => useSavedLocation('destination', location)} onChange={(location) => onEndpointChange('destination', location)} canSave={canSaveNewItems} saveNewLocation={saveNewDestination} onSaveNewLocationChange={onSaveNewDestinationChange} />
+          <EndpointLocationField label="Para" location={form.destination_location} fallback={locations[1]} savedLocations={savedLocations} onSavedLocation={(location) => selectSavedLocation('destination', location)} onChange={(location) => onEndpointChange('destination', location)} canSave={canSaveNewItems} saveNewLocation={saveNewDestination} onSaveNewLocationChange={onSaveNewDestinationChange} />
         </div>
         {!adventureEnabled && (
           <div className="duration-field">
             <label htmlFor="duration_minutes">Duração da viagem <small>(1 a 1440 minutos)</small></label>
+            <div className="duration-presets" aria-label="Durações sugeridas">
+              {[15, 60, 1440].map((minutes) => (
+                <button
+                  key={minutes}
+                  type="button"
+                  className="button secondary"
+                  aria-pressed={form.duration_minutes === minutes}
+                  onClick={() => onFieldChange('duration_minutes', minutes)}
+                >
+                  {minutes === 15 ? '15 min' : minutes === 60 ? '1 hora' : '24 horas'}
+                </button>
+              ))}
+            </div>
             <div className="duration-input">
               <input id="duration_minutes" type="number" required min={1} max={1440} value={form.duration_minutes} aria-invalid={fieldErrors.duration_minutes ? true : undefined} aria-describedby={fieldErrors.duration_minutes ? 'duration-minutes-error' : undefined} onChange={(event) => onFieldChange('duration_minutes', Number(event.target.value))} />
               <span>minutos</span>
@@ -255,8 +283,12 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
         {fieldErrors.steps && <FieldError messages={fieldErrors.steps} />}
         </div>
       </div>
+      <div className="mobile-review">
+        <DeliverySummary form={{ ...form, steps: adventureEnabled ? form.steps : [] }} />
+      </div>
+      <p>A mensagem será revelada ao final da viagem. Depois de enviar, compartilhe o link com o destinatário.</p>
       <button className="button primary submit-button" type="submit" disabled={submitting}>
-        {submitting ? 'Selando a carta…' : 'Traçar esta entrega ✦'}
+        {submitting ? 'Selando a carta…' : 'Enviar carta ✦'}
       </button>
     </form>
   )

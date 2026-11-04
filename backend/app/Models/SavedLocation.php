@@ -6,10 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class SavedLocation extends Model
 {
-    protected $fillable = ['name', 'label', 'latitude', 'longitude'];
+    protected $fillable = ['name', 'label', 'latitude', 'longitude', 'is_default'];
 
     protected function casts(): array
     {
-        return ['latitude' => 'float', 'longitude' => 'float'];
+        return ['latitude' => 'float', 'longitude' => 'float', 'is_default' => 'boolean'];
     }
 }

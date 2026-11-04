@@ -1,3 +1,4 @@
+import { colors } from '../src/theme'
 import { useState } from 'react'
 import { Link, useRouter } from 'expo-router'
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
@@ -96,15 +97,15 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#fffaf4', flex: 1 },
-  container: { flex: 1, padding: 28, backgroundColor: '#fffaf4' },
-  back: { color: '#7c3aed', fontSize: 16, marginBottom: 48 },
-  title: { color: '#241b35', fontSize: 32, fontWeight: '800', marginBottom: 12 },
-  body: { color: '#665d70', fontSize: 16, lineHeight: 24, marginBottom: 28 },
-  input: { backgroundColor: '#ffffff', borderColor: '#e5dcef', borderRadius: 12, borderWidth: 1, fontSize: 16, marginBottom: 12, padding: 16 },
+  safeArea: { backgroundColor: colors.background, flex: 1 },
+  container: { flex: 1, padding: 28, backgroundColor: colors.background },
+  back: { color: colors.primary, fontSize: 16, marginBottom: 48 },
+  title: { color: colors.ink, fontSize: 32, fontWeight: '800', marginBottom: 12 },
+  body: { color: colors.muted, fontSize: 16, lineHeight: 24, marginBottom: 28 },
+  input: { backgroundColor: '#ffffff', borderColor: colors.line, borderRadius: 12, borderWidth: 1, fontSize: 16, marginBottom: 12, padding: 16 },
   error: { color: '#b42318', marginBottom: 12 },
-  button: { alignItems: 'center', backgroundColor: '#7c3aed', borderRadius: 12, marginTop: 8, padding: 16 },
+  button: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, marginTop: 8, padding: 16 },
   buttonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   switchButton: { alignItems: 'center', padding: 16 },
-  switchText: { color: '#7c3aed', fontSize: 16, fontWeight: '700' },
+  switchText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
 })

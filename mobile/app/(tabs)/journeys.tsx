@@ -1,8 +1,10 @@
+import { colors } from '../../src/theme'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { Link, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -16,6 +18,8 @@ import {
   ApiError,
   fetchAccountDeliveries,
   fetchIncomingDeliveries,
+  fetchIncomingDeliveryToken,
+  openDeliveryMessage,
 } from '../../src/api'
 import { useSession } from '../../src/context/SessionContext'
 import type { AccountDelivery } from '../../src/domain'
@@ -34,9 +38,10 @@ type DeliveryCardProps = {
   delivery: AccountDelivery
   kind: 'incoming' | 'sent'
   onOpen: () => void
+  onOpenLetter?: () => void
 }
 
-function DeliveryCard({ delivery, kind, onOpen }: DeliveryCardProps) {
+function DeliveryCard({ delivery, kind, onOpen, onOpenLetter }: DeliveryCardProps) {
   const progress = deliveryProgressPercent(delivery.progress)
   const arrival = arrivalLabel(delivery.arrives_at)
   const title = kind === 'incoming'
@@ -70,14 +75,26 @@ function DeliveryCard({ delivery, kind, onOpen }: DeliveryCardProps) {
           {arrival}
         </Text>
       ) : null}
-      <Pressable
-        accessibilityLabel={`Acompanhar viagem ${title.toLowerCase()}`}
-        accessibilityRole="button"
-        onPress={onOpen}
-        style={styles.cardButton}
-      >
-        <Text style={styles.cardButtonText}>Acompanhar viagem</Text>
-      </Pressable>
+      <View style={styles.cardActions}>
+        <Pressable
+          accessibilityLabel={`Ver entrega ${title.toLowerCase()}`}
+          accessibilityRole="button"
+          onPress={onOpen}
+          style={styles.cardButton}
+        >
+          <Text style={styles.cardButtonText}>{kind === 'incoming' && delivery.opened_at ? 'Ver entrega' : 'Acompanhar viagem'}</Text>
+        </Pressable>
+        {kind === 'incoming' && delivery.opened_at && onOpenLetter ? (
+          <Pressable
+            accessibilityLabel={`Ver carta ${title.toLowerCase()}`}
+            accessibilityRole="button"
+            onPress={onOpenLetter}
+            style={styles.cardLetterButton}
+          >
+            <Text style={styles.cardLetterButtonText}>Ver carta</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   )
 }
@@ -140,6 +157,8 @@ export default function JourneysScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [letterModal, setLetterModal] = useState<{ sender: string | null; message: string } | null>(null)
+  const [letterLoading, setLetterLoading] = useState(false)
   const loadedToken = useRef<string | null>(null)
   const requestId = useRef(0)
 
@@ -213,6 +232,20 @@ export default function JourneysScreen() {
     })
   }
 
+  async function openIncomingLetter(delivery: AccountDelivery) {
+    setLetterLoading(true)
+    setError('')
+    try {
+      const tokenResponse = await fetchIncomingDeliveryToken(delivery.public_id, session!.token)
+      const messageResponse = await openDeliveryMessage(delivery.public_id, tokenResponse.data.access_token, true)
+      setLetterModal({ sender: delivery.sender_name ?? null, message: messageResponse.data.message })
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Não foi possível abrir a carta agora.')
+    } finally {
+      setLetterLoading(false)
+    }
+  }
+
   function openSent(publicId: string) {
     router.push({
       pathname: '/track',
@@ -276,6 +309,13 @@ export default function JourneysScreen() {
         <Text style={styles.intro}>
           Acompanhe as mensagens que chegaram e as cartas que você enviou.
         </Text>
+        {session ? (
+          <Link href={'/simultaneous' as Href} asChild>
+            <Pressable accessibilityRole="button" style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Ver entregas em andamento no mapa</Text>
+            </Pressable>
+          </Link>
+        ) : null}
 
         {sessionExpired ? (
           <View style={styles.errorPanel}>
@@ -358,6 +398,7 @@ export default function JourneysScreen() {
                     delivery={delivery}
                     kind="incoming"
                     onOpen={() => openIncoming(delivery.public_id)}
+                    onOpenLetter={() => { if (!letterLoading) void openIncomingLetter(delivery) }}
                   />
                 )) : null}
               </>
@@ -442,16 +483,40 @@ export default function JourneysScreen() {
           </View>
         ) : null}
       </ScrollView>
+      <Modal
+        visible={letterModal !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLetterModal(null)}
+      >
+        <View style={styles.letterModalBackdrop}>
+          <View style={styles.letterModal}>
+            <Pressable
+              accessibilityLabel="Fechar carta"
+              accessibilityRole="button"
+              onPress={() => setLetterModal(null)}
+              style={styles.letterModalClose}
+            >
+              <Text style={styles.letterModalCloseText}>×</Text>
+            </Pressable>
+            <Text style={styles.messageEyebrow}>MENSAGEM RECEBIDA</Text>
+            <Text style={styles.letterModalTitle}>
+              {letterModal?.sender ? `Carta de ${letterModal.sender}` : 'Uma carta para você'}
+            </Text>
+            <Text style={styles.messageText}>{letterModal?.message}</Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#fffaf4', flex: 1 },
-  container: { backgroundColor: '#fffaf4', flexGrow: 1, padding: 24, paddingBottom: 32 },
-  eyebrow: { color: '#7c3aed', fontWeight: '800', letterSpacing: 2, marginBottom: 10 },
-  title: { color: '#241b35', fontSize: 32, fontWeight: '800', lineHeight: 38 },
-  intro: { color: '#665d70', fontSize: 15, lineHeight: 22, marginTop: 8 },
+  safeArea: { backgroundColor: colors.background, flex: 1 },
+  container: { backgroundColor: colors.background, flexGrow: 1, padding: 24, paddingBottom: 32 },
+  eyebrow: { color: colors.primary, fontWeight: '800', letterSpacing: 2, marginBottom: 10 },
+  title: { color: colors.ink, fontSize: 32, fontWeight: '800', lineHeight: 38 },
+  intro: { color: colors.muted, fontSize: 15, lineHeight: 22, marginTop: 8 },
   segment: {
     backgroundColor: '#eee8f7',
     borderRadius: 14,
@@ -469,8 +534,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   segmentSelected: { backgroundColor: '#ffffff' },
-  segmentText: { color: '#665d70', fontSize: 14, fontWeight: '700' },
-  segmentTextSelected: { color: '#7c3aed' },
+  segmentText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
+  segmentTextSelected: { color: colors.primary },
   loading: { marginVertical: 32 },
   card: {
     backgroundColor: '#ffffff',
@@ -480,12 +545,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     padding: 18,
   },
-  cardStatus: { color: '#7c3aed', fontSize: 13, fontWeight: '800', marginBottom: 8 },
-  cardTitle: { color: '#241b35', fontSize: 19, fontWeight: '800' },
-  cardRoute: { color: '#665d70', fontSize: 15, lineHeight: 21, marginTop: 8 },
+  cardStatus: { color: colors.primary, fontSize: 13, fontWeight: '800', marginBottom: 8 },
+  cardTitle: { color: colors.ink, fontSize: 19, fontWeight: '800' },
+  cardRoute: { color: colors.muted, fontSize: 15, lineHeight: 21, marginTop: 8 },
   progressHeading: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 },
-  progressLabel: { color: '#665d70', fontSize: 13 },
-  progressPercent: { color: '#241b35', fontSize: 13, fontWeight: '800' },
+  progressLabel: { color: colors.muted, fontSize: 13 },
+  progressPercent: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   progressTrack: {
     backgroundColor: '#eee8f7',
     borderRadius: 99,
@@ -493,37 +558,70 @@ const styles = StyleSheet.create({
     marginTop: 8,
     overflow: 'hidden',
   },
-  progressValue: { backgroundColor: '#7c3aed', borderRadius: 99, height: 7 },
-  arrival: { color: '#665d70', fontSize: 13, marginTop: 12 },
+  progressValue: { backgroundColor: colors.primary, borderRadius: 99, height: 7 },
+  arrival: { color: colors.muted, fontSize: 13, marginTop: 12 },
+  cardActions: { flexDirection: 'row', gap: 8, marginTop: 16 },
   cardButton: {
     alignItems: 'center',
-    borderColor: '#e5dcef',
+    borderColor: colors.line,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
-    marginTop: 16,
+    flex: 1,
+    marginTop: 0,
     minHeight: 48,
     paddingHorizontal: 12,
   },
-  cardButtonText: { color: '#7c3aed', fontSize: 15, fontWeight: '700' },
+  cardButtonText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
+  cardLetterButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 48,
+    paddingHorizontal: 12,
+  },
+  cardLetterButtonText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  letterModalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(36, 27, 53, 0.55)',
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  letterModal: {
+    backgroundColor: colors.background,
+    borderColor: colors.line,
+    borderRadius: 20,
+    borderWidth: 1,
+    maxWidth: 620,
+    padding: 24,
+    width: '100%',
+  },
+  letterModalClose: { alignSelf: 'flex-end', minHeight: 36, minWidth: 36 },
+  letterModalCloseText: { color: colors.muted, fontSize: 28, lineHeight: 32, textAlign: 'center' },
+  letterModalTitle: { color: colors.ink, fontSize: 22, fontWeight: '800', marginBottom: 16 },
+  messageEyebrow: { color: colors.primary, fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginBottom: 12 },
+  messageText: { color: colors.ink, fontSize: 19, lineHeight: 29 },
   emptyCard: {
     backgroundColor: '#ffffff',
-    borderColor: '#e5dcef',
+    borderColor: colors.line,
     borderRadius: 18,
     borderWidth: 1,
     padding: 20,
   },
-  emptyTitle: { color: '#241b35', fontSize: 17, fontWeight: '800', marginBottom: 6 },
-  empty: { color: '#665d70', fontSize: 15, lineHeight: 22 },
+  emptyTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', marginBottom: 6 },
+  empty: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   errorPanel: { backgroundColor: '#fff1ef', borderRadius: 14, marginTop: 20, padding: 16 },
   error: { color: '#b42318', fontSize: 15, lineHeight: 22 },
   retryButton: { alignSelf: 'flex-start', justifyContent: 'center', marginTop: 10, minHeight: 44 },
-  retryText: { color: '#7c3aed', fontSize: 15, fontWeight: '800' },
+  retryText: { color: colors.primary, fontSize: 15, fontWeight: '800' },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     justifyContent: 'center',
     marginTop: 18,
@@ -533,17 +631,17 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   secondaryButton: {
     alignItems: 'center',
-    borderColor: '#e5dcef',
+    borderColor: colors.line,
     borderRadius: 12,
     borderWidth: 1,
     justifyContent: 'center',
     marginTop: 18,
     minHeight: 48,
   },
-  secondaryButtonText: { color: '#7c3aed', fontSize: 15, fontWeight: '700' },
+  secondaryButtonText: { color: colors.primary, fontSize: 15, fontWeight: '700' },
   localSection: { marginTop: 18 },
-  localTitle: { color: '#241b35', fontSize: 20, fontWeight: '800' },
-  localDescription: { color: '#665d70', fontSize: 14, lineHeight: 20, marginBottom: 14, marginTop: 6 },
+  localTitle: { color: colors.ink, fontSize: 20, fontWeight: '800' },
+  localDescription: { color: colors.muted, fontSize: 14, lineHeight: 20, marginBottom: 14, marginTop: 6 },
   localCard: {
     backgroundColor: '#ffffff',
     borderColor: '#eee8f7',
@@ -560,7 +658,7 @@ const styles = StyleSheet.create({
   },
   localOpenButton: {
     alignItems: 'center',
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary,
     borderRadius: 10,
     flex: 1,
     justifyContent: 'center',
@@ -568,5 +666,5 @@ const styles = StyleSheet.create({
   },
   localOpenText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
   localRemoveButton: { justifyContent: 'center', minHeight: 44 },
-  localRemoveText: { color: '#665d70', fontSize: 14, fontWeight: '700' },
+  localRemoveText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
 })

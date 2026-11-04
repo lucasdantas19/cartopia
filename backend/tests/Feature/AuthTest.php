@@ -44,6 +44,70 @@ it('rejects an expired account token when creating a delivery', function () {
     expect(Delivery::count())->toBe(0);
 });
 
+it('shows only the five newest active deliveries associated with the account on the map', function () {
+    $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+    $user = User::factory()->create(['email' => 'ana@example.com']);
+    $other = User::factory()->create();
+    $token = $this->postJson('/api/v1/auth/login', [
+        'email' => $user->email, 'password' => 'password',
+    ])->json('token');
+    $now = CarbonImmutable::now('UTC');
+    $ids = [];
+
+    for ($index = 0; $index < 7; $index++) {
+        $created = $this->postJson('/api/v1/deliveries', deliveryPayload([
+            'recipient_email' => 'ANA@example.com',
+        ]))->assertCreated();
+        $id = $created->json('data.public_id');
+        Delivery::where('public_id', $id)->update([
+            'starts_at' => $now->subMinutes(5),
+            'arrives_at' => $now->addMinutes(30),
+            'created_at' => $now->addSeconds($index),
+        ]);
+        $ids[] = $id;
+    }
+
+    $this->withToken($token)->postJson('/api/v1/deliveries', deliveryPayload())->assertCreated();
+    $unrelated = $this->withHeaders(['Authorization' => ''])->postJson('/api/v1/deliveries', deliveryPayload())->assertCreated();
+    Delivery::where('public_id', $unrelated->json('data.public_id'))->update([
+        'starts_at' => $now->subMinutes(5), 'arrives_at' => $now->addMinutes(30),
+    ]);
+
+    $this->getJson('/api/v1/account/active-map-deliveries')->assertUnauthorized();
+    $response = $this->withToken($token)->getJson('/api/v1/account/active-map-deliveries')
+        ->assertOk()->assertJsonCount(5, 'data');
+    expect(array_column($response->json('data'), 'public_id'))->toBe(array_reverse(array_slice($ids, 2)));
+    expect($response->json('data.0.status'))->toBe('IN_TRANSIT');
+    expect($response->json('data.0'))->toHaveKeys(['origin_location', 'destination_location', 'starts_at', 'arrives_at', 'courier']);
+    $otherToken = $this->postJson('/api/v1/auth/login', [
+        'email' => $other->email, 'password' => 'password',
+    ])->json('token');
+    $this->withToken($otherToken)->getJson('/api/v1/account/active-map-deliveries')->assertJsonCount(0, 'data');
+});
+
+it('includes sent and explicitly tracked active deliveries once each', function () {
+    $user = User::factory()->create(['email' => 'ana@example.com']);
+    $token = $this->postJson('/api/v1/auth/login', [
+        'email' => $user->email, 'password' => 'password',
+    ])->json('token');
+    $sent = $this->withToken($token)->postJson('/api/v1/deliveries', deliveryPayload([
+        'recipient_email' => 'ana@example.com',
+    ]))->assertCreated();
+    $tracked = $this->withHeaders(['Authorization' => ''])->postJson('/api/v1/deliveries', deliveryPayload())->assertCreated();
+    $now = CarbonImmutable::now('UTC');
+    Delivery::query()->update(['starts_at' => $now->subMinute(), 'arrives_at' => $now->addHour()]);
+
+    $this->withToken($token)->postJson('/api/v1/account/tracked-deliveries', [
+        'public_id' => $tracked->json('data.public_id'),
+        'access_token' => $tracked->json('recipient_access_token'),
+    ])->assertCreated();
+
+    $response = $this->withToken($token)->getJson('/api/v1/account/active-map-deliveries')
+        ->assertOk()->assertJsonCount(2, 'data');
+    expect(array_column($response->json('data'), 'public_id'))
+        ->toContain($sent->json('data.public_id'), $tracked->json('data.public_id'));
+});
+
 it('lets an account owner follow their sent delivery without exposing recipient content', function () {
     $owner = User::factory()->create();
     $other = User::factory()->create();
@@ -79,6 +143,30 @@ it('stores saved recipients and locations only for their owner', function () {
     $this->withToken($secondToken)->getJson('/api/account/locations')->assertJsonCount(0, 'data');
     $this->withToken($secondToken)->deleteJson('/api/account/locations/'.$location['id'])->assertNotFound();
     $this->withToken($secondToken)->deleteJson('/api/account/recipients/'.$recipient['id'])->assertNotFound();
+});
+
+it('allows an account to configure and change its default location', function () {
+    $user = User::factory()->create();
+    $token = $this->postJson('/api/auth/login', [
+        'email' => $user->email, 'password' => 'password',
+    ])->json('token');
+
+    $first = $this->withToken($token)->postJson('/api/account/locations', [
+        'name' => 'Casa', 'label' => 'Meu endereço', 'latitude' => -8, 'longitude' => -34, 'is_default' => true,
+    ])->assertCreated()->json('data');
+    $second = $this->withToken($token)->postJson('/api/account/locations', [
+        'name' => 'Escritório', 'label' => 'Meu trabalho', 'latitude' => -9, 'longitude' => -35,
+    ])->assertCreated()->json('data');
+
+    expect($first['is_default'])->toBeTrue();
+    expect($second['is_default'])->toBeFalse();
+
+    $this->withToken($token)->putJson('/api/account/locations/'.$second['id'].'/default')
+        ->assertOk()->assertJsonPath('data.is_default', true);
+    $locations = $this->withToken($token)->getJson('/api/account/locations')
+        ->assertOk()->json('data');
+    expect(collect($locations)->firstWhere('id', $second['id'])['is_default'])->toBeTrue();
+    expect(collect($locations)->firstWhere('id', $first['id'])['is_default'])->toBeFalse();
 });
 
 it('associates a delivery link with the authenticated account and protects it from other users', function () {
