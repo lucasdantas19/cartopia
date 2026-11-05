@@ -5,6 +5,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ApiError } from '../src/api'
 import { useSession } from '../src/context/SessionContext'
+import { isPasswordStrongEnough, passwordRequirements } from '../src/passwordRequirements'
 
 export default function AuthScreen() {
   const router = useRouter()
@@ -23,7 +24,7 @@ export default function AuthScreen() {
     if (registering && !name.trim()) nextErrors.name = 'Informe seu nome.'
     if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email.trim())) nextErrors.email = 'Informe um e-mail válido.'
     if (!password) nextErrors.password = 'Informe sua senha.'
-    else if (registering && (password.length < 8 || password.length > 72)) nextErrors.password = 'A senha deve ter entre 8 e 72 caracteres.'
+    else if (registering && (password.length > 72 || !isPasswordStrongEnough(password))) nextErrors.password = 'A senha precisa ter 8 a 72 caracteres, com letra maiúscula, minúscula e número.'
     if (Object.keys(nextErrors).length) {
       setFieldErrors(nextErrors)
       setError('Revise os campos indicados.')
@@ -83,6 +84,22 @@ export default function AuthScreen() {
           </Pressable>
         </View>
         {fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
+        {registering ? (
+          <View accessibilityLabel="Requisitos da senha" style={styles.passwordRequirements}>
+            <Text style={styles.passwordRequirementsTitle}>A senha precisa ter:</Text>
+            {passwordRequirements(password).map((requirement) => (
+              <Text
+                key={requirement.key}
+                style={[
+                  styles.passwordRequirement,
+                  requirement.valid ? styles.passwordRequirementValid : undefined,
+                ]}
+              >
+                {requirement.valid ? '✓' : '○'} {requirement.label}
+              </Text>
+            ))}
+          </View>
+        ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Pressable
           disabled={submitting}
@@ -129,6 +146,10 @@ const styles = StyleSheet.create({
   showPasswordButton: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 12 },
   showPasswordText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   fieldError: { color: '#b42318', fontSize: 13, marginBottom: 6, marginTop: 3 },
+  passwordRequirements: { backgroundColor: '#f7f5fb', borderRadius: 10, marginBottom: 8, marginTop: 4, padding: 12 },
+  passwordRequirementsTitle: { color: colors.ink, fontSize: 13, fontWeight: '700', marginBottom: 5 },
+  passwordRequirement: { color: colors.muted, fontSize: 13, lineHeight: 20 },
+  passwordRequirementValid: { color: '#27724b' },
   error: { color: '#b42318', marginBottom: 12 },
   button: { alignItems: 'center', backgroundColor: colors.primary, borderRadius: 12, marginTop: 8, padding: 16 },
   buttonText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
