@@ -223,6 +223,14 @@ input::placeholder, textarea::placeholder { color: #687785; opacity: 1; }
 .account-form { display: grid; gap: .65rem; max-width: 30rem; margin: 2rem 0 1rem; }
 .account-form.compact { margin-top: 1.25rem; }
 .account-form .button { justify-self: start; margin-top: .4rem; }
+.password-field { display: flex; align-items: center; border: 1px solid var(--line); border-radius: .7rem; background: rgba(255,255,255,.62); }
+.password-field:focus-within { border-color: var(--coral); box-shadow: 0 0 0 3px rgba(190, 91, 67, .12); }
+.password-field input { border: 0; background: transparent; box-shadow: none; }
+.password-field input:focus { box-shadow: none; }
+.password-toggle { flex: 0 0 auto; margin-right: .55rem; padding: .45rem; border: 0; background: transparent; color: var(--coral); font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.password-requirements { display: grid; gap: .25rem; margin: .15rem 0 .2rem; padding: 0; color: var(--muted); font-size: .8rem; list-style: none; }
+.password-requirements li { display: flex; gap: .4rem; align-items: center; }
+.password-requirements li.valid { color: #27724b; }
 .account-header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
 .account-section { max-width: none; margin-top: 1rem; }
 .active-map-wrapper { position: relative; margin-top: 1rem; overflow: hidden; border: 1px solid var(--line); border-radius: .9rem; }
