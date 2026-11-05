@@ -7,7 +7,7 @@ use Carbon\CarbonImmutable;
 
 it('registers and authenticates a user without exposing the token hash', function () {
     $response = $this->postJson('/api/auth/register', [
-        'name' => 'Lucas', 'email' => 'lucas@example.com', 'password' => 'password123',
+        'name' => 'Lucas', 'email' => 'lucas@example.com', 'password' => 'Password123',
     ])->assertCreated();
 
     $token = $response->json('token');
@@ -15,6 +15,26 @@ it('registers and authenticates a user without exposing the token hash', functio
     expect(User::first()->api_token_hash)->toBe(hash('sha256', $token));
 
     $this->withToken($token)->getJson('/api/auth/me')->assertOk()->assertJsonPath('data.name', 'Lucas');
+});
+
+it('requires a mixed case password with a number only when registering', function () {
+    foreach (['password123', 'PASSWORD123', 'Password'] as $password) {
+        $this->postJson('/api/auth/register', [
+            'name' => 'Nova conta',
+            'email' => 'new-'.$password.'@example.com',
+            'password' => $password,
+        ])->assertUnprocessable()->assertJsonValidationErrors('password');
+    }
+
+    $legacyUser = User::factory()->create([
+        'email' => 'legacy@example.com',
+        'password' => 'password',
+    ]);
+
+    $this->postJson('/api/auth/login', [
+        'email' => $legacyUser->email,
+        'password' => 'password',
+    ])->assertOk();
 });
 
 it('resolves a recipient account address according to the selected delivery source', function () {
