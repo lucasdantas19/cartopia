@@ -335,7 +335,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
 
   if (created) {
     return (
-      <Shell eyebrow="A aventura está pronta" onHome={onHome} onPrivacy={onPrivacy} onAccount={onAccount}>
+      <Shell eyebrow="A aventura está em andamento" onHome={onHome} onPrivacy={onPrivacy} onAccount={onAccount}>
         <DeliveryCreationSuccess
           created={created}
           copied={copied}
