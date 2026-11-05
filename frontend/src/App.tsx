@@ -1,14 +1,15 @@
 import { accountSectionFromPath, type AccountSection } from './utils/accountNavigation'
-import { useEffect, useState } from 'react'
-import { CreatePage } from './pages/CreatePage'
-import { PrivacyPageShell } from './pages/PrivacyPageShell'
-import { TrackingPage } from './pages/TrackingPage'
-import { AdminPage } from './pages/AdminPage'
-import { AuthPage } from './pages/AuthPage'
-import { AccountPage } from './pages/AccountPage'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { accountSessionExpiredEvent, getAuthToken } from './services/api'
 import type { AccessRole } from './domain/delivery/types'
 import './App.css'
+
+const CreatePage = lazy(async () => ({ default: (await import('./pages/CreatePage')).CreatePage }))
+const PrivacyPageShell = lazy(async () => ({ default: (await import('./pages/PrivacyPageShell')).PrivacyPageShell }))
+const TrackingPage = lazy(async () => ({ default: (await import('./pages/TrackingPage')).TrackingPage }))
+const AdminPage = lazy(async () => ({ default: (await import('./pages/AdminPage')).AdminPage }))
+const AuthPage = lazy(async () => ({ default: (await import('./pages/AuthPage')).AuthPage }))
+const AccountPage = lazy(async () => ({ default: (await import('./pages/AccountPage')).AccountPage }))
 type Route = { page: 'create' } | { page: 'tracking'; publicId: string } | { page: 'privacy' } | { page: 'admin' } | { page: 'auth' } | { page: 'account'; section: AccountSection }
 
 function routeFromLocation(): Route {
@@ -50,36 +51,32 @@ function App() {
   const onHome = () => navigate('/')
   const onPrivacy = () => navigate('/privacidade')
   const onAccount = () => navigate(getAuthToken() ? '/conta' : '/entrar')
-  if (route.page === 'tracking') {
-    return <TrackingPage
-      publicId={route.publicId}
-      onHome={onHome}
-      onPrivacy={onPrivacy} />
-  }
-  if (route.page === 'privacy') {
-    return <PrivacyPageShell onHome={onHome} onPrivacy={onPrivacy} />
-  }
-  if (route.page === 'admin') {
-    return <AdminPage onHome={onHome} />
-  }
-  if (route.page === 'auth') return <AuthPage
-    onHome={onHome}
-    onPrivacy={onPrivacy}
-    onAuthenticated={() => navigate('/conta')} />
-  if (route.page === 'account') return <AccountPage
-    section={route.section}
-    onNavigate={navigate}
-    onHome={onHome}
-    onPrivacy={onPrivacy}
-    onLogout={() => navigate('/')}
-    onTrack={(publicId, token, role, openMessage) => navigate(`/d/${publicId}${openMessage ? '?carta=1' : ''}#token=${encodeURIComponent(token)}${role === 'sender' ? '&role=sender' : ''}`)} />
   return (
-    <CreatePage
-      onTrack={(publicId, token, role: AccessRole = 'recipient') => navigate(`/d/${publicId}#token=${encodeURIComponent(token)}${role === 'sender' ? '&role=sender' : ''}`)}
-      onHome={onHome}
-      onPrivacy={onPrivacy}
-      onAccount={onAccount}
-    />
+    <Suspense fallback={<div className="app-loading" role="status">Carregando…</div>}>
+      {route.page === 'tracking' && <TrackingPage
+        publicId={route.publicId}
+        onHome={onHome}
+        onPrivacy={onPrivacy} />}
+      {route.page === 'privacy' && <PrivacyPageShell onHome={onHome} onPrivacy={onPrivacy} />}
+      {route.page === 'admin' && <AdminPage onHome={onHome} />}
+      {route.page === 'auth' && <AuthPage
+        onHome={onHome}
+        onPrivacy={onPrivacy}
+        onAuthenticated={() => navigate('/conta')} />}
+      {route.page === 'account' && <AccountPage
+        section={route.section}
+        onNavigate={navigate}
+        onHome={onHome}
+        onPrivacy={onPrivacy}
+        onLogout={() => navigate('/')}
+        onTrack={(publicId, token, role, openMessage) => navigate(`/d/${publicId}${openMessage ? '?carta=1' : ''}#token=${encodeURIComponent(token)}${role === 'sender' ? '&role=sender' : ''}`)} />}
+      {route.page === 'create' && <CreatePage
+        onTrack={(publicId, token, role: AccessRole = 'recipient') => navigate(`/d/${publicId}#token=${encodeURIComponent(token)}${role === 'sender' ? '&role=sender' : ''}`)}
+        onHome={onHome}
+        onPrivacy={onPrivacy}
+        onAccount={onAccount}
+      />}
+    </Suspense>
   )
 }
 export default App
