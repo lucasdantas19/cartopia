@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import type { CreateDeliveryInput } from '../../domain/delivery/types'
 import { getCourier } from '../../domain/delivery/couriers'
 import { handleCourierImageError } from './courierImage'
@@ -13,6 +12,18 @@ function formatDuration(minutes: number): string {
   if (minutes % 1440 === 0) return `${minutes / 1440} ${minutes / 1440 === 1 ? 'dia' : 'dias'}`
   if (minutes % 60 === 0) return `${minutes / 60} ${minutes / 60 === 1 ? 'hora' : 'horas'}`
   return `${minutes} minutos`
+}
+
+function formatArrival(value: string | undefined, fallback = 'horário pendente'): string {
+  if (!value) return fallback
+  const arrivalAt = new Date(value)
+  if (Number.isNaN(arrivalAt.getTime())) return fallback
+  return `chega ${arrivalAt.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`
 }
 
 function getTotalDuration(form: CreateDeliveryInput): number {
@@ -65,7 +76,6 @@ function getLocationLabel(form: CreateDeliveryInput, kind: 'origin' | 'destinati
 }
 
 export function DeliverySummary({ form, adventureEnabled }: DeliverySummaryProps) {
-  const [now, setNow] = useState(() => Date.now())
   const courier = getCourier(form.courier)
   const duration = getTotalDuration(form)
   const arrivalAt = form.arrival_at ? new Date(form.arrival_at) : null
@@ -73,18 +83,6 @@ export function DeliverySummary({ form, adventureEnabled }: DeliverySummaryProps
   const origin = getLocationLabel(form, 'origin')
   const destination = getLocationLabel(form, 'destination')
   const stops = form.steps ?? []
-  const adventureComplete = !adventureEnabled && stops.length === 0 || (
-    stops.length > 0
-    && stops.every((step) => Number(step.duration_minutes) > 0)
-    && Number(form.final_duration_minutes) > 0
-  )
-  const canEstimateArrival = adventureEnabled && route.ready && adventureComplete && duration > 0
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30000)
-    return () => window.clearInterval(timer)
-  }, [])
-
   return (
     <aside className="delivery-summary" aria-label="Bilhete de postagem">
       <div className="summary-heading">
@@ -101,12 +99,10 @@ export function DeliverySummary({ form, adventureEnabled }: DeliverySummaryProps
           <strong>{origin} → {destination}</strong>
         </div>
         <div className="summary-primary">
-          <span>{adventureEnabled ? 'Duração' : 'Chegada'}</span>
-          <strong>{adventureEnabled
-            ? formatDuration(duration)
-            : arrivalAt && !Number.isNaN(arrivalAt.getTime())
-              ? arrivalAt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-              : 'Ainda não definida'}</strong>
+          <span>{arrivalAt && !Number.isNaN(arrivalAt.getTime()) ? 'Chegada' : 'Duração'}</span>
+          <strong>{arrivalAt && !Number.isNaN(arrivalAt.getTime())
+            ? arrivalAt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : formatDuration(duration)}</strong>
         </div>
         <div className="summary-primary">
           <span>Desbloqueio</span>
@@ -141,31 +137,17 @@ export function DeliverySummary({ form, adventureEnabled }: DeliverySummaryProps
         </div>
         {stops.map((step, index) => (
           <div className="summary-route-point" key={step.id ?? index}>
-            <i>{step.duration_minutes || 0} min</i>
+            <i>{formatArrival(step.arrival_at, step.duration_minutes ? `${step.duration_minutes} min` : undefined)}</i>
             <span />
             <strong>{step.location?.label || step.title || `Parada ${index + 1}`}</strong>
           </div>
         ))}
         <div className="summary-route-point end">
-            <i>{stops.length
-              ? form.final_duration_minutes
-                ? `${form.final_duration_minutes} min`
-                : 'até a chegada'
-              : 'chegada'}</i>
+          <i>{formatArrival(form.arrival_at, form.final_duration_minutes ? `${form.final_duration_minutes} min` : undefined)}</i>
           <span />
           <strong>{destination}</strong>
         </div>
       </div>
-      {canEstimateArrival ? (
-        <p className="summary-arrival">
-          Chegada estimada se enviar agora: {new Date(now + duration * 60000).toLocaleString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}.
-        </p>
-      ) : null}
       <p className="summary-note">{route.note}</p>
     </aside>
   )

@@ -58,6 +58,7 @@ export interface Delivery {
   steps: DeliveryStep[]
   route_visibility: RouteVisibility
   hidden_steps_count: number
+  next_step_arrives_at?: string | null
   current_step: number | null
   courier: string
   starts_at: string

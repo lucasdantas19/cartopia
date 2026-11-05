@@ -12,12 +12,20 @@ class DeliveryResource extends JsonResource
     {
         $allSteps = $this->routeSteps();
         $hiddenStepsCount = 0;
+        $nextStepArrivesAt = null;
         $steps = $allSteps;
         if (($this->access_role ?? null) === 'recipient' && $this->route_visibility === 'progressive') {
             $now = CarbonImmutable::now('UTC');
+            $nextHiddenStep = collect($allSteps)->first(function (array $step) use ($now): bool {
+                $arrivesAt = $step['arrives_at'] instanceof CarbonImmutable ? $step['arrives_at'] : CarbonImmutable::parse($step['arrives_at']);
+                return $now->lt($arrivesAt);
+            });
+            $nextStepArrivesAt = $nextHiddenStep
+                ? (($nextHiddenStep['arrives_at'] instanceof CarbonImmutable ? $nextHiddenStep['arrives_at'] : CarbonImmutable::parse($nextHiddenStep['arrives_at']))->toISOString())
+                : null;
             $steps = array_values(array_filter($allSteps, function (array $step) use ($now): bool {
-                $startsAt = $step['starts_at'] instanceof CarbonImmutable ? $step['starts_at'] : CarbonImmutable::parse($step['starts_at']);
-                return $now->gte($startsAt);
+                $arrivesAt = $step['arrives_at'] instanceof CarbonImmutable ? $step['arrives_at'] : CarbonImmutable::parse($step['arrives_at']);
+                return $now->gte($arrivesAt);
             }));
             $hiddenStepsCount = count($allSteps) - count($steps);
         }
@@ -59,6 +67,7 @@ class DeliveryResource extends JsonResource
             ], $steps),
             'route_visibility' => $this->route_visibility,
             'hidden_steps_count' => $hiddenStepsCount,
+            'next_step_arrives_at' => $nextStepArrivesAt,
             // Compatibilidade temporária com clientes que ainda conhecem apenas trechos.
             'route_legs' => $routeLegs,
             'current_step' => $this->currentStepIndex(),

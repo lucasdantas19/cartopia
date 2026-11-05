@@ -14,6 +14,7 @@ interface JourneyPassportProps {
   steps: DeliveryStep[]
   finalDurationMinutes: number | null
   hiddenStepsCount: number
+  nextStepArrivesAt?: string | null
   now: number
 }
 
@@ -23,10 +24,19 @@ const stamps: Array<{ status: DeliveryStatus; label: string }> = [
   { status: 'DELIVERED', label: 'Entregue' },
 ]
 
-export function JourneyPassport({ publicId, originLabel, destinationLabel, courier, startsAt, arrivesAt, status, steps, finalDurationMinutes, hiddenStepsCount, now }: JourneyPassportProps) {
+export function JourneyPassport({ publicId, originLabel, destinationLabel, courier, startsAt, arrivesAt, status, steps, finalDurationMinutes, hiddenStepsCount, nextStepArrivesAt, now }: JourneyPassportProps) {
   const courierOption = getCourier(courier)
   const activeStamp = stamps.findIndex((stamp) => stamp.status === status)
   const nextStep = steps.find((step) => now < instant(step.arrives_at))
+  const currentStepIndex = steps.findIndex((step) => now >= instant(step.starts_at) && now < instant(step.arrives_at))
+  const currentStep = currentStepIndex >= 0 ? steps[currentStepIndex] : null
+  const liveStatus = status === 'SCHEDULED'
+    ? 'A carta está se preparando para partir.'
+    : status === 'DELIVERED'
+      ? 'A carta chegou ao destino.'
+      : currentStep
+        ? `A carta está em ${currentStep.title}.`
+        : 'A carta está viajando para o destino.'
 
   return <section className="journey-passport" aria-label="Passaporte da mensagem">
     <div className="passport-heading">
@@ -41,6 +51,13 @@ export function JourneyPassport({ publicId, originLabel, destinationLabel, couri
       <span className="passport-route-line" aria-hidden="true">✦ · · · · ✦</span>
       <div className="passport-destination"><span>Destino</span><strong>{destinationLabel}</strong></div>
     </div>
+    <div className="passport-live-status" role="status" aria-live="polite">
+      <span className="passport-live-status-dot" aria-hidden="true" />
+      <div>
+        <span>Agora</span>
+        <strong>{liveStatus}</strong>
+      </div>
+    </div>
     <p className="passport-narrative">
       {buildJourneyNarrative({
         origin: originLabel,
@@ -48,16 +65,30 @@ export function JourneyPassport({ publicId, originLabel, destinationLabel, couri
         status,
         steps,
         hiddenSteps: hiddenStepsCount,
-        currentStep: steps.length ? steps.findIndex((step) => now >= instant(step.starts_at) && now < instant(step.arrives_at)) : null,
+        currentStep: steps.length ? currentStepIndex : null,
       })}
     </p>
-    {nextStep && status !== 'DELIVERED' && <p className="passport-next-step" role="status">Próxima parada: <strong>{nextStep.title}</strong></p>}
+    {status !== 'DELIVERED' && (hiddenStepsCount > 0
+      ? <p className="passport-next-step" role="status">A caminho de mais uma parada. <strong>O que acontecerá lá será revelado quando a carta chegar.</strong>{nextStepArrivesAt && <> <span>Chegada prevista: {formatLocalDate(nextStepArrivesAt)}.</span></>}</p>
+      : nextStep && <p className="passport-next-step" role="status">Próxima parada: <strong>{nextStep.title}</strong></p>)}
     {hiddenStepsCount > 0 && <p className="passport-surprise" role="status">✦ {hiddenStepsCount === 1 ? 'Uma próxima etapa' : `${hiddenStepsCount} próximas etapas`} serão reveladas conforme a viagem continuar.</p>}
     {steps.length > 0 && <div className="passport-steps" aria-label="Capítulos da aventura">{steps.map((step, index) => {
       const completed = now >= instant(step.arrives_at)
-      const current = now >= instant(step.starts_at) && !completed
+      const current = index === currentStepIndex
       const locationLabel = step.location?.label ?? (step.location ? `${step.location.latitude?.toFixed(2)}, ${step.location.longitude?.toFixed(2)}` : null)
-      return <article className={`passport-step ${completed ? 'completed' : ''} ${current ? 'current' : ''}`} key={`${step.starts_at}-${index}`}><span className="passport-step-marker">{completed ? '✓' : String(index + 1).padStart(2, '0')}</span><div><strong>{step.title}</strong>{step.description && <p>{step.description}</p>}<small>{locationLabel ?? 'Durante o caminho'} · {formatLocalDate(step.starts_at)} – {formatLocalDate(step.arrives_at)}</small></div></article>
+      return (
+        <article className={`passport-step ${completed ? 'completed' : ''} ${current ? 'current' : ''}`} aria-current={current ? 'step' : undefined} key={`${step.starts_at}-${index}`}>
+          <span className="passport-step-marker">{completed ? '✓' : String(index + 1).padStart(2, '0')}</span>
+          <div>
+            <div className="passport-step-title">
+              <strong>{step.title}</strong>
+              {current && <span className="passport-step-now">Agora</span>}
+            </div>
+            {step.description && <p>{step.description}</p>}
+            <small>{locationLabel ?? 'Durante o caminho'} · {formatLocalDate(step.starts_at)} – {formatLocalDate(step.arrives_at)}</small>
+          </div>
+        </article>
+      )
     })}{steps.length > 0 && finalDurationMinutes && <article className="passport-step final-step"><span className="passport-step-marker">✦</span><div><strong>Chegada ao destino final</strong><small>Último trecho · {formatLocalDate(steps[steps.length - 1].arrives_at)} – {formatLocalDate(arrivesAt)}</small></div></article>}</div>}
     <div className="passport-meta">
       <div><span>Entregador</span><strong>{courierOption.label}</strong><em>{courierOption.motto}</em></div>

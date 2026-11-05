@@ -21,6 +21,7 @@ interface DeliveryMapProps {
   stops?: Array<Omit<DeliveryLocation, 'code'> & { code: string; arrivesAt?: string }>
   routeLegs?: DeliveryRouteLeg[]
   hiddenStepsCount?: number
+  nextStepArrivesAt?: string | null
   courier: string
   startsAt: string
   arrivesAt: string
@@ -55,7 +56,7 @@ function createCourierElement(courier: string): HTMLDivElement {
   return element
 }
 
-export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], hiddenStepsCount = 0, courier, startsAt, arrivesAt }: DeliveryMapProps) {
+export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], hiddenStepsCount = 0, nextStepArrivesAt, courier, startsAt, arrivesAt }: DeliveryMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const markersRef = useRef<Marker[]>([])
@@ -63,12 +64,12 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], h
   const courierRef = useRef(courier)
   const animationRef = useRef<ReturnType<typeof createCourierAnimation> | null>(null)
   const hasFittedRouteRef = useRef(false)
-  const routeRef = useRef({ origin, destination, stops, routeLegs, startsAt, arrivesAt })
+  const routeRef = useRef({ origin, destination, stops, routeLegs, hiddenStepsCount, startsAt, arrivesAt })
   const [mapError, setMapError] = useState(false)
 
   useEffect(() => {
-    routeRef.current = { origin, destination, stops, routeLegs, startsAt, arrivesAt }
-  }, [origin, destination, stops, routeLegs, startsAt, arrivesAt])
+    routeRef.current = { origin, destination, stops, routeLegs, hiddenStepsCount, startsAt, arrivesAt }
+  }, [origin, destination, stops, routeLegs, hiddenStepsCount, startsAt, arrivesAt])
 
   useEffect(() => {
     courierRef.current = courier
@@ -87,8 +88,15 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], h
     if (!container || !hasMapDimensions(container.clientWidth, container.clientHeight)) return false
 
     map.resize()
-    const routeLocations = [routeRef.current.origin, ...routeRef.current.stops, routeRef.current.destination]
+    const routeLocations = routeRef.current.hiddenStepsCount > 0
+      ? [routeRef.current.origin, ...routeRef.current.stops]
+      : [routeRef.current.origin, ...routeRef.current.stops, routeRef.current.destination]
     const coordinates = routeLocations.map((location) => location.coordinates)
+    if (coordinates.length < 2) {
+      map.flyTo({ center: coordinates[0], zoom: 8, duration: 0 })
+      hasFittedRouteRef.current = true
+      return true
+    }
     const longitudes = coordinates.map(([longitude]) => longitude)
     const latitudes = coordinates.map(([, latitude]) => latitude)
     map.fitBounds(new LngLatBounds([[Math.min(...longitudes), Math.min(...latitudes)], [Math.max(...longitudes), Math.max(...latitudes)]]), {
@@ -101,14 +109,19 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], h
   }, [])
 
   const drawRoute = useCallback((map: Map) => {
-    const { origin: currentOrigin, destination: currentDestination, stops: currentStops } = routeRef.current
+    const { origin: currentOrigin, destination: currentDestination, stops: currentStops, hiddenStepsCount: currentHiddenStepsCount } = routeRef.current
     const routeLocations = [currentOrigin, ...currentStops, currentDestination]
+    const visibleRouteLocations = currentHiddenStepsCount > 0
+      ? [currentOrigin, ...currentStops]
+      : routeLocations
     const route = {
       type: 'Feature' as const,
       properties: {},
       geometry: {
         type: 'LineString' as const,
-        coordinates: routeLocations.map((location) => location.coordinates),
+        coordinates: visibleRouteLocations.length > 1
+          ? visibleRouteLocations.map((location) => location.coordinates)
+          : [currentOrigin.coordinates, currentOrigin.coordinates],
       },
     }
 
@@ -221,20 +234,22 @@ export function DeliveryMap({ origin, destination, stops = [], routeLegs = [], h
     if (!map) return
 
     if (map.isStyleLoaded()) drawRoute(map)
-  }, [drawRoute, origin, destination])
+  }, [drawRoute, origin, destination, stops, routeLegs, hiddenStepsCount])
 
   function recenterRoute() {
     const map = mapRef.current
     if (map) fitRoute(map)
   }
 
-  const routeDescription = [origin.label, ...stops.map((stop) => stop.label), destination.label].join(' → ')
+  const routeDescription = hiddenStepsCount > 0
+    ? [origin.label, ...stops.map((stop) => stop.label), 'uma parada surpresa', destination.label].join(' → ')
+    : [origin.label, ...stops.map((stop) => stop.label), destination.label].join(' → ')
 
   return <div className="delivery-map-wrapper">
     <div ref={containerRef} className="delivery-map" aria-label={`Mapa da rota entre ${origin.label} e ${destination.label}`} aria-describedby="delivery-map-route-description" />
     <p id="delivery-map-route-description" className="sr-only">Rota da entrega: {routeDescription}.</p>
     <button type="button" className="delivery-map-recenter" onClick={recenterRoute}>Centralizar rota</button>
-    {hiddenStepsCount > 0 && <p className="delivery-map-surprise" role="status">✦ O restante do caminho é surpresa.</p>}
+    {hiddenStepsCount > 0 && <p className="delivery-map-surprise" role="status">✦ O próximo trecho é uma surpresa e será revelado quando a carta chegar à parada.{nextStepArrivesAt ? ` Chegada prevista: ${new Date(nextStepArrivesAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.` : ''}</p>}
     {mapError && <p className="delivery-map-fallback" role="status">O mapa não pôde ser carregado, mas o acompanhamento continua disponível.</p>}
   </div>
 }

@@ -202,10 +202,11 @@ it('reveals progressive adventure steps only as the delivery advances to the rec
         ->getJson('/api/deliveries/'.$publicId)
         ->assertOk()
         ->assertJsonPath('data.route_visibility', 'progressive')
-        ->assertJsonPath('data.hidden_steps_count', 1)
-        ->assertJsonCount(1, 'data.steps')
+        ->assertJsonPath('data.hidden_steps_count', 2)
+        ->assertJsonPath('data.next_step_arrives_at', '2026-10-21T15:30:00.000000Z')
+        ->assertJsonCount(0, 'data.steps')
         ->assertJsonCount(1, 'data.route_legs')
-        ->assertJsonPath('data.steps.0.title', 'Primeira surpresa');
+        ->assertJsonMissingPath('data.steps.0.title');
 
     $this->withToken($senderToken)
         ->getJson('/api/deliveries/'.$publicId)
@@ -214,6 +215,14 @@ it('reveals progressive adventure steps only as the delivery advances to the rec
         ->assertJsonCount(2, 'data.steps');
 
     CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:31:00', 'UTC'));
+    $this->withToken($recipientToken)
+        ->getJson('/api/deliveries/'.$publicId)
+        ->assertOk()
+        ->assertJsonPath('data.hidden_steps_count', 1)
+        ->assertJsonCount(1, 'data.steps')
+        ->assertJsonPath('data.steps.0.title', 'Primeira surpresa');
+
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:51:00', 'UTC'));
     $this->withToken($recipientToken)
         ->getJson('/api/deliveries/'.$publicId)
         ->assertOk()
