@@ -50,6 +50,11 @@ class User extends Authenticatable
         return $this->hasMany(TrackedDelivery::class);
     }
 
+    public function devices()
+    {
+        return $this->hasMany(UserDevice::class);
+    }
+
     public function deliveryPreferences()
     {
         return $this->hasMany(DeliveryPreference::class, 'recipient_user_id');

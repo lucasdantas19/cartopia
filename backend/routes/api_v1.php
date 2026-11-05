@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\DeviceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -29,14 +30,19 @@ Route::middleware('user.auth')->group(function (): void {
     Route::delete('/account/delivery-preferences/{preference}', [AccountController::class, 'deleteDeliveryPreference']);
     Route::post('/account/locations', [AccountController::class, 'storeLocation']);
     Route::put('/account/locations/{location}/default', [AccountController::class, 'setDefaultLocation']);
+    Route::delete('/account/locations/{location}/default', [AccountController::class, 'clearDefaultLocation']);
     Route::delete('/account/locations/{location}', [AccountController::class, 'deleteLocation']);
+    Route::put('/account/locations/{location}', [AccountController::class, 'updateLocation']);
     Route::get('/account/recipients', [AccountController::class, 'recipients']);
     Route::post('/account/recipients', [AccountController::class, 'storeRecipient']);
     Route::delete('/account/recipients/{recipient}', [AccountController::class, 'deleteRecipient']);
+    Route::put('/account/recipients/{recipient}', [AccountController::class, 'updateRecipient']);
     Route::get('/account/tracked-deliveries', [AccountController::class, 'trackedDeliveries']);
     Route::post('/account/tracked-deliveries', [AccountController::class, 'storeTrackedDelivery']);
     Route::get('/account/tracked-deliveries/{trackedDelivery}/token', [AccountController::class, 'trackedDeliveryToken']);
     Route::delete('/account/tracked-deliveries/{trackedDelivery}', [AccountController::class, 'deleteTrackedDelivery']);
+    Route::post('/account/devices', [DeviceController::class, 'store']);
+    Route::delete('/account/devices/{device}', [DeviceController::class, 'destroy']);
 });
 
 Route::post('/deliveries', [DeliveryController::class, 'store'])

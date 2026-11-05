@@ -235,6 +235,52 @@ it('stores saved recipients and locations only for their owner', function () {
     $this->withToken($secondToken)->deleteJson('/api/account/recipients/'.$recipient['id'])->assertNotFound();
 });
 
+it('filters sent deliveries by a saved recipient across the complete history', function () {
+    $user = User::factory()->create();
+    $token = $this->postJson('/api/auth/login', [
+        'email' => $user->email, 'password' => 'password',
+    ])->json('token');
+
+    $this->withToken($token)->postJson('/api/deliveries', deliveryPayload([
+        'recipient_name' => 'Ana',
+        'recipient_email' => 'ana@example.com',
+    ]))->assertCreated();
+    $this->withToken($token)->postJson('/api/deliveries', deliveryPayload([
+        'recipient_name' => 'Bruno',
+        'recipient_email' => 'bruno@example.com',
+    ]))->assertCreated();
+
+    $response = $this->withToken($token)->getJson('/api/account/deliveries?recipient_name=Ana&recipient_email=ANA%40example.com&per_page=1')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('meta.per_page', 1);
+
+    expect($response->json('data.0.recipient_name'))->toBe('Ana');
+});
+
+it('updates saved agenda items and searches recipients', function () {
+    $user = User::factory()->create();
+    $token = $this->postJson('/api/auth/login', [
+        'email' => $user->email, 'password' => 'password',
+    ])->json('token');
+    $location = $this->withToken($token)->postJson('/api/account/locations', [
+        'name' => 'Casa', 'label' => 'Rua antiga', 'latitude' => -8, 'longitude' => -34,
+    ])->assertCreated()->json('data');
+    $recipient = $this->withToken($token)->postJson('/api/account/recipients', [
+        'name' => 'Ana Souza', 'email' => 'ana@example.com', 'nickname' => 'Aninha',
+    ])->assertCreated()->json('data');
+
+    $this->withToken($token)->putJson('/api/account/locations/'.$location['id'], [
+        'name' => 'Casa nova', 'label' => 'Rua atual', 'latitude' => -8.1, 'longitude' => -34.1,
+    ])->assertOk()->assertJsonPath('data.name', 'Casa nova');
+    $this->withToken($token)->putJson('/api/account/recipients/'.$recipient['id'], [
+        'name' => 'Ana Souza', 'email' => 'ana@example.com', 'nickname' => 'Aninha querida',
+    ])->assertOk()->assertJsonPath('data.nickname', 'Aninha querida');
+
+    $this->withToken($token)->getJson('/api/account/recipients?search=querida')
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $recipient['id']);
+});
+
 it('allows an account to configure and change its default location', function () {
     $user = User::factory()->create();
     $token = $this->postJson('/api/auth/login', [
@@ -257,6 +303,13 @@ it('allows an account to configure and change its default location', function ()
         ->assertOk()->json('data');
     expect(collect($locations)->firstWhere('id', $second['id'])['is_default'])->toBeTrue();
     expect(collect($locations)->firstWhere('id', $first['id'])['is_default'])->toBeFalse();
+
+    $this->withToken($token)->deleteJson('/api/account/locations/'.$second['id'].'/default')
+        ->assertOk()->assertJsonPath('data.is_default', false);
+
+    $locations = $this->withToken($token)->getJson('/api/account/locations')
+        ->assertOk()->json('data');
+    expect(collect($locations)->every(fn (array $location) => $location['is_default'] === false))->toBeTrue();
 });
 
 it('associates a delivery link with the authenticated account and protects it from other users', function () {

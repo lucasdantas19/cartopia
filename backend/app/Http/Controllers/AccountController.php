@@ -48,23 +48,54 @@ class AccountController extends Controller
 
     public function deliveries(Request $request): JsonResponse
     {
-        return response()->json(['data' => Delivery::where('user_id', $request->user()->id)->latest()->get()->map(fn (Delivery $delivery) => [
+        $query = Delivery::where('user_id', $request->user()->id);
+        $recipientEmail = trim((string) $request->input('recipient_email'));
+        $recipientName = trim((string) $request->input('recipient_name'));
+
+        if ($recipientEmail !== '') {
+            $query->where(function ($recipientQuery) use ($recipientEmail, $recipientName): void {
+                $recipientQuery->whereRaw('LOWER(recipient_email) = ?', [strtolower($recipientEmail)]);
+
+                if ($recipientName !== '') {
+                    $recipientQuery->orWhere(function ($legacyQuery) use ($recipientName): void {
+                        $legacyQuery->whereNull('recipient_email')
+                            ->whereRaw('LOWER(recipient_name) = ?', [strtolower($recipientName)]);
+                    });
+                }
+            });
+        } elseif ($recipientName !== '') {
+            $query->whereRaw('LOWER(recipient_name) = ?', [strtolower($recipientName)]);
+        }
+
+        $deliveries = $query->latest()->paginate($this->pageSize($request));
+
+        return response()->json(['data' => $deliveries->getCollection()->map(fn (Delivery $delivery) => [
             'public_id' => $delivery->public_id, 'recipient_name' => $delivery->recipient_name,
             'recipient_email' => $delivery->recipient_email,
             'origin' => $delivery->origin, 'destination' => $delivery->destination, 'status' => $delivery->status(),
             'progress' => $delivery->progress(), 'starts_at' => $delivery->starts_at?->toISOString(),
             'arrives_at' => $delivery->arrives_at?->toISOString(),
-        ])]);
+        ]), 'meta' => $this->paginationMeta($deliveries)]);
     }
 
     public function incomingDeliveries(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        return response()->json(['data' => Delivery::where(function ($query) use ($user): void {
+        $query = Delivery::where(function ($query) use ($user): void {
             $query->where('recipient_user_id', $user->id)
                 ->orWhereRaw('LOWER(recipient_email) = ?', [strtolower($user->email)]);
-        })->latest()->get()->map(fn (Delivery $delivery): array => [
+        });
+
+        if ($request->input('opened') === 'true') {
+            $query->whereNotNull('opened_at');
+        } elseif ($request->input('opened') === 'false') {
+            $query->whereNull('opened_at');
+        }
+
+        $deliveries = $query->latest()->paginate($this->pageSize($request));
+
+        return response()->json(['data' => $deliveries->getCollection()->map(fn (Delivery $delivery): array => [
             'public_id' => $delivery->public_id,
             'sender_name' => $delivery->sender_name,
             'recipient_name' => $delivery->recipient_name,
@@ -74,7 +105,7 @@ class AccountController extends Controller
             'progress' => $delivery->progress(),
             'arrives_at' => $delivery->arrives_at?->toISOString(),
             'opened_at' => $delivery->opened_at?->toISOString(),
-        ])]);
+        ]), 'meta' => $this->paginationMeta($deliveries)]);
     }
 
     public function incomingDeliveryToken(Request $request, string $publicId): JsonResponse
@@ -106,7 +137,8 @@ class AccountController extends Controller
 
     public function locations(Request $request): JsonResponse
     {
-        return response()->json(['data' => $request->user()->savedLocations()->latest()->get()]);
+        $locations = $request->user()->savedLocations()->latest()->paginate($this->pageSize($request));
+        return response()->json(['data' => $locations->getCollection(), 'meta' => $this->paginationMeta($locations)]);
     }
 
     public function deliverySettings(Request $request): JsonResponse
@@ -151,13 +183,13 @@ class AccountController extends Controller
 
     public function deliveryPreferences(Request $request): JsonResponse
     {
-        $preferences = $request->user()->deliveryPreferences()->with(['senderUser:id,name,email', 'savedLocation:id,name,label'])->latest()->get();
+        $preferences = $request->user()->deliveryPreferences()->with(['senderUser:id,name,email', 'savedLocation:id,name,label'])->latest()->paginate($this->pageSize($request));
 
-        return response()->json(['data' => $preferences->map(fn (DeliveryPreference $preference): array => [
+        return response()->json(['data' => $preferences->getCollection()->map(fn (DeliveryPreference $preference): array => [
             'id' => $preference->id,
             'sender' => $preference->senderUser,
             'location' => $preference->savedLocation,
-        ])]);
+        ]), 'meta' => $this->paginationMeta($preferences)]);
     }
 
     public function storeDeliveryPreference(Request $request): JsonResponse
@@ -212,6 +244,14 @@ class AccountController extends Controller
         return response()->json(['data' => $location->fresh()]);
     }
 
+    public function clearDefaultLocation(Request $request, SavedLocation $location): JsonResponse
+    {
+        abort_unless($location->user_id === $request->user()->id, 404);
+        $location->update(['is_default' => false]);
+
+        return response()->json(['data' => $location->fresh()]);
+    }
+
     public function deleteLocation(Request $request, SavedLocation $location): JsonResponse
     {
         abort_unless($location->user_id === $request->user()->id, 404);
@@ -219,16 +259,37 @@ class AccountController extends Controller
         return response()->json(['data' => ['deleted' => true]]);
     }
 
+    public function updateLocation(Request $request, SavedLocation $location): JsonResponse
+    {
+        abort_unless($location->user_id === $request->user()->id, 404);
+        $data = $request->validate(['name' => ['required', 'string', 'max:80'], 'label' => ['required', 'string', 'max:255'], 'latitude' => ['required', 'numeric', 'between:-90,90'], 'longitude' => ['required', 'numeric', 'between:-180,180']]);
+        $location->update($data);
+
+        return response()->json(['data' => $location->fresh()]);
+    }
+
     public function recipients(Request $request): JsonResponse
     {
-        return response()->json(['data' => $request->user()->savedRecipients()->latest()->get()]);
+        $query = $request->user()->savedRecipients();
+        $search = trim((string) $request->input('search'));
+        if ($search !== '') {
+            $like = '%'.strtolower($search).'%';
+            $query->where(function ($recipientQuery) use ($like): void {
+                $recipientQuery->whereRaw('LOWER(name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(COALESCE(nickname, \'\')) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', [$like]);
+            });
+        }
+
+        $recipients = $query->latest()->paginate($this->pageSize($request));
+        return response()->json(['data' => $recipients->getCollection(), 'meta' => $this->paginationMeta($recipients)]);
     }
 
     public function trackedDeliveries(Request $request): JsonResponse
     {
-        $tracked = $request->user()->trackedDeliveries()->with('delivery')->latest()->get();
+        $tracked = $request->user()->trackedDeliveries()->with('delivery')->latest()->paginate($this->pageSize($request));
 
-        return response()->json(['data' => $tracked->map(fn (TrackedDelivery $item): array => [
+        return response()->json(['data' => $tracked->getCollection()->map(fn (TrackedDelivery $item): array => [
             'id' => $item->id,
             'public_id' => $item->delivery->public_id,
             'label' => $item->label,
@@ -239,7 +300,7 @@ class AccountController extends Controller
             'status' => $item->delivery->status(),
             'progress' => $item->delivery->progress(),
             'arrives_at' => $item->delivery->arrives_at?->toISOString(),
-        ])]);
+        ]), 'meta' => $this->paginationMeta($tracked)]);
     }
 
     public function storeTrackedDelivery(Request $request): JsonResponse
@@ -291,5 +352,29 @@ class AccountController extends Controller
         abort_unless($recipient->user_id === $request->user()->id, 404);
         $recipient->delete();
         return response()->json(['data' => ['deleted' => true]]);
+    }
+
+    public function updateRecipient(Request $request, SavedRecipient $recipient): JsonResponse
+    {
+        abort_unless($recipient->user_id === $request->user()->id, 404);
+        $data = $request->validate(['name' => ['required', 'string', 'max:120'], 'email' => ['nullable', 'email', 'max:255'], 'nickname' => ['nullable', 'string', 'max:80']]);
+        $recipient->update($data);
+
+        return response()->json(['data' => $recipient->fresh()]);
+    }
+
+    private function pageSize(Request $request): int
+    {
+        return min(20, max(1, (int) $request->input('per_page', 5)));
+    }
+
+    private function paginationMeta($paginator): array
+    {
+        return [
+            'total' => $paginator->total(),
+            'per_page' => $paginator->perPage(),
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+        ];
     }
 }
