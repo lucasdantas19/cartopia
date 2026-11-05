@@ -36,7 +36,8 @@ export interface CreateDeliveryStep {
   id?: string
   title: string
   description?: string
-  duration_minutes: number
+  arrival_at?: string
+  duration_minutes?: number
   location?: { label: string; latitude?: number; longitude?: number }
 }
 

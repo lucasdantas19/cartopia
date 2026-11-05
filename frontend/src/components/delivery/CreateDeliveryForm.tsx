@@ -23,7 +23,7 @@ interface CreateDeliveryFormProps {
   onAdventureChange: (enabled: boolean) => void
   onDeliveryModeChange: (mode: 'real' | 'playful') => void
   onUnlockTypeChange: (type: 'none' | 'password' | 'hangman') => void
-  onStepChange: (index: number, field: 'title' | 'description' | 'duration_minutes', value: string | number) => void
+  onStepChange: (index: number, field: 'title' | 'description' | 'arrival_at', value: string) => void
   onStepLocationChange: (index: number, location: CreateDeliveryStep['location']) => void
   onAddStep: () => void
   onRemoveStep: (index: number) => void
@@ -112,23 +112,37 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
   const courierComplete = couriers.some((courier) => courier.code === form.courier)
   const stepsComplete = Boolean(
     form.steps?.length &&
-    form.steps.every((step) => step.title.trim() && Number(step.duration_minutes) > 0),
+    form.steps.every((step, index) => {
+      const arrival = new Date(step.arrival_at ?? '')
+      const previousArrival = index === 0 ? Date.now() : new Date(form.steps?.[index - 1]?.arrival_at ?? '').getTime()
+      return step.title.trim() && !Number.isNaN(arrival.getTime()) && arrival.getTime() > previousArrival
+    }),
+  )
+  const arrivalAt = new Date(form.arrival_at ?? '')
+  const arrivalAtComplete = Boolean(
+    form.arrival_at &&
+    !Number.isNaN(arrivalAt.getTime()) &&
+    arrivalAt.getTime() > Date.now(),
   )
   const recipientError = fieldErrors.recipient_name?.[0]
     ?? (touchedFields.recipient_name && !form.recipient_name.trim() ? 'Informe o nome do destinatário.' : undefined)
   const messageError = fieldErrors.message?.[0]
     ?? (touchedFields.message && !form.message.trim() ? 'Escreva uma mensagem antes de continuar.' : undefined)
   const emailError = fieldErrors.recipient_email?.[0]
+  const lastStepArrival = form.steps?.length
+    ? new Date(form.steps[form.steps.length - 1].arrival_at ?? '')
+    : null
+  const adventureFinalDuration = arrivalAtComplete && lastStepArrival && !Number.isNaN(lastStepArrival.getTime())
+    ? Math.ceil((arrivalAt.getTime() - lastStepArrival.getTime()) / 60000)
+    : 0
+  const adventureDuration = arrivalAtComplete
+    ? Math.ceil((arrivalAt.getTime() - Date.now()) / 60000)
+    : 0
   const routeComplete = Boolean(
     form.origin_location &&
     (form.destination_source !== 'specific' || form.destination_location) &&
-    Number(form.duration_minutes) > 0 &&
-    Number(form.final_duration_minutes) > 0 &&
-    (!adventureEnabled || stepsComplete),
-  )
-  const adventureDuration = (form.steps ?? []).reduce(
-    (total, step) => total + Number(step.duration_minutes || 0),
-    Number(form.final_duration_minutes || 0),
+    arrivalAtComplete &&
+    (!adventureEnabled || (stepsComplete && adventureFinalDuration > 0)),
   )
 
   return (
@@ -466,9 +480,49 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
             </div>
             <div className="steps-editor-heading"><div><label>Paradas da aventura</label><small>Defina o tempo desde o ponto anterior até cada parada.</small></div><span>{(form.steps ?? []).length} {(form.steps ?? []).length === 1 ? 'parada' : 'paradas'}</span></div>
             {!(form.steps ?? []).length && <div className="steps-empty"><strong>Sua aventura ainda não tem paradas.</strong><p>Adicione uma história, uma pausa ou um lugar especial ao caminho.</p></div>}
-            {(form.steps ?? []).map((step, index) => <article className="step-editor" key={step.id ?? index}><div className="step-editor-number">{String(index + 1).padStart(2, '0')}</div><div className="step-editor-fields"><div className="step-editor-heading-row"><strong>Parada {index + 1}</strong><div className="step-reorder"><button type="button" className="step-order-button" disabled={index === 0} aria-label={`Mover parada ${index + 1} para cima`} onClick={() => onMoveStep(index, -1)}>↑ subir</button><button type="button" className="step-order-button" disabled={index === (form.steps ?? []).length - 1} aria-label={`Mover parada ${index + 1} para baixo`} onClick={() => onMoveStep(index, 1)}>↓ descer</button></div></div><input required maxLength={120} aria-label={`Título da etapa ${index + 1}`} value={step.title} onChange={(event) => onStepChange(index, 'title', event.target.value)} placeholder="Ex.: Uma pausa para um croissant" /><textarea maxLength={500} aria-label={`Descrição da etapa ${index + 1}`} value={step.description ?? ''} onChange={(event) => onStepChange(index, 'description', event.target.value)} placeholder="Descreva esse momento da jornada (opcional)." rows={2} /><div className="step-duration"><label htmlFor={`step-duration-${index}`}>Tempo até esta parada</label><input id={`step-duration-${index}`} required type="number" min={1} max={1440} value={step.duration_minutes} onChange={(event) => onStepChange(index, 'duration_minutes', Number(event.target.value))} /><span>minutos</span>{<button type="button" className="text-button" onClick={() => onRemoveStep(index)}>remover</button>}</div>{form.delivery_mode === 'real' && <LocationPicker center={form.origin_location ? [form.origin_location.longitude, form.origin_location.latitude] : locations[0].coordinates} location={step.location} onChange={(location) => onStepLocationChange(index, location)} onClear={() => onStepLocationChange(index, undefined)} />}</div></article>)}
+            {(form.steps ?? []).map((step, index) => {
+              const previousArrival = index === 0 ? new Date() : new Date(form.steps?.[index - 1]?.arrival_at ?? '')
+              return (
+                <article className="step-editor" key={step.id ?? index}>
+                  <div className="step-editor-number">{String(index + 1).padStart(2, '0')}</div>
+                  <div className="step-editor-fields">
+                    <div className="step-editor-heading-row">
+                      <strong>Parada {index + 1}</strong>
+                      <div className="step-reorder">
+                        <button type="button" className="step-order-button" disabled={index === 0} aria-label={`Mover parada ${index + 1} para cima`} onClick={() => onMoveStep(index, -1)}>↑ subir</button>
+                        <button type="button" className="step-order-button" disabled={index === (form.steps ?? []).length - 1} aria-label={`Mover parada ${index + 1} para baixo`} onClick={() => onMoveStep(index, 1)}>↓ descer</button>
+                      </div>
+                    </div>
+                    <input required maxLength={120} aria-label={`Título da etapa ${index + 1}`} value={step.title} onChange={(event) => onStepChange(index, 'title', event.target.value)} placeholder="Ex.: Uma pausa para um croissant" />
+                    <textarea maxLength={500} aria-label={`Descrição da etapa ${index + 1}`} value={step.description ?? ''} onChange={(event) => onStepChange(index, 'description', event.target.value)} placeholder="Descreva esse momento da jornada (opcional)." rows={2} />
+                    <div className="step-duration">
+                      <label htmlFor={`step-arrival-${index}`}>Quando chega nesta parada?</label>
+                      <input id={`step-arrival-${index}`} required type="datetime-local" min={toLocalDateTimeInput(previousArrival)} value={step.arrival_at ?? ''} onChange={(event) => onStepChange(index, 'arrival_at', event.target.value)} />
+                      <small className="field-help">O horário será interpretado conforme o fuso deste dispositivo.</small>
+                      <button type="button" className="text-button" onClick={() => onRemoveStep(index)}>remover</button>
+                    </div>
+                    {form.delivery_mode === 'real' && <LocationPicker center={form.origin_location ? [form.origin_location.longitude, form.origin_location.latitude] : locations[0].coordinates} location={step.location} onChange={(location) => onStepLocationChange(index, location)} onClear={() => onStepLocationChange(index, undefined)} />}
+                  </div>
+                </article>
+              )
+            })}
             <button type="button" className="text-button" onClick={onAddStep}>+ adicionar parada</button>
-            <div className="final-destination-duration"><label htmlFor="final_duration_minutes">Tempo da última parada até o destino final</label><div className="duration-input"><input id="final_duration_minutes" type="number" required min={1} max={1440} value={form.final_duration_minutes} onChange={(event) => onFieldChange('final_duration_minutes', Number(event.target.value))} /><span>minutos</span></div></div>
+            <div className="duration-field journey-duration-field">
+              <label htmlFor="adventure-arrival_at">Quando a mensagem deve chegar?</label>
+              <p className="field-help">O último trecho será calculado automaticamente depois das paradas.</p>
+              <input
+                id="adventure-arrival_at"
+                type="datetime-local"
+                required
+                min={toLocalDateTimeInput(new Date())}
+                value={form.arrival_at ?? ''}
+                aria-invalid={fieldErrors.arrival_at ? true : undefined}
+                aria-describedby={fieldErrors.arrival_at ? 'adventure-arrival-at-error' : 'adventure-arrival-at-help'}
+                onChange={(event) => onFieldChange('arrival_at', event.target.value)}
+              />
+              <small id="adventure-arrival-at-help" className="field-help">O horário será interpretado conforme o fuso deste dispositivo.</small>
+              {fieldErrors.arrival_at && <FieldError id="adventure-arrival-at-error" messages={fieldErrors.arrival_at} />}
+            </div>
             {form.delivery_mode === 'real' && form.origin_location && form.destination_location ? <JourneyPreview origin={form.origin_location} destination={form.destination_location} steps={form.steps ?? []} finalDurationMinutes={form.final_duration_minutes ?? 0} /> : <p className="steps-empty">{form.delivery_mode === 'real' ? 'A prévia do mapa aparece quando origem e destino forem escolhidos diretamente.' : 'Locais lúdicos não usam mapa: a história aparece pelos nomes e descrições das paradas.'}</p>}
           </div>}
         </section>

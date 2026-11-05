@@ -120,6 +120,44 @@ it('creates an adventure with sequential route legs', function () {
         ->assertJsonPath('data.arrives_at', '2026-10-21T16:00:00.000000Z');
 });
 
+it('uses the requested arrival time after the adventure stops', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
+
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'duration_minutes' => null,
+        'arrival_at' => '2026-10-21T19:00:00-03:00',
+        'steps' => [
+            ['title' => 'Primeira parada', 'duration_minutes' => 30],
+        ],
+        'final_duration_minutes' => null,
+    ]));
+
+    $response->assertCreated()
+        ->assertJsonPath('data.arrives_at', '2026-10-21T22:00:00.000000Z')
+        ->assertJsonPath('data.final_duration_minutes', 390);
+});
+
+it('calculates adventure segments from each requested stop arrival', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
+
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'duration_minutes' => null,
+        'arrival_at' => '2026-10-21T19:00:00-03:00',
+        'steps' => [
+            ['title' => 'Primeira parada', 'arrival_at' => '2026-10-21T17:00:00-03:00'],
+            ['title' => 'Segunda parada', 'arrival_at' => '2026-10-21T18:00:00-03:00'],
+        ],
+        'final_duration_minutes' => null,
+    ]));
+
+    $response->assertCreated()
+        ->assertJsonPath('data.steps.0.starts_at', '2026-10-21T15:00:00.000000Z')
+        ->assertJsonPath('data.steps.0.arrives_at', '2026-10-21T20:00:00.000000Z')
+        ->assertJsonPath('data.steps.1.arrives_at', '2026-10-21T21:00:00.000000Z')
+        ->assertJsonPath('data.final_duration_minutes', 60)
+        ->assertJsonPath('data.arrives_at', '2026-10-21T22:00:00.000000Z');
+});
+
 it('creates an automatic narrative with timed steps and an optional location', function () {
     CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
 

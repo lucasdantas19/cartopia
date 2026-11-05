@@ -16,6 +16,10 @@ function formatDuration(minutes: number): string {
 }
 
 function getTotalDuration(form: CreateDeliveryInput): number {
+  if (form.arrival_at) {
+    const arrivalAt = new Date(form.arrival_at)
+    if (!Number.isNaN(arrivalAt.getTime())) return Math.ceil((arrivalAt.getTime() - Date.now()) / 60000)
+  }
   if (!form.steps?.length) return Number(form.duration_minutes)
   return form.steps.reduce(
     (total, step) => total + Number(step.duration_minutes || 0),
@@ -143,7 +147,11 @@ export function DeliverySummary({ form, adventureEnabled }: DeliverySummaryProps
           </div>
         ))}
         <div className="summary-route-point end">
-            <i>{stops.length ? `${form.final_duration_minutes || 0} min` : 'chegada'}</i>
+            <i>{stops.length
+              ? form.final_duration_minutes
+                ? `${form.final_duration_minutes} min`
+                : 'até a chegada'
+              : 'chegada'}</i>
           <span />
           <strong>{destination}</strong>
         </div>

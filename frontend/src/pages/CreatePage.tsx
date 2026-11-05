@@ -112,7 +112,7 @@ function hasDeliveryDraft(form: CreateDeliveryInput, adventureEnabled: boolean):
 }
 
 function newStep(): CreateDeliveryStep {
-  return { id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `step-${Date.now()}-${Math.random()}`, title: '', description: '', duration_minutes: 30 }
+  return { id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `step-${Date.now()}-${Math.random()}`, title: '', description: '', arrival_at: '' }
 }
 
 export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePageProps) {
@@ -177,7 +177,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
     setDraftRecovered(false)
   }
 
-  function updateStep(index: number, field: 'title' | 'description' | 'duration_minutes', value: string | number) {
+  function updateStep(index: number, field: 'title' | 'description' | 'arrival_at', value: string) {
     setForm((current) => {
       const steps = [...(current.steps ?? [])]
       steps[index] = { ...steps[index], [field]: value }
@@ -270,13 +270,11 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
       if (!form.origin_location || (form.destination_source === 'specific' && !form.destination_location)) { setError('Escolha a origem e o destino da entrega para continuar.'); return }
       if (form.destination_source === 'specific' && form.origin_location && form.destination_location && form.origin_location.latitude === form.destination_location.latitude && form.origin_location.longitude === form.destination_location.longitude) { setError('Escolha localidades diferentes para a partida e o destino.'); return }
     }
-    if (!adventureEnabled) {
-      const arrivalAt = new Date(form.arrival_at ?? '')
-      if (!form.arrival_at || Number.isNaN(arrivalAt.getTime()) || arrivalAt.getTime() <= Date.now()) {
-        setError('Escolha uma data e hora futuras para a chegada da entrega.')
-        setFieldErrors({ arrival_at: ['A chegada deve acontecer no futuro.'] })
-        return
-      }
+    const arrivalAt = new Date(form.arrival_at ?? '')
+    if (!form.arrival_at || Number.isNaN(arrivalAt.getTime()) || arrivalAt.getTime() <= Date.now()) {
+      setError('Escolha uma data e hora futuras para a chegada da entrega.')
+      setFieldErrors({ arrival_at: ['A chegada deve acontecer no futuro.'] })
+      return
     }
     if (adventureEnabled && !form.steps?.length) { setError('Adicione pelo menos uma parada para criar uma aventura.'); return }
     setSubmitting(true)
@@ -290,7 +288,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
               ...(form.delivery_mode === 'real' && location ? { location } : {}),
               title: step.title.trim(),
               description: step.description?.trim() || undefined,
-              duration_minutes: Number(step.duration_minutes),
+              arrival_at: new Date(step.arrival_at ?? '').toISOString(),
             })),
           }
         : directForm
@@ -302,8 +300,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
         sender_name: form.sender_name?.trim() || undefined,
         ...(adventureEnabled
           ? {
-              duration_minutes: Number(form.duration_minutes),
-              final_duration_minutes: Number(form.final_duration_minutes),
+              arrival_at: new Date(form.arrival_at ?? '').toISOString(),
             }
           : {
               arrival_at: new Date(form.arrival_at ?? '').toISOString(),

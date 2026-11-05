@@ -40,6 +40,14 @@ function createMarkerElement(point: PreviewPoint): HTMLDivElement {
   return element
 }
 
+function stepDurationMinutes(step: CreateDeliveryStep, index: number, steps: CreateDeliveryStep[]): number {
+  if (!step.arrival_at) return Number(step.duration_minutes || 0)
+  const arrival = new Date(step.arrival_at).getTime()
+  const previous = index === 0 ? Date.now() : new Date(steps[index - 1].arrival_at ?? '').getTime()
+  if (!Number.isFinite(arrival) || !Number.isFinite(previous)) return 0
+  return Math.max(0, Math.ceil((arrival - previous) / 60000))
+}
+
 export function JourneyPreview({ origin, destination, steps, finalDurationMinutes }: JourneyPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
@@ -68,9 +76,11 @@ export function JourneyPreview({ origin, destination, steps, finalDurationMinute
     if (map?.isStyleLoaded()) drawPreview(map, points, markersRef)
   }, [points])
 
+  const totalDuration = steps.reduce((total, step, index) => total + stepDurationMinutes(step, index, steps), Number(finalDurationMinutes || 0))
+
   return <section className="journey-preview" aria-label="Prévia da aventura">
-    <div className="journey-preview-heading"><div><h3>Prévia da sua aventura</h3><p>Veja a ordem dos momentos antes de selar a entrega.</p></div><strong>{steps.reduce((total, step) => total + Number(step.duration_minutes || 0), Number(finalDurationMinutes || 0))} min</strong></div>
-    <div className="journey-preview-timeline"><div className="journey-preview-event origin"><span className="journey-preview-dot" /><div><small>Partida</small><strong>{origin.label}</strong></div></div>{steps.map((step, index) => <div className="journey-preview-event" key={index}><span className="journey-preview-dot" /><div><small>{step.duration_minutes || 0} min desde o ponto anterior</small><strong>{step.title || `Parada ${index + 1}`}</strong>{step.location?.label && <em>{step.location.label}</em>}</div></div>)}<div className="journey-preview-event destination"><span className="journey-preview-dot" /><div><small>{finalDurationMinutes || 0} min desde a última parada</small><strong>{destination.label}</strong></div></div></div>
+    <div className="journey-preview-heading"><div><h3>Prévia da sua aventura</h3><p>Veja a ordem dos momentos antes de selar a entrega.</p></div><strong>{totalDuration} min</strong></div>
+    <div className="journey-preview-timeline"><div className="journey-preview-event origin"><span className="journey-preview-dot" /><div><small>Partida</small><strong>{origin.label}</strong></div></div>{steps.map((step, index) => <div className="journey-preview-event" key={index}><span className="journey-preview-dot" /><div><small>{stepDurationMinutes(step, index, steps)} min desde o ponto anterior</small><strong>{step.title || `Parada ${index + 1}`}</strong>{step.location?.label && <em>{step.location.label}</em>}</div></div>)}<div className="journey-preview-event destination"><span className="journey-preview-dot" /><div><small>{finalDurationMinutes || 0} min desde a última parada</small><strong>{destination.label}</strong></div></div></div>
     <div ref={containerRef} className="journey-preview-map" aria-label="Mapa da prévia da aventura" />
     {points.length < 2 && <p className="journey-preview-note">Adicione uma localização para visualizar o percurso no mapa.</p>}
   </section>

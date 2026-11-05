@@ -60,7 +60,9 @@ class CreateDelivery
 
         $routeSteps = [];
         foreach ($steps as $step) {
-            $stepArrivesAt = $legStartsAt->addMinutes($step['duration_minutes']);
+            $stepArrivesAt = isset($step['arrival_at'])
+                ? CarbonImmutable::parse($step['arrival_at'])->utc()
+                : $legStartsAt->addMinutes($step['duration_minutes']);
             $routeSteps[] = [
                 'title' => $step['title'],
                 'description' => $step['description'] ?? null,
@@ -89,10 +91,12 @@ class CreateDelivery
         }
 
         $finalDurationMinutes = $hasNarrativeSteps
-            ? ($finalDurationMinutes ?? 0)
+            ? ($requestedArrivalAt
+                ? max(1, (int) ceil($legStartsAt->diffInSeconds($requestedArrivalAt) / 60))
+                : ($finalDurationMinutes ?? 0))
             : ($requestedArrivalAt ? max(1, (int) ceil($startsAt->diffInSeconds($requestedArrivalAt) / 60)) : $durationMinutes);
         $arrivesAt = $hasNarrativeSteps
-            ? $legStartsAt->addMinutes($finalDurationMinutes)
+            ? ($requestedArrivalAt ?? $legStartsAt->addMinutes($finalDurationMinutes))
             : ($requestedArrivalAt ?? $startsAt->addMinutes($durationMinutes));
 
         $delivery = Delivery::create([

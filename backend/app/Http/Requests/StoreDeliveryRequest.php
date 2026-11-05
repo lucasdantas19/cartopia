@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -48,14 +49,15 @@ class StoreDeliveryRequest extends FormRequest
                 'min:1',
                 'max:'.config('deliveries.max_duration_minutes'),
             ],
-            'final_duration_minutes' => ['required_with:steps', 'integer', 'min:1', 'max:'.config('deliveries.max_duration_minutes')],
+            'final_duration_minutes' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.config('deliveries.max_duration_minutes')],
             'legs' => ['sometimes', 'array', 'min:1', 'max:8'],
             'legs.*.destination' => ['required', 'string', Rule::in(config('deliveries.destinations'))],
             'legs.*.duration_minutes' => ['required', 'integer', 'min:1', 'max:'.config('deliveries.max_duration_minutes')],
             'steps' => ['sometimes', 'array', 'max:12'],
             'steps.*.title' => ['required', 'string', 'max:120'],
             'steps.*.description' => ['nullable', 'string', 'max:500'],
-            'steps.*.duration_minutes' => ['required', 'integer', 'min:1', 'max:'.config('deliveries.max_duration_minutes')],
+            'steps.*.arrival_at' => ['nullable', 'date', 'required_without:steps.*.duration_minutes'],
+            'steps.*.duration_minutes' => ['nullable', 'integer', 'min:1', 'max:'.config('deliveries.max_duration_minutes'), 'required_without:steps.*.arrival_at'],
             'steps.*.location' => ['nullable', 'array'],
             'steps.*.location.label' => ['required_with:steps.*.location', 'string', 'max:160'],
             'steps.*.location.latitude' => ['nullable', 'numeric', 'between:-90,90'],
@@ -111,9 +113,30 @@ class StoreDeliveryRequest extends FormRequest
                 return;
             }
 
-            $total = array_sum(array_map('intval', array_column($steps, 'duration_minutes'))) + (int) $this->input('final_duration_minutes');
-            if ($total > config('deliveries.max_duration_minutes')) {
-                $validator->errors()->add('steps', 'A duração total da aventura não pode ultrapassar 1440 minutos.');
+            $arrivalAt = $this->input('arrival_at');
+            $previousArrivalAt = CarbonImmutable::now();
+            foreach ($steps as $index => $step) {
+                if (! empty($step['arrival_at'])) {
+                    $stepArrivalAt = CarbonImmutable::parse($step['arrival_at']);
+                    if ($stepArrivalAt->lessThanOrEqualTo($previousArrivalAt)) {
+                        $validator->errors()->add("steps.$index.arrival_at", 'A chegada da parada deve ser posterior à etapa anterior.');
+                    }
+                    $previousArrivalAt = $stepArrivalAt;
+                } else {
+                    $previousArrivalAt = $previousArrivalAt->addMinutes((int) ($step['duration_minutes'] ?? 0));
+                }
+            }
+            if ($arrivalAt !== null && $arrivalAt !== '') {
+                if (CarbonImmutable::parse($arrivalAt)->lessThanOrEqualTo($previousArrivalAt)) {
+                    $validator->errors()->add('arrival_at', 'A chegada final deve ser posterior à última parada.');
+                }
+            } elseif (collect($steps)->contains(fn (array $step): bool => ! empty($step['arrival_at']))) {
+                $validator->errors()->add('arrival_at', 'Informe a data e hora de chegada final da aventura.');
+            } else {
+                $total = array_sum(array_map('intval', array_column($steps, 'duration_minutes'))) + (int) $this->input('final_duration_minutes');
+                if ($total > config('deliveries.max_duration_minutes')) {
+                    $validator->errors()->add('steps', 'A duração total da aventura não pode ultrapassar 1440 minutos.');
+                }
             }
         });
     }
