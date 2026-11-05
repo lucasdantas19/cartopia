@@ -1,5 +1,5 @@
 import { apiUrl } from './config'
-import type { AccountDelivery, ActiveMapDelivery, Delivery, DeliveryLocation, DeliveryMessage, DeliveryMode, DestinationSource, Session, UnlockType, User } from './domain'
+import type { AccountDelivery, ActiveMapDelivery, Delivery, DeliveryLocation, DeliveryMessage, DeliveryMode, DeliveryStep, DestinationSource, PaginationMeta, RouteVisibility, SavedLocation, SavedRecipient, Session, TrackedDelivery, UnlockType, User } from './domain'
 
 export class ApiError extends Error {
   constructor(
@@ -132,16 +132,16 @@ export function logout(token: string) {
   return request('/auth/logout', { method: 'POST' }, token)
 }
 
-export function fetchAccountDeliveries(token: string) {
-  return request<{ data: AccountDelivery[] }>('/account/deliveries', {}, token, true)
+export function fetchAccountDeliveries(token: string, page = 1) {
+  return request<{ data: AccountDelivery[]; meta: PaginationMeta }>(`/account/deliveries?page=${page}&per_page=5`, {}, token, true)
 }
 
 export function fetchActiveMapDeliveries(token: string) {
   return request<{ data: ActiveMapDelivery[] }>('/account/active-map-deliveries', {}, token, true)
 }
 
-export function fetchIncomingDeliveries(token: string) {
-  return request<{ data: AccountDelivery[] }>('/account/incoming-deliveries', {}, token, true)
+export function fetchIncomingDeliveries(token: string, page = 1) {
+  return request<{ data: AccountDelivery[]; meta: PaginationMeta }>(`/account/incoming-deliveries?page=${page}&per_page=5`, {}, token, true)
 }
 
 export function fetchIncomingDeliveryToken(publicId: string, token: string) {
@@ -180,6 +180,82 @@ export function updateDeliverySettings(allowContactDelivery: boolean, token: str
   }, token, true)
 }
 
+export function registerDevice(input: { push_token: string; platform: 'ios' | 'android'; device_name?: string }, token: string) {
+  return request<{ data: { id: number; registered: boolean } }>('/account/devices', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }, token, true)
+}
+
+export function fetchSavedLocations(token: string, page = 1) {
+  return request<{ data: SavedLocation[]; meta: PaginationMeta }>(`/account/locations?page=${page}&per_page=5`, {}, token, true)
+}
+
+export function saveLocation(input: Omit<SavedLocation, 'id' | 'is_default'>, token: string) {
+  return request<{ data: SavedLocation }>('/account/locations', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }, token, true)
+}
+
+export function updateLocation(id: number, input: Omit<SavedLocation, 'id' | 'is_default'>, token: string) {
+  return request<{ data: SavedLocation }>(`/account/locations/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  }, token, true)
+}
+
+export function setDefaultLocation(id: number, token: string) {
+  return request<{ data: SavedLocation }>(`/account/locations/${id}/default`, { method: 'PUT' }, token, true)
+}
+
+export function clearDefaultLocation(id: number, token: string) {
+  return request<{ data: SavedLocation }>(`/account/locations/${id}/default`, { method: 'DELETE' }, token, true)
+}
+
+export function deleteLocation(id: number, token: string) {
+  return request(`/account/locations/${id}`, { method: 'DELETE' }, token, true)
+}
+
+export function fetchSavedRecipients(token: string, page = 1, search = '') {
+  const query = new URLSearchParams({ page: String(page), per_page: '5' })
+  if (search.trim()) query.set('search', search.trim())
+  return request<{ data: SavedRecipient[]; meta: PaginationMeta }>(`/account/recipients?${query}`, {}, token, true)
+}
+
+export function saveRecipient(input: { name: string; email?: string; nickname?: string }, token: string) {
+  return request<{ data: SavedRecipient }>('/account/recipients', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }, token, true)
+}
+
+export function updateRecipient(id: number, input: { name: string; email?: string; nickname?: string }, token: string) {
+  return request<{ data: SavedRecipient }>(`/account/recipients/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  }, token, true)
+}
+
+export function deleteRecipient(id: number, token: string) {
+  return request(`/account/recipients/${id}`, { method: 'DELETE' }, token, true)
+}
+
+export function fetchTrackedDeliveries(token: string, page = 1) {
+  return request<{ data: TrackedDelivery[]; meta: PaginationMeta }>(`/account/tracked-deliveries?page=${page}&per_page=5`, {}, token, true)
+}
+
+export function saveTrackedDelivery(input: { public_id: string; access_token: string; role: 'sender' | 'recipient'; label?: string }, token: string) {
+  return request<{ data: { id: number; public_id: string; role: 'sender' | 'recipient' } }>('/account/tracked-deliveries', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }, token, true)
+}
+
+export function deleteTrackedDelivery(id: number, token: string) {
+  return request(`/account/tracked-deliveries/${id}`, { method: 'DELETE' }, token, true)
+}
+
 export type CreateDeliveryPayload = {
   message: string
   sender_name?: string
@@ -195,6 +271,9 @@ export type CreateDeliveryPayload = {
   destination_source?: DestinationSource
   courier: string
   duration_minutes: number
+  steps?: DeliveryStep[]
+  route_visibility?: RouteVisibility
+  final_duration_minutes?: number
 }
 
 export function createDelivery(payload: CreateDeliveryPayload, token?: string) {

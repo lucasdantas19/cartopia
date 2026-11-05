@@ -12,12 +12,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useSession } from '../../src/context/SessionContext'
 import { fetchDeliverySettings, updateDeliverySettings } from '../../src/api'
+import { requestAndRegisterNotifications } from '../../src/notifications'
 
 export default function AccountScreen() {
   const router = useRouter()
   const { session, loading, sessionExpired, signOut } = useSession()
   const [allowContactDelivery, setAllowContactDelivery] = useState(false)
   const [settingsLoading, setSettingsLoading] = useState(false)
+  const [notificationsState, setNotificationsState] = useState<'idle' | 'loading' | 'enabled' | 'denied' | 'error'>('idle')
 
   useEffect(() => {
     if (!session?.token) return
@@ -80,6 +82,58 @@ export default function AccountScreen() {
                 A aba Viagens reúne as mensagens enviadas para este e-mail
                 e os envios associados à sua conta.
               </Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Avisos de entrega</Text>
+              <Text style={styles.body}>
+                Receba avisos quando uma viagem começar ou uma carta chegar.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                disabled={notificationsState === 'loading' || notificationsState === 'enabled'}
+                onPress={() => {
+                  if (!session?.token) return
+                  setNotificationsState('loading')
+                  void requestAndRegisterNotifications(session.token)
+                    .then((result) => setNotificationsState(result === 'registered' ? 'enabled' : 'denied'))
+                    .catch(() => setNotificationsState('error'))
+                }}
+                style={styles.primaryButton}
+              >
+                <Text style={styles.primaryButtonText}>
+                  {notificationsState === 'loading'
+                    ? 'Ativando…'
+                    : notificationsState === 'enabled'
+                      ? 'Avisos ativados'
+                      : notificationsState === 'denied'
+                        ? 'Permissão não concedida'
+                        : 'Ativar avisos'}
+                </Text>
+              </Pressable>
+              {notificationsState === 'error' ? <Text style={styles.body}>Não foi possível registrar este aparelho. Tente novamente.</Text> : null}
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Organizar sua conta</Text>
+              <Text style={styles.body}>
+                Salve pessoas e lugares para criar entregas com menos digitação.
+              </Text>
+              <Link href="/recipients" asChild>
+                <Pressable accessibilityRole="button" style={styles.secondaryButton}>
+                  <Text style={styles.secondaryButtonText}>Destinatários salvos</Text>
+                </Pressable>
+              </Link>
+              <Link href="/locations" asChild>
+                <Pressable accessibilityRole="button" style={styles.secondaryButton}>
+                  <Text style={styles.secondaryButtonText}>Locais salvos</Text>
+                </Pressable>
+              </Link>
+              <Link href="/tracked" asChild>
+                <Pressable accessibilityRole="button" style={styles.secondaryButton}>
+                  <Text style={styles.secondaryButtonText}>Entregas acompanhadas</Text>
+                </Pressable>
+              </Link>
             </View>
 
             <View style={styles.card}>
@@ -196,6 +250,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   primaryButtonText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
+  secondaryButton: {
+    alignItems: 'center',
+    borderColor: colors.line,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: 10,
+    minHeight: 46,
+    paddingHorizontal: 14,
+  },
+  secondaryButtonText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
   signOutButton: {
     alignItems: 'center',
     justifyContent: 'center',

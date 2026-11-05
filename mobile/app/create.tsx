@@ -19,12 +19,12 @@ import {
   type ScrollViewInstance,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { ApiError, createDelivery, fetchRecipientDeliveryOptions, type RecipientDeliveryOptions } from '../src/api'
+import { ApiError, createDelivery, fetchRecipientDeliveryOptions, fetchSavedLocations, fetchSavedRecipients, type RecipientDeliveryOptions } from '../src/api'
 import { webUrl } from '../src/config'
 import { RealLocationPicker } from '../src/components/RealLocationPicker'
 import { useSession } from '../src/context/SessionContext'
 import { createDeliveryShareUrl, previewDeliveryShareUrl } from '../src/deepLinks'
-import type { DeliveryLocation, DeliveryMode, DestinationSource, UnlockType } from '../src/domain'
+import type { DeliveryLocation, DeliveryMode, DeliveryStep, DestinationSource, RouteVisibility, SavedLocation, SavedRecipient, UnlockType } from '../src/domain'
 import { saveRecentDelivery } from '../src/recentDeliveries'
 import {
   validateCreateDelivery,
@@ -66,6 +66,8 @@ export default function CreateScreen() {
   const [recipientName, setRecipientName] = useState('')
   const [recipientEmail, setRecipientEmail] = useState('')
   const [recipientOptions, setRecipientOptions] = useState<RecipientDeliveryOptions | null>(null)
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([])
+  const [savedRecipients, setSavedRecipients] = useState<SavedRecipient[]>([])
   const [destinationSource, setDestinationSource] = useState<DestinationSource>('specific')
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('real')
   const [unlockType, setUnlockType] = useState<UnlockType>('none')
@@ -78,6 +80,9 @@ export default function CreateScreen() {
   const [mapPickerOpen, setMapPickerOpen] = useState<'origin' | 'destination' | null>(null)
   const [courier, setCourier] = useState(couriers[0].code)
   const [duration, setDuration] = useState('30')
+  const [adventureEnabled, setAdventureEnabled] = useState(false)
+  const [routeVisibility, setRouteVisibility] = useState<RouteVisibility>('full')
+  const [steps, setSteps] = useState<DeliveryStep[]>([])
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<CreateDeliveryErrors>({})
   const [submitting, setSubmitting] = useState(false)
@@ -96,7 +101,7 @@ export default function CreateScreen() {
   const hasDraft = Boolean(
     senderName || recipientName || recipientEmail || message || origin || destination || deliveryMode !== 'real' ||
     unlockType !== 'none' || unlockPassword ||
-    originLocation || destinationLocation || courier !== couriers[0].code || duration !== '30',
+    originLocation || destinationLocation || courier !== couriers[0].code || duration !== '30' || adventureEnabled || steps.length > 0,
   )
   useEffect(() => {
     let active = true
@@ -116,6 +121,9 @@ export default function CreateScreen() {
       setDestinationSource(draft.destinationSource ?? 'specific')
       setCourier(draft.courier)
       setDuration(draft.duration)
+      setAdventureEnabled(draft.adventureEnabled ?? false)
+      setRouteVisibility(draft.routeVisibility ?? 'full')
+      setSteps(draft.steps ?? [])
       setStage(draft.stage)
       setDraftNotice('Rascunho recuperado neste dispositivo.')
     }).catch(() => {
@@ -127,14 +135,25 @@ export default function CreateScreen() {
   }, [])
 
   useEffect(() => {
+    if (!session?.token) return
+    void Promise.all([
+      fetchSavedLocations(session.token),
+      fetchSavedRecipients(session.token),
+    ]).then(([locationsResponse, recipientsResponse]) => {
+      setSavedLocations(locationsResponse.data)
+      setSavedRecipients(recipientsResponse.data)
+    }).catch(() => undefined)
+  }, [session?.token])
+
+  useEffect(() => {
     if (!draftReady || created || draftStopped.current) return
     const operation = hasDraft
-      ? deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, deliveryMode, unlockType, unlockPassword, origin, destination, originLocation, destinationLocation, destinationSource, courier, duration, stage })
+      ? deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, deliveryMode, unlockType, unlockPassword, origin, destination, originLocation, destinationLocation, destinationSource, courier, duration, stage, adventureEnabled, routeVisibility, steps })
       : deliveryDraftStore.clear()
     void operation.then(() => setDraftNotice(hasDraft ? 'Rascunho salvo neste dispositivo.' : '')).catch(() => {
       setDraftNotice('Não foi possível salvar o rascunho. Mantenha esta tela aberta para não perder o texto.')
     })
-  }, [draftReady, created, hasDraft, senderName, recipientName, recipientEmail, message, deliveryMode, unlockType, unlockPassword, origin, destination, originLocation, destinationLocation, destinationSource, courier, duration, stage])
+  }, [draftReady, created, hasDraft, senderName, recipientName, recipientEmail, message, deliveryMode, unlockType, unlockPassword, origin, destination, originLocation, destinationLocation, destinationSource, courier, duration, stage, adventureEnabled, routeVisibility, steps])
 
   const disablePrevention = usePreventRemove(hasDraft && !created, ({ repeat }) => {
     Alert.alert(
@@ -145,7 +164,7 @@ export default function CreateScreen() {
         {
           text: 'Guardar e sair',
           onPress: () => {
-            void deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, deliveryMode, unlockType, unlockPassword, origin, destination, originLocation, destinationLocation, destinationSource, courier, duration, stage }).then(() => {
+            void deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, deliveryMode, unlockType, unlockPassword, origin, destination, originLocation, destinationLocation, destinationSource, courier, duration, stage, adventureEnabled, routeVisibility, steps }).then(() => {
               draftStopped.current = true
               disablePrevention()
               repeat()
@@ -200,6 +219,9 @@ export default function CreateScreen() {
     setDestinationLocation(null)
     setCourier(couriers[0].code)
     setDuration('30')
+    setAdventureEnabled(false)
+    setRouteVisibility('full')
+    setSteps([])
     setStage(0)
     setDraftNotice('')
     setFieldErrors({})
@@ -253,6 +275,21 @@ export default function CreateScreen() {
       setError('Escolha a origem e o destino no mapa antes de criar a entrega.')
       return
     }
+    if (adventureEnabled && steps.length === 0) {
+      setError('Adicione pelo menos uma parada para criar uma aventura.')
+      setStage(1)
+      return
+    }
+    if (adventureEnabled && steps.some((step) => !step.title.trim() || !step.duration_minutes)) {
+      setError('Preencha o título e a duração de todas as paradas.')
+      setStage(1)
+      return
+    }
+    if (adventureEnabled && steps.reduce((total, step) => total + step.duration_minutes, 30) > 1440) {
+      setError('A duração total da aventura não pode ultrapassar 24 horas.')
+      setStage(1)
+      return
+    }
 
     const durationMinutes = Number(duration)
     setSubmitting(true)
@@ -274,6 +311,7 @@ export default function CreateScreen() {
         destination_source: deliveryMode === 'playful' ? 'specific' : destinationSource,
         courier,
         duration_minutes: durationMinutes,
+        ...(adventureEnabled ? { steps, route_visibility: routeVisibility, final_duration_minutes: 30 } : {}),
       }, session?.token)
 
       if (Platform.OS !== 'web') {
@@ -634,6 +672,26 @@ export default function CreateScreen() {
                   style={styles.input}
                 />
                 {fieldErrors.recipientName ? <Text style={styles.fieldError}>{fieldErrors.recipientName}</Text> : null}
+                {savedRecipients.length > 0 ? (
+                  <View style={styles.savedChoices}>
+                    <Text style={styles.fieldHint}>Usar destinatário salvo</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {savedRecipients.map((recipient) => (
+                        <Pressable
+                          key={recipient.id}
+                          accessibilityRole="button"
+                          onPress={() => {
+                            setRecipientName(recipient.name)
+                            setRecipientEmail(recipient.email ?? '')
+                          }}
+                          style={styles.savedChoice}
+                        >
+                          <Text style={styles.savedChoiceText}>{recipient.nickname || recipient.name}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : null}
               </View>
               <View
                 onLayout={(event) => {
@@ -825,6 +883,24 @@ export default function CreateScreen() {
                   />
                 ) : <>
                   <Text style={styles.fieldHint}>Escolha no mapa de onde a carta vai partir.</Text>
+                  {savedLocations.length > 0 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.savedLocations}>
+                      {savedLocations.map((location) => (
+                        <Pressable
+                          key={location.id}
+                          accessibilityRole="button"
+                          onPress={() => {
+                            setOrigin(location.label)
+                            setOriginLocation({ label: location.label, latitude: location.latitude, longitude: location.longitude })
+                            clearFieldError('origin')
+                          }}
+                          style={styles.savedChoice}
+                        >
+                          <Text style={styles.savedChoiceText}>{location.name}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  ) : null}
                   <Pressable
                   accessibilityRole="button"
                   onPress={() => setMapPickerOpen('origin')}
@@ -867,6 +943,24 @@ export default function CreateScreen() {
                   />
                 ) : <>
                 <Text style={styles.fieldHint}>{destinationSource === 'specific' ? 'Escolha no mapa onde a carta vai chegar.' : 'O destino protegido será resolvido pela conta do destinatário.'}</Text>
+                {destinationSource === 'specific' && savedLocations.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.savedLocations}>
+                    {savedLocations.map((location) => (
+                      <Pressable
+                        key={location.id}
+                        accessibilityRole="button"
+                        onPress={() => {
+                          setDestination(location.label)
+                          setDestinationLocation({ label: location.label, latitude: location.latitude, longitude: location.longitude })
+                          clearFieldError('destination')
+                        }}
+                        style={styles.savedChoice}
+                      >
+                        <Text style={styles.savedChoiceText}>{location.name}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ) : null}
                 {destinationSource === 'specific' ? <Pressable
                   accessibilityRole="button"
                   onPress={() => setMapPickerOpen('destination')}
@@ -929,6 +1023,99 @@ export default function CreateScreen() {
                   <Text style={styles.durationUnit}>minutos</Text>
                 </View>
                 {fieldErrors.duration ? <Text style={styles.fieldError}>{fieldErrors.duration}</Text> : null}
+              </View>
+              <View style={styles.adventureSection}>
+                <Text style={styles.label}>Aventura com paradas</Text>
+                <Text style={styles.fieldHint}>
+                  Adicione momentos especiais ao caminho. A duração de cada parada é contada a partir da etapa anterior.
+                </Text>
+                <View style={styles.destinationOptions}>
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: !adventureEnabled }}
+                    onPress={() => setAdventureEnabled(false)}
+                    style={[styles.destinationOption, !adventureEnabled ? styles.selectedLocationMode : undefined]}
+                  >
+                    <Text style={styles.destinationOptionTitle}>Entrega direta</Text>
+                    <Text style={styles.fieldHint}>Uma viagem simples entre origem e destino.</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: adventureEnabled }}
+                    onPress={() => setAdventureEnabled(true)}
+                    style={[styles.destinationOption, adventureEnabled ? styles.selectedLocationMode : undefined]}
+                  >
+                    <Text style={styles.destinationOptionTitle}>Criar uma aventura</Text>
+                    <Text style={styles.fieldHint}>Revele a rota aos poucos, com paradas e descrições.</Text>
+                  </Pressable>
+                </View>
+                {adventureEnabled ? (
+                  <>
+                    <Text style={styles.label}>Visibilidade da rota</Text>
+                    <View style={styles.destinationOptions}>
+                      <Pressable
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: routeVisibility === 'full' }}
+                        onPress={() => setRouteVisibility('full')}
+                        style={[styles.destinationOption, routeVisibility === 'full' ? styles.selectedLocationMode : undefined]}
+                      >
+                        <Text style={styles.destinationOptionTitle}>Rota completa</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: routeVisibility === 'progressive' }}
+                        onPress={() => setRouteVisibility('progressive')}
+                        style={[styles.destinationOption, routeVisibility === 'progressive' ? styles.selectedLocationMode : undefined]}
+                      >
+                        <Text style={styles.destinationOptionTitle}>Revelação progressiva</Text>
+                      </Pressable>
+                    </View>
+                    {steps.map((step, index) => (
+                      <View key={`${index}-${step.title}`} style={styles.stepCard}>
+                        <Text style={styles.stepNumber}>PARADA {index + 1}</Text>
+                        <TextInput
+                          accessibilityLabel={`Título da parada ${index + 1}`}
+                          maxLength={120}
+                          onChangeText={(value) => setSteps((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: value } : item))}
+                          placeholder="Título da parada"
+                          style={styles.input}
+                          value={step.title}
+                        />
+                        <TextInput
+                          accessibilityLabel={`Descrição da parada ${index + 1}`}
+                          maxLength={500}
+                          multiline
+                          onChangeText={(value) => setSteps((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, description: value } : item))}
+                          placeholder="O que acontece neste momento?"
+                          style={[styles.input, styles.stepDescription]}
+                          value={step.description ?? ''}
+                        />
+                        <View style={styles.durationRow}>
+                          <TextInput
+                            accessibilityLabel={`Duração da parada ${index + 1} em minutos`}
+                            keyboardType="number-pad"
+                            maxLength={4}
+                            onChangeText={(value) => setSteps((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, duration_minutes: Number(value.replace(/\D/g, '')) || 0 } : item))}
+                            style={[styles.input, styles.durationInput]}
+                            value={step.duration_minutes ? String(step.duration_minutes) : ''}
+                          />
+                          <Text style={styles.durationUnit}>minutos até a próxima parada</Text>
+                        </View>
+                        <Pressable onPress={() => setSteps((current) => current.filter((_, itemIndex) => itemIndex !== index))} style={styles.removeStepButton}>
+                          <Text style={styles.removeStepText}>Remover parada</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={steps.length >= 12}
+                      onPress={() => setSteps((current) => [...current, { title: '', description: '', duration_minutes: 15 }])}
+                      style={styles.addStepButton}
+                    >
+                      <Text style={styles.addStepText}>+ Adicionar parada</Text>
+                    </Pressable>
+                  </>
+                ) : null}
               </View>
               <View style={styles.challengeSection}>
                 <Text style={styles.label}>Desbloqueio da carta</Text>
@@ -1007,6 +1194,11 @@ export default function CreateScreen() {
                 {origin || 'Origem não escolhida'} → {destination || 'Destino não escolhido'}
               </Text>
               <Text style={styles.summaryDetail}>{selectedCourier.label} · {duration} minutos</Text>
+              {adventureEnabled ? (
+                <Text style={styles.summaryDetail}>
+                  Aventura com {steps.length} {steps.length === 1 ? 'parada' : 'paradas'} · {routeVisibility === 'progressive' ? 'revelação progressiva' : 'rota completa'}
+                </Text>
+              ) : null}
               {Number(duration) > 0 && Number(duration) <= 1440 ? (
                 <Text style={styles.fieldHint}>
                   Chegada estimada se enviar agora: {new Date(Date.now() + Number(duration) * 60000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.
@@ -1066,6 +1258,10 @@ const styles = StyleSheet.create({
   label: { color: colors.ink, fontSize: 15, fontWeight: '700', marginBottom: 8, marginTop: 16 },
   optional: { color: '#8a8193', fontWeight: '400' },
   fieldHint: { color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 10 },
+  savedChoices: { marginTop: 10 },
+  savedLocations: { marginBottom: 8, marginTop: 10 },
+  savedChoice: { backgroundColor: '#f0eafa', borderColor: colors.line, borderRadius: 10, borderWidth: 1, justifyContent: 'center', marginRight: 8, minHeight: 42, paddingHorizontal: 12 },
+  savedChoiceText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   fieldError: { color: '#b42318', fontSize: 14, lineHeight: 20, marginTop: 8 },
   input: { backgroundColor: '#fffdfb', borderColor: colors.line, borderRadius: 12, borderWidth: 1, fontSize: 16, padding: 15 },
   messageInput: { minHeight: 130 },
@@ -1077,6 +1273,14 @@ const styles = StyleSheet.create({
   destinationOption: { backgroundColor: '#fffdfb', borderColor: colors.line, borderRadius: 14, borderWidth: 1, marginTop: 8, padding: 12 },
   selectedLocationMode: { borderColor: colors.primary, borderWidth: 2 },
   challengeSection: { marginTop: 22 },
+  adventureSection: { marginTop: 22 },
+  stepCard: { backgroundColor: '#f8f6fc', borderColor: colors.line, borderRadius: 14, borderWidth: 1, marginTop: 12, padding: 12 },
+  stepNumber: { color: colors.primary, fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 4 },
+  stepDescription: { minHeight: 76, marginTop: 10, textAlignVertical: 'top' },
+  addStepButton: { alignItems: 'center', borderColor: colors.primary, borderRadius: 12, borderWidth: 1, justifyContent: 'center', marginTop: 12, minHeight: 46 },
+  addStepText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+  removeStepButton: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: 40, marginTop: 4 },
+  removeStepText: { color: '#b42318', fontSize: 13, fontWeight: '700' },
   destinationOptionTitle: { color: colors.ink, fontSize: 14, fontWeight: '800', marginBottom: 3 },
   courierOption: { alignItems: 'center', borderColor: colors.line, borderRadius: 16, borderWidth: 1, flex: 1, minWidth: 0, paddingHorizontal: 4, paddingVertical: 10 },
   selectedCourierOption: { backgroundColor: colors.sand, borderColor: colors.primary },

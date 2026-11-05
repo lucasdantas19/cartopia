@@ -1,6 +1,6 @@
 import { StyleSheet, View, type ColorValue } from 'react-native'
 
-type Props = { name: 'home' | 'letter' | 'account'; color: ColorValue }
+type Props = { name: 'home' | 'letter' | 'account' | 'map'; color: ColorValue }
 
 export function TabIcon({ name, color }: Props) {
   return (
@@ -20,10 +20,16 @@ export function TabIcon({ name, color }: Props) {
           <View style={[styles.envelope, { borderColor: color }]} />
           <View style={[styles.flap, { borderColor: color }]} />
         </>
-      ) : (
+      ) : name === 'account' ? (
         <>
           <View style={[styles.head, { borderColor: color }]} />
           <View style={[styles.shoulders, { borderColor: color }]} />
+        </>
+      ) : (
+        <>
+          <View style={[styles.mapFrame, { borderColor: color }]} />
+          <View style={[styles.mapFold, { borderColor: color }]} />
+          <View style={[styles.mapPin, { backgroundColor: color }]} />
         </>
       )}
     </View>
@@ -39,4 +45,7 @@ const styles = StyleSheet.create({
   flap: { position: 'absolute', left: 6, top: 2, width: 12, height: 12, borderBottomWidth: 2, borderRightWidth: 2, transform: [{ rotate: '45deg' }] },
   head: { position: 'absolute', left: 8, top: 1, width: 9, height: 9, borderWidth: 2, borderRadius: 5 },
   shoulders: { position: 'absolute', left: 3, top: 13, width: 19, height: 10, borderWidth: 2, borderTopLeftRadius: 10, borderTopRightRadius: 10 },
+  mapFrame: { position: 'absolute', left: 2, top: 4, width: 20, height: 17, borderWidth: 2, borderRadius: 3 },
+  mapFold: { position: 'absolute', left: 8, top: 4, width: 7, height: 17, borderLeftWidth: 1, borderRightWidth: 1, transform: [{ skewY: '-15deg' }] },
+  mapPin: { position: 'absolute', left: 10, top: 7, width: 5, height: 5, borderRadius: 3 },
 })

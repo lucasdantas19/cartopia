@@ -521,6 +521,40 @@ export default function TrackScreen() {
               ) : null}
             </View>
 
+            {delivery.steps && delivery.steps.length > 0 ? (
+              <View style={styles.stepsCard}>
+                <Text style={styles.sectionEyebrow}>PASSAPORTE DA AVENTURA</Text>
+                <Text style={styles.stepsTitle}>Paradas da viagem</Text>
+                {delivery.steps.map((step, index) => {
+                  const arrived = step.arrives_at ? new Date(step.arrives_at).getTime() <= Date.now() : false
+                  const current = !arrived && (index === 0 || !delivery.steps?.[index - 1]?.arrives_at || new Date(delivery.steps[index - 1].arrives_at!).getTime() <= Date.now())
+                  return (
+                    <View key={`${step.title}-${index}`} style={[styles.stepRow, current ? styles.stepCurrent : undefined]}>
+                      <View style={[styles.stepMarker, arrived ? styles.stepCompleted : undefined]}>
+                        <Text style={styles.stepMarkerText}>{arrived ? '✓' : index + 1}</Text>
+                      </View>
+                      <View style={styles.stepContent}>
+                        <View style={styles.stepHeading}>
+                          <Text style={styles.stepTitle}>{step.title}</Text>
+                          {current ? <Text style={styles.stepNow}>AGORA</Text> : null}
+                        </View>
+                        {step.description ? <Text style={styles.stepDescription}>{step.description}</Text> : null}
+                        {step.arrives_at ? <Text style={styles.stepTime}>{arrived ? 'Chegou' : `Chegada: ${arrivalLabel(step.arrives_at) ?? 'em breve'}`}</Text> : null}
+                      </View>
+                    </View>
+                  )
+                })}
+                {delivery.hidden_steps_count ? (
+                  <Text style={styles.hiddenSteps}>
+                    {delivery.hidden_steps_count} {delivery.hidden_steps_count === 1 ? 'parada ainda será revelada' : 'paradas ainda serão reveladas'} durante a viagem.
+                  </Text>
+                ) : null}
+                {delivery.next_step_arrives_at ? (
+                  <Text style={styles.nextStep}>Próxima revelação: {arrivalLabel(delivery.next_step_arrives_at) ?? 'em breve'}</Text>
+                ) : null}
+              </View>
+            ) : null}
+
             {courier ? (
               <View style={styles.courierCard}>
                 <Image accessible={false} source={courier.image} style={styles.courierImage} />
@@ -963,6 +997,21 @@ const styles = StyleSheet.create({
   routePlace: {
     minHeight: 52,
   },
+  stepsCard: { backgroundColor: '#ffffff', borderColor: colors.line, borderRadius: 18, borderWidth: 1, marginTop: 14, padding: 18 },
+  stepsTitle: { color: colors.ink, fontSize: 21, fontWeight: '800', marginBottom: 14 },
+  stepRow: { flexDirection: 'row', gap: 12, paddingBottom: 16, paddingTop: 4 },
+  stepCurrent: { backgroundColor: '#f8f6fc', borderRadius: 12, paddingHorizontal: 10 },
+  stepMarker: { alignItems: 'center', borderColor: colors.line, borderRadius: 14, borderWidth: 1, height: 28, justifyContent: 'center', width: 28 },
+  stepCompleted: { backgroundColor: colors.primary, borderColor: colors.primary },
+  stepMarkerText: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+  stepContent: { flex: 1 },
+  stepHeading: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  stepTitle: { color: colors.ink, flexShrink: 1, fontSize: 16, fontWeight: '800' },
+  stepNow: { color: colors.primary, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  stepDescription: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  stepTime: { color: colors.muted, fontSize: 12, marginTop: 5 },
+  hiddenSteps: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 4 },
+  nextStep: { color: colors.primary, fontSize: 13, fontWeight: '700', marginTop: 8 },
   placeLabel: {
     color: '#8a8193',
     fontSize: 11,

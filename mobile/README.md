@@ -46,6 +46,12 @@ npm start -- --lan
 Abra o QR code com o Expo Go. Se o celular não conectar, confirme que o firewall permite conexões TCP na porta 8000 e que computador e celular estão na mesma rede.
 Para usar os links web, permita também a porta TCP 5173. Em produção, configure `EXPO_PUBLIC_WEB_URL` com a origem pública do frontend.
 
+Em builds de produção, use `EXPO_PUBLIC_WEB_URL` com HTTPS para gerar os
+Universal Links do iOS e App Links do Android. Publique também os arquivos
+`frontend/public/.well-known/apple-app-site-association` e
+`frontend/public/.well-known/assetlinks.json`, substituindo o identificador da
+Apple e a impressão digital SHA-256 do certificado Android de produção.
+
 ## Escolher lugares reais no mapa
 
 A tela de criação pede uma origem e um destino reais. Em cada campo, é possível pesquisar um lugar ou tocar no mapa para marcar o ponto. A busca usa o mesmo token público do Mapbox usado pelo frontend web:

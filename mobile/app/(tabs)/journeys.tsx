@@ -22,7 +22,7 @@ import {
   openDeliveryMessage,
 } from '../../src/api'
 import { useSession } from '../../src/context/SessionContext'
-import type { AccountDelivery } from '../../src/domain'
+import type { AccountDelivery, PaginationMeta } from '../../src/domain'
 import {
   arrivalLabel,
   deliveryProgressPercent,
@@ -99,6 +99,43 @@ function DeliveryCard({ delivery, kind, onOpen, onOpenLetter }: DeliveryCardProp
   )
 }
 
+type PaginationControlsProps = {
+  meta: PaginationMeta | null
+  onChange: (page: number) => void
+}
+
+function PaginationControls({ meta, onChange }: PaginationControlsProps) {
+  if (!meta || meta.last_page <= 1) return null
+
+  return (
+    <View style={styles.pagination}>
+      <Pressable
+        accessibilityLabel="Página anterior"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: meta.current_page === 1 }}
+        disabled={meta.current_page === 1}
+        onPress={() => onChange(meta.current_page - 1)}
+        style={styles.paginationButton}
+      >
+        <Text style={styles.paginationButtonText}>Anterior</Text>
+      </Pressable>
+      <Text style={styles.paginationLabel}>
+        Página {meta.current_page} de {meta.last_page}
+      </Text>
+      <Pressable
+        accessibilityLabel="Próxima página"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: meta.current_page === meta.last_page }}
+        disabled={meta.current_page === meta.last_page}
+        onPress={() => onChange(meta.current_page + 1)}
+        style={styles.paginationButton}
+      >
+        <Text style={styles.paginationButtonText}>Próxima</Text>
+      </Pressable>
+    </View>
+  )
+}
+
 type LocalDeliveriesProps = {
   deliveries: RecentDelivery[]
   onOpen: (delivery: RecentDelivery) => void
@@ -151,6 +188,10 @@ export default function JourneysScreen() {
   const [selected, setSelected] = useState<'incoming' | 'sent'>('incoming')
   const [deliveries, setDeliveries] = useState<AccountDelivery[]>([])
   const [incoming, setIncoming] = useState<AccountDelivery[]>([])
+  const [sentMeta, setSentMeta] = useState<PaginationMeta | null>(null)
+  const [incomingMeta, setIncomingMeta] = useState<PaginationMeta | null>(null)
+  const [sentPage, setSentPage] = useState(1)
+  const [incomingPage, setIncomingPage] = useState(1)
   const [recent, setRecent] = useState<RecentDelivery[]>([])
   const [recentLoading, setRecentLoading] = useState(Platform.OS !== 'web')
   const [recentError, setRecentError] = useState('')
@@ -184,7 +225,10 @@ export default function JourneysScreen() {
     }
   }, [])
 
-  const loadAccount = useCallback(async (showRefresh = false) => {
+  const loadAccount = useCallback(async (
+    showRefresh = false,
+    pages: { sent: number; incoming: number } = { sent: sentPage, incoming: incomingPage },
+  ) => {
     if (!session) return
 
     const currentRequest = ++requestId.current
@@ -194,13 +238,17 @@ export default function JourneysScreen() {
 
     try {
       const [sentResponse, incomingResponse] = await Promise.all([
-        fetchAccountDeliveries(session.token),
-        fetchIncomingDeliveries(session.token),
+        fetchAccountDeliveries(session.token, pages.sent),
+        fetchIncomingDeliveries(session.token, pages.incoming),
       ])
       if (requestId.current !== currentRequest) return
 
       setDeliveries(sentResponse.data)
       setIncoming(incomingResponse.data)
+      setSentMeta(sentResponse.meta)
+      setIncomingMeta(incomingResponse.meta)
+      setSentPage(sentResponse.meta.current_page)
+      setIncomingPage(incomingResponse.meta.current_page)
       loadedToken.current = session.token
     } catch (caught) {
       if (requestId.current === currentRequest) {
@@ -212,7 +260,18 @@ export default function JourneysScreen() {
         setRefreshing(false)
       }
     }
-  }, [session?.token])
+  }, [incomingPage, sentPage, session?.token])
+
+  function changePage(kind: 'incoming' | 'sent', page: number) {
+    const pages = {
+      sent: kind === 'sent' ? page : sentPage,
+      incoming: kind === 'incoming' ? page : incomingPage,
+    }
+
+    if (kind === 'sent') setSentPage(page)
+    else setIncomingPage(page)
+    void loadAccount(false, pages)
+  }
 
   useFocusEffect(useCallback(() => {
     void loadAccount()
@@ -400,7 +459,11 @@ export default function JourneysScreen() {
                     onOpen={() => openIncoming(delivery.public_id)}
                     onOpenLetter={() => { if (!letterLoading) void openIncomingLetter(delivery) }}
                   />
-                )) : null}
+              )) : null}
+                <PaginationControls
+                  meta={incomingMeta}
+                  onChange={(page) => changePage('incoming', page)}
+                />
               </>
             )}
             <LocalDeliveries
@@ -438,6 +501,10 @@ export default function JourneysScreen() {
                 onOpen={() => openSent(delivery.public_id)}
               />
             )) : null}
+            <PaginationControls
+              meta={sentMeta}
+              onChange={(page) => changePage('sent', page)}
+            />
 
             <LocalDeliveries
               deliveries={localSent}
@@ -667,4 +734,22 @@ const styles = StyleSheet.create({
   localOpenText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
   localRemoveButton: { justifyContent: 'center', minHeight: 44 },
   localRemoveText: { color: colors.muted, fontSize: 14, fontWeight: '700' },
+  pagination: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    marginTop: 4,
+  },
+  paginationButton: {
+    alignItems: 'center',
+    borderColor: colors.line,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  paginationButtonText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  paginationLabel: { color: colors.muted, fontSize: 13, fontWeight: '700' },
 })

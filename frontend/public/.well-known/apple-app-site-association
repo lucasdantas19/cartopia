@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["COM_CARTOPIA_APP_PLACEHOLDER"],
+        "components": [
+          { "/": "/d/*" }
+        ]
+      }
+    ]
+  }
+}

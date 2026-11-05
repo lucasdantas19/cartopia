@@ -8,6 +8,16 @@ export type User = {
 export type DestinationSource = 'specific' | 'recipient_default' | 'contact_preference'
 export type DeliveryMode = 'real' | 'playful'
 export type UnlockType = 'none' | 'password' | 'hangman'
+export type RouteVisibility = 'full' | 'progressive'
+
+export type DeliveryStep = {
+  title: string
+  description: string | null
+  duration_minutes: number
+  location?: DeliveryLocation | null
+  starts_at?: string
+  arrives_at?: string
+}
 
 export type Session = {
   token: string
@@ -32,6 +42,10 @@ export type Delivery = {
   current_step: number
   courier: string
   access_role: 'sender' | 'recipient' | null
+  route_visibility?: RouteVisibility
+  steps?: DeliveryStep[]
+  hidden_steps_count?: number
+  next_step_arrives_at?: string | null
 }
 
 export type DeliveryMessage = {
@@ -52,6 +66,35 @@ export type AccountDelivery = {
   starts_at?: string | null
   arrives_at: string | null
   opened_at?: string | null
+}
+
+export type PaginationMeta = {
+  total: number
+  per_page: number
+  current_page: number
+  last_page: number
+}
+
+export type SavedLocation = {
+  id: number
+  name: string
+  label: string
+  latitude: number
+  longitude: number
+  is_default: boolean
+}
+
+export type SavedRecipient = {
+  id: number
+  name: string
+  email: string | null
+  nickname: string | null
+}
+
+export type TrackedDelivery = AccountDelivery & {
+  id: number
+  label: string | null
+  role: 'sender' | 'recipient'
 }
 
 export type ActiveMapDelivery = Pick<Delivery,

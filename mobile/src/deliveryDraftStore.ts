@@ -1,4 +1,4 @@
-import type { DeliveryLocation, DeliveryMode, DestinationSource, UnlockType } from './domain'
+import type { DeliveryLocation, DeliveryMode, DeliveryStep, DestinationSource, RouteVisibility, UnlockType } from './domain'
 
 export type DeliveryDraft = {
   senderName: string
@@ -16,6 +16,9 @@ export type DeliveryDraft = {
   courier: string
   duration: string
   stage: number
+  adventureEnabled?: boolean
+  routeVisibility?: RouteVisibility
+  steps?: DeliveryStep[]
 }
 
 export interface DraftStorage {
@@ -46,12 +49,15 @@ export function parseDraft(value: string): DeliveryDraft | null {
     }
     if (!['paper-swallow', 'postal-cat', 'little-dragon'].includes(draft.courier)
       || (draft.deliveryMode !== undefined && !['real', 'playful'].includes(draft.deliveryMode))
-      || (draft.unlockType !== undefined && !['none', 'password'].includes(draft.unlockType))
+      || (draft.unlockType !== undefined && !['none', 'password', 'hangman'].includes(draft.unlockType))
       || (draft.unlockPassword !== undefined && (typeof draft.unlockPassword !== 'string' || draft.unlockPassword.length > 120))
       || (draft.origin !== undefined && (typeof draft.origin !== 'string' || draft.origin.length > 160))
       || (draft.destination !== undefined && (typeof draft.destination !== 'string' || draft.destination.length > 160))
       || ![0, 1, 2].includes(draft.stage)
       || (draft.destinationSource !== undefined && !['specific', 'recipient_default', 'contact_preference'].includes(draft.destinationSource))
+      || (draft.adventureEnabled !== undefined && typeof draft.adventureEnabled !== 'boolean')
+      || (draft.routeVisibility !== undefined && !['full', 'progressive'].includes(draft.routeVisibility))
+      || (draft.steps !== undefined && (!Array.isArray(draft.steps) || draft.steps.length > 12 || draft.steps.some((step) => !step || typeof step.title !== 'string' || step.title.length > 120 || typeof step.description !== 'string' || step.description.length > 500 || !Number.isInteger(step.duration_minutes) || step.duration_minutes < 1 || step.duration_minutes > 1440)))
       || !validLocation(draft.originLocation) || !validLocation(draft.destinationLocation)) return null
     return draft
   } catch {
