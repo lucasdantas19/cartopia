@@ -13,6 +13,9 @@ class AdminDeliveryController extends Controller
     {
         $query = trim((string) $request->query('q', ''));
         $status = $request->query('status');
+        $owner = $request->query('owner');
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
         $page = max(1, (int) $request->query('page', 1));
         $perPage = min(50, max(1, (int) $request->query('per_page', 20)));
         $builder = Delivery::query()->latest('created_at');
@@ -24,6 +27,17 @@ class AdminDeliveryController extends Controller
                     ->orWhereRaw('LOWER(origin) LIKE ?', [$search])
                     ->orWhereRaw('LOWER(destination) LIKE ?', [$search]);
             });
+        }
+        if ($owner === 'anonymous') {
+            $builder->whereNull('user_id');
+        } elseif ($owner === 'account') {
+            $builder->whereNotNull('user_id');
+        }
+        if (is_string($dateFrom) && $dateFrom !== '') {
+            $builder->whereDate('created_at', '>=', $dateFrom);
+        }
+        if (is_string($dateTo) && $dateTo !== '') {
+            $builder->whereDate('created_at', '<=', $dateTo);
         }
         $now = CarbonImmutable::now('UTC');
         if ($status === 'SCHEDULED') $builder->where('starts_at', '>', $now);
@@ -83,6 +97,7 @@ class AdminDeliveryController extends Controller
             'steps_count' => count($delivery->routeSteps()),
             'route_visibility' => $delivery->route_visibility,
             'created_at' => $delivery->created_at?->toISOString(),
+            'requester_type' => $delivery->user_id === null ? 'anonymous' : 'account',
         ];
     }
 }

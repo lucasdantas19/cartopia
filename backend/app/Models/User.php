@@ -30,6 +30,11 @@ class User extends Authenticatable
         return $this->hasMany(Delivery::class);
     }
 
+    public function recipientDeliveries()
+    {
+        return $this->hasMany(Delivery::class, 'recipient_user_id');
+    }
+
     public function savedLocations()
     {
         return $this->hasMany(SavedLocation::class);

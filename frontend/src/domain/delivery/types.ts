@@ -115,6 +115,53 @@ export interface AdminDeliverySummary {
   steps_count: number
   route_visibility: RouteVisibility
   created_at: string
+  requester_type: 'anonymous' | 'account'
+}
+
+export interface AdminUserSummary {
+  id: number
+  name: string
+  email: string
+  allow_contact_delivery: boolean
+  created_at: string
+  locations_count: number
+  sent_deliveries_count: number
+  received_deliveries_count: number
+  tracked_deliveries_count: number
+}
+
+export interface AdminUserLocation {
+  id: number
+  name: string
+  label: string
+  latitude: number
+  longitude: number
+  is_default: boolean
+}
+
+export interface AdminUserDelivery {
+  public_id: string
+  sender_name: string | null
+  recipient_name: string
+  recipient_email: string | null
+  origin: string
+  destination: string
+  status: DeliveryStatus
+  progress: number
+  starts_at: string
+  arrives_at: string
+  created_at: string
+}
+
+export interface AdminUserDetails extends AdminUserSummary {
+  locations: AdminUserLocation[]
+  sent_deliveries: AdminUserDelivery[]
+  received_deliveries: AdminUserDelivery[]
+  tracked_deliveries: (AdminUserDelivery & {
+    id: number
+    label: string | null
+    role: 'sender' | 'recipient'
+  })[]
 }
 
 export interface DeliveryMessage {

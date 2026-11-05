@@ -5,6 +5,8 @@ import type {
   DeliveryMessage,
   ApiErrorPayload,
   AdminDeliverySummary,
+  AdminUserDetails,
+  AdminUserSummary,
 } from '../domain/delivery/types'
 import { resolveApiBaseUrl } from '../config/runtimeConfig.ts'
 import { shouldExpireAccountSession } from './accountSession.ts'
@@ -74,6 +76,9 @@ export interface SavedRecipient { id: number; name: string; email: string | null
 export interface AccountDelivery { public_id: string; recipient_name: string; recipient_email: string | null; origin: string; destination: string; status: string; progress: number; starts_at: string; arrives_at: string }
 export interface IncomingDelivery { public_id: string; sender_name: string | null; recipient_name: string; origin: string; destination: string; status: string; progress: number; arrives_at: string; opened_at: string | null }
 export interface TrackedDelivery { id: number; public_id: string; label: string | null; role: 'sender' | 'recipient'; recipient_name: string; origin: string; destination: string; status: string; progress: number; arrives_at: string }
+export interface PaginationMeta { total: number; per_page: number; current_page: number; last_page: number }
+export type AccountListKey = 'deliveries' | 'locations' | 'recipients' | 'trackedDeliveries' | 'unopenedDeliveries' | 'openedLetters' | 'deliveryPreferences'
+export type AccountPages = Partial<Record<AccountListKey, number>>
 export interface ActiveMapDelivery {
   public_id: string
   recipient_name: string
@@ -100,17 +105,40 @@ export function logout() {
   return request<{ data: { logged_out: boolean } }>('/auth/logout', { method: 'POST' })
 }
 
-export function fetchAccount() {
+function accountListPath(path: string, page: number) {
+  return `${path}?page=${page}&per_page=5`
+}
+
+function accountListPathWithParams(path: string, page: number, params: Record<string, string>) {
+  const searchParams = new URLSearchParams({ page: String(page), per_page: '5', ...params })
+  return `${path}?${searchParams.toString()}`
+}
+
+export function fetchAccount(pages: AccountPages = {}, recipientSearch = '') {
+  const recipientsPath = recipientSearch.trim()
+    ? accountListPathWithParams('/account/recipients', pages.recipients ?? 1, { search: recipientSearch.trim() })
+    : accountListPath('/account/recipients', pages.recipients ?? 1)
+
   return Promise.all([
     request<{ data: AuthUser }>('/auth/me'),
-    request<{ data: AccountDelivery[] }>('/account/deliveries'),
-    request<{ data: SavedLocation[] }>('/account/locations'),
-    request<{ data: SavedRecipient[] }>('/account/recipients'),
-    request<{ data: TrackedDelivery[] }>('/account/tracked-deliveries'),
-    request<{ data: IncomingDelivery[] }>('/account/incoming-deliveries'),
+    request<{ data: AccountDelivery[]; meta: PaginationMeta }>(accountListPath('/account/deliveries', pages.deliveries ?? 1)),
+    request<{ data: SavedLocation[]; meta: PaginationMeta }>(accountListPath('/account/locations', pages.locations ?? 1)),
+    request<{ data: SavedRecipient[]; meta: PaginationMeta }>(recipientsPath),
+    request<{ data: TrackedDelivery[]; meta: PaginationMeta }>(accountListPath('/account/tracked-deliveries', pages.trackedDeliveries ?? 1)),
+    request<{ data: IncomingDelivery[]; meta: PaginationMeta }>(`${accountListPath('/account/incoming-deliveries', pages.unopenedDeliveries ?? 1)}&opened=false`),
+    request<{ data: IncomingDelivery[]; meta: PaginationMeta }>(`${accountListPath('/account/incoming-deliveries', pages.openedLetters ?? 1)}&opened=true`),
     request<{ data: DeliverySettings }>('/account/delivery-settings'),
-    request<{ data: DeliveryPreference[] }>('/account/delivery-preferences'),
-  ]).then(([user, deliveries, locations, recipients, trackedDeliveries, incomingDeliveries, deliverySettings, deliveryPreferences]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data, trackedDeliveries: trackedDeliveries.data, incomingDeliveries: incomingDeliveries.data, deliverySettings: deliverySettings.data, deliveryPreferences: deliveryPreferences.data }))
+    request<{ data: DeliveryPreference[]; meta: PaginationMeta }>(accountListPath('/account/delivery-preferences', pages.deliveryPreferences ?? 1)),
+  ]).then(([user, deliveries, locations, recipients, trackedDeliveries, unopenedDeliveries, openedLetters, deliverySettings, deliveryPreferences]) => ({ ...user.data, deliveries: deliveries.data, locations: locations.data, recipients: recipients.data, trackedDeliveries: trackedDeliveries.data, incomingDeliveries: [...unopenedDeliveries.data, ...openedLetters.data], deliverySettings: deliverySettings.data, deliveryPreferences: deliveryPreferences.data, pagination: { deliveries: deliveries.meta, locations: locations.meta, recipients: recipients.meta, trackedDeliveries: trackedDeliveries.meta, unopenedDeliveries: unopenedDeliveries.meta, openedLetters: openedLetters.meta, deliveryPreferences: deliveryPreferences.meta } }))
+}
+
+export function fetchRecipientDeliveries(recipient: { name: string; email: string | null }, page = 1) {
+  const params: Record<string, string> = { recipient_name: recipient.name }
+  if (recipient.email) params.recipient_email = recipient.email
+
+  return request<{ data: AccountDelivery[]; meta: PaginationMeta }>(
+    accountListPathWithParams('/account/deliveries', page, params),
+  )
 }
 
 export function fetchActiveMapDeliveries() {
@@ -119,9 +147,19 @@ export function fetchActiveMapDeliveries() {
 
 export function fetchSavedItems() {
   return Promise.all([
-    request<{ data: SavedLocation[] }>('/account/locations'),
-    request<{ data: SavedRecipient[] }>('/account/recipients'),
+    request<{ data: SavedLocation[] }>('/account/locations?per_page=20'),
+    request<{ data: SavedRecipient[] }>('/account/recipients?per_page=20'),
   ]).then(([locations, recipients]) => ({ locations: locations.data, recipients: recipients.data }))
+}
+
+export async function fetchAllSavedLocations(): Promise<SavedLocation[]> {
+  const firstPage = await request<{ data: SavedLocation[]; meta: PaginationMeta }>('/account/locations?page=1&per_page=20')
+  const pages = Array.from({ length: Math.max(0, firstPage.meta.last_page - 1) }, (_, index) => index + 2)
+  const remainingPages = await Promise.all(
+    pages.map((page) => request<{ data: SavedLocation[] }>(`/account/locations?page=${page}&per_page=20`)),
+  )
+
+  return [firstPage.data, ...remainingPages.map((response) => response.data)].flat()
 }
 
 export function fetchRecipientDeliveryOptions(recipientEmail: string) {
@@ -150,8 +188,16 @@ export function saveLocation(input: Omit<SavedLocation, 'id' | 'is_default'> & {
   return request<{ data: SavedLocation }>('/account/locations', { method: 'POST', body: JSON.stringify(input) })
 }
 
+export function updateLocation(id: number, input: Omit<SavedLocation, 'id' | 'is_default'>) {
+  return request<{ data: SavedLocation }>(`/account/locations/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
 export function setDefaultLocation(id: number) {
   return request<{ data: SavedLocation }>(`/account/locations/${id}/default`, { method: 'PUT' })
+}
+
+export function clearDefaultLocation(id: number) {
+  return request<{ data: SavedLocation }>(`/account/locations/${id}/default`, { method: 'DELETE' })
 }
 
 export function deleteLocation(id: number) {
@@ -160,6 +206,10 @@ export function deleteLocation(id: number) {
 
 export function saveRecipient(input: { name: string; email?: string; nickname?: string }) {
   return request<{ data: SavedRecipient }>('/account/recipients', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function updateRecipient(id: number, input: { name: string; email?: string; nickname?: string }) {
+  return request<{ data: SavedRecipient }>(`/account/recipients/${id}`, { method: 'PUT', body: JSON.stringify(input) })
 }
 
 export function fetchIncomingDeliveryToken(publicId: string) {
@@ -230,10 +280,21 @@ function adminHeaders(token: string): HeadersInit {
   return { Authorization: `Bearer ${token}` }
 }
 
-export function fetchAdminDeliveries(token: string, query = '', status = '', page = 1) {
+export function fetchAdminDeliveries(
+  token: string,
+  query = '',
+  status = '',
+  page = 1,
+  owner = '',
+  dateFrom = '',
+  dateTo = '',
+) {
   const params = new URLSearchParams()
   if (query.trim()) params.set('q', query.trim())
   if (status) params.set('status', status)
+  if (owner) params.set('owner', owner)
+  if (dateFrom) params.set('date_from', dateFrom)
+  if (dateTo) params.set('date_to', dateTo)
   params.set('page', String(page))
   return request<{ data: AdminDeliverySummary[]; meta: { total: number; per_page: number; current_page: number; last_page: number } }>(`/admin/deliveries?${params}`, { headers: adminHeaders(token) })
 }
@@ -244,4 +305,21 @@ export function regenerateAdminLinks(publicId: string, token: string) {
 
 export function deleteAdminDelivery(publicId: string, token: string) {
   return request<{ data: { deleted: boolean } }>(`/admin/deliveries/${encodeURIComponent(publicId)}`, { method: 'DELETE', headers: adminHeaders(token) })
+}
+
+export function fetchAdminUsers(token: string, query = '', page = 1) {
+  const params = new URLSearchParams()
+  if (query.trim()) params.set('q', query.trim())
+  params.set('page', String(page))
+
+  return request<{
+    data: AdminUserSummary[]
+    meta: { total: number; per_page: number; current_page: number; last_page: number }
+  }>(`/admin/users?${params}`, { headers: adminHeaders(token) })
+}
+
+export function fetchAdminUser(userId: number, token: string) {
+  return request<{ data: AdminUserDetails }>(`/admin/users/${userId}`, {
+    headers: adminHeaders(token),
+  })
 }
