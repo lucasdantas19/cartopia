@@ -22,6 +22,7 @@ return [
         'origin' => 'origem',
         'destination' => 'destino',
         'courier' => 'entregador',
+        'arrival_at' => 'data e hora de chegada',
         'duration_minutes' => 'duração da viagem',
     ],
 ];

@@ -64,6 +64,7 @@ export function DeliverySummary({ form, adventureEnabled }: DeliverySummaryProps
   const [now, setNow] = useState(() => Date.now())
   const courier = getCourier(form.courier)
   const duration = getTotalDuration(form)
+  const arrivalAt = form.arrival_at ? new Date(form.arrival_at) : null
   const route = getRouteState(form)
   const origin = getLocationLabel(form, 'origin')
   const destination = getLocationLabel(form, 'destination')
@@ -73,7 +74,7 @@ export function DeliverySummary({ form, adventureEnabled }: DeliverySummaryProps
     && stops.every((step) => Number(step.duration_minutes) > 0)
     && Number(form.final_duration_minutes) > 0
   )
-  const canEstimateArrival = route.ready && adventureComplete && duration > 0
+  const canEstimateArrival = adventureEnabled && route.ready && adventureComplete && duration > 0
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000)
@@ -96,8 +97,12 @@ export function DeliverySummary({ form, adventureEnabled }: DeliverySummaryProps
           <strong>{origin} → {destination}</strong>
         </div>
         <div className="summary-primary">
-          <span>Duração</span>
-          <strong>{formatDuration(duration)}</strong>
+          <span>{adventureEnabled ? 'Duração' : 'Chegada'}</span>
+          <strong>{adventureEnabled
+            ? formatDuration(duration)
+            : arrivalAt && !Number.isNaN(arrivalAt.getTime())
+              ? arrivalAt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : 'Ainda não definida'}</strong>
         </div>
         <div className="summary-primary">
           <span>Desbloqueio</span>
@@ -138,7 +143,7 @@ export function DeliverySummary({ form, adventureEnabled }: DeliverySummaryProps
           </div>
         ))}
         <div className="summary-route-point end">
-          <i>{stops.length ? `${form.final_duration_minutes || 0} min` : `${form.duration_minutes || 0} min`}</i>
+            <i>{stops.length ? `${form.final_duration_minutes || 0} min` : 'chegada'}</i>
           <span />
           <strong>{destination}</strong>
         </div>

@@ -62,6 +62,28 @@ it('keeps a five-minute delivery five minutes apart in UTC', function () {
         ->and(Delivery::first()->starts_at->diffInSeconds(Delivery::first()->arrives_at))->toEqual(300);
 });
 
+it('converts a requested local arrival time to UTC', function () {
+    $now = CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC');
+    CarbonImmutable::setTestNow($now);
+
+    [$data] = createDelivery([
+        'duration_minutes' => null,
+        'arrival_at' => '2026-10-21T18:30:00-03:00',
+    ]);
+
+    expect($data['arrives_at'])->toBe('2026-10-21T21:30:00.000000Z')
+        ->and($data['final_duration_minutes'])->toBe(390);
+});
+
+it('rejects an arrival time that is not in the future', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
+
+    $this->postJson('/api/deliveries', deliveryPayload([
+        'duration_minutes' => null,
+        'arrival_at' => '2026-10-21T14:59:00Z',
+    ]))->assertUnprocessable()->assertJsonValidationErrors('arrival_at');
+});
+
 it('creates a direct delivery when the steps array is empty', function () {
     CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-21 15:00:00', 'UTC'));
 

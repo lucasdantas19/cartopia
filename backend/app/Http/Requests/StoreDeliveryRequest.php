@@ -35,8 +35,15 @@ class StoreDeliveryRequest extends FormRequest
             'destination_location.longitude' => ['required_with:destination_location', 'numeric', 'between:-180,180'],
             'route_visibility' => ['sometimes', 'string', Rule::in(['full', 'progressive'])],
             'courier' => ['sometimes', 'string', Rule::in(config('deliveries.couriers'))],
+            'arrival_at' => [
+                'nullable',
+                'date',
+                'after:now',
+                'required_without_all:duration_minutes,legs,steps',
+            ],
             'duration_minutes' => [
-                'required_without_all:legs,steps',
+                'nullable',
+                'required_without_all:arrival_at,legs,steps',
                 'integer',
                 'min:1',
                 'max:'.config('deliveries.max_duration_minutes'),

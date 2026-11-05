@@ -20,11 +20,15 @@ class CreateDelivery
         $recipientAccessToken = bin2hex(random_bytes(32));
         $senderAccessToken = bin2hex(random_bytes(32));
         $durationMinutes = $attributes['duration_minutes'] ?? null;
+        $requestedArrivalAt = isset($attributes['arrival_at'])
+            ? CarbonImmutable::parse($attributes['arrival_at'])->utc()
+            : null;
         $finalDurationMinutes = $attributes['final_duration_minutes'] ?? null;
         $courier = $attributes['courier'] ?? config('deliveries.couriers.0');
         $routeVisibility = $attributes['route_visibility'] ?? 'full';
         $unlockType = $attributes['unlock_type'] ?? 'none';
         $unlockPassword = $attributes['unlock_password'] ?? null;
+        unset($attributes['arrival_at']);
         unset($attributes['duration_minutes']);
         unset($attributes['final_duration_minutes']);
         unset($attributes['route_visibility']);
@@ -86,10 +90,10 @@ class CreateDelivery
 
         $finalDurationMinutes = $hasNarrativeSteps
             ? ($finalDurationMinutes ?? 0)
-            : $durationMinutes;
+            : ($requestedArrivalAt ? max(1, (int) ceil($startsAt->diffInSeconds($requestedArrivalAt) / 60)) : $durationMinutes);
         $arrivesAt = $hasNarrativeSteps
             ? $legStartsAt->addMinutes($finalDurationMinutes)
-            : $startsAt->addMinutes($durationMinutes);
+            : ($requestedArrivalAt ?? $startsAt->addMinutes($durationMinutes));
 
         $delivery = Delivery::create([
             ...$attributes,

@@ -26,6 +26,11 @@ interface CreatedDelivery {
 
 const createdDeliveryStorageKey = 'cartopia.created_delivery'
 
+function toLocalDateTimeInput(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 function readCreatedDelivery(): CreatedDelivery | null {
   if (typeof window === 'undefined') return null
 
@@ -50,7 +55,7 @@ function readCreatedDelivery(): CreatedDelivery | null {
 
 const initialForm: CreateDeliveryInput = {
   message: '', sender_name: '', recipient_name: '', origin: '', origin_location: null,
-  delivery_mode: 'real', unlock_type: 'none', destination: '', destination_location: null, destination_source: 'specific', duration_minutes: 60, courier: 'paper-swallow',
+  delivery_mode: 'real', unlock_type: 'none', destination: '', destination_location: null, destination_source: 'specific', arrival_at: toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)), courier: 'paper-swallow',
   final_duration_minutes: 30, steps: [], route_visibility: 'full',
 }
 
@@ -77,7 +82,6 @@ function readDeliveryDraft(): DeliveryDraft | null {
       typeof draftForm.recipient_name !== 'string' ||
       typeof draftForm.origin !== 'string' ||
       typeof draftForm.destination !== 'string' ||
-      typeof draftForm.duration_minutes !== 'number' ||
       typeof draftForm.final_duration_minutes !== 'number' ||
       typeof draftForm.courier !== 'string' ||
       typeof draftForm.route_visibility !== 'string'
@@ -266,6 +270,14 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
       if (!form.origin_location || (form.destination_source === 'specific' && !form.destination_location)) { setError('Escolha a origem e o destino da entrega para continuar.'); return }
       if (form.destination_source === 'specific' && form.origin_location && form.destination_location && form.origin_location.latitude === form.destination_location.latitude && form.origin_location.longitude === form.destination_location.longitude) { setError('Escolha localidades diferentes para a partida e o destino.'); return }
     }
+    if (!adventureEnabled) {
+      const arrivalAt = new Date(form.arrival_at ?? '')
+      if (!form.arrival_at || Number.isNaN(arrivalAt.getTime()) || arrivalAt.getTime() <= Date.now()) {
+        setError('Escolha uma data e hora futuras para a chegada da entrega.')
+        setFieldErrors({ arrival_at: ['A chegada deve acontecer no futuro.'] })
+        return
+      }
+    }
     if (adventureEnabled && !form.steps?.length) { setError('Adicione pelo menos uma parada para criar uma aventura.'); return }
     setSubmitting(true)
     try {
@@ -288,8 +300,14 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
         destination: form.destination.trim(),
         ...(form.delivery_mode === 'playful' ? { origin_location: null, destination_location: null, destination_source: 'specific' as const } : {}),
         sender_name: form.sender_name?.trim() || undefined,
-        duration_minutes: Number(form.duration_minutes),
-        final_duration_minutes: Number(form.final_duration_minutes),
+        ...(adventureEnabled
+          ? {
+              duration_minutes: Number(form.duration_minutes),
+              final_duration_minutes: Number(form.final_duration_minutes),
+            }
+          : {
+              arrival_at: new Date(form.arrival_at ?? '').toISOString(),
+            }),
       })
       if (getAuthToken()) {
         const saveRequests: Promise<unknown>[] = []

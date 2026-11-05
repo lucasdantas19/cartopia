@@ -81,8 +81,9 @@ export interface CreateDeliveryInput {
   destination: string
   destination_location: DeliveryLocationValue | null
   destination_source: DestinationSource
-  duration_minutes: number
-  final_duration_minutes: number
+  arrival_at?: string
+  duration_minutes?: number
+  final_duration_minutes?: number
   legs?: CreateDeliveryLeg[]
   steps?: CreateDeliveryStep[]
   route_visibility: RouteVisibility

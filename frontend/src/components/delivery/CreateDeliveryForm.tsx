@@ -42,6 +42,11 @@ interface CreateDeliveryFormProps {
   onSaveNewDestinationChange: (shouldSave: boolean) => void
 }
 
+function toLocalDateTimeInput(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors, submitting, onSubmit, onFieldChange, onEndpointChange, onAdventureChange, onDeliveryModeChange, onUnlockTypeChange, onStepChange, onStepLocationChange, onAddStep, onRemoveStep, onMoveStep, savedLocations, savedRecipients, recipientOptions, onCheckRecipientOptions, onDestinationSourceChange, canSaveNewItems, saveNewRecipient, onSaveNewRecipientChange, saveNewOrigin, onSaveNewOriginChange, saveNewDestination, onSaveNewDestinationChange }: CreateDeliveryFormProps) {
   const formRef = useRef<HTMLFormElement>(null)
   const [openSections, setOpenSections] = useState<FormSectionState>({ message: true, courier: false, adventure: false })
@@ -435,20 +440,20 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
           )}
           {!adventureEnabled && (
             <div className="duration-field journey-duration-field">
-              <label htmlFor="duration_minutes">Quanto tempo a viagem vai durar?</label>
-              <p className="field-help">Defina quanto tempo a carta ficará em viagem antes de chegar ao destino.</p>
-              <div className="duration-presets" aria-label="Durações sugeridas">
-                {[15, 60, 1440].map((minutes) => (
-                  <button key={minutes} type="button" className="button secondary" aria-pressed={form.duration_minutes === minutes} onClick={() => onFieldChange('duration_minutes', minutes)}>
-                    {minutes === 15 ? '15 minutos' : minutes === 60 ? '1 hora' : '24 horas'}
-                  </button>
-                ))}
-              </div>
-              <div className="duration-input">
-                <input id="duration_minutes" type="number" required min={1} max={1440} value={form.duration_minutes} aria-invalid={fieldErrors.duration_minutes ? true : undefined} aria-describedby={fieldErrors.duration_minutes ? 'duration-minutes-error' : undefined} onChange={(event) => onFieldChange('duration_minutes', Number(event.target.value))} />
-                <span>minutos</span>
-              </div>
-              {fieldErrors.duration_minutes && <FieldError id="duration-minutes-error" messages={fieldErrors.duration_minutes} />}
+              <label htmlFor="arrival_at">Quando a mensagem deve chegar?</label>
+              <p className="field-help">Escolha a data e a hora no seu horário local. A duração da viagem será calculada automaticamente.</p>
+              <input
+                id="arrival_at"
+                type="datetime-local"
+                required
+                min={toLocalDateTimeInput(new Date())}
+                value={form.arrival_at ?? ''}
+                aria-invalid={fieldErrors.arrival_at ? true : undefined}
+                aria-describedby={fieldErrors.arrival_at ? 'arrival-at-error' : 'arrival-at-help'}
+                onChange={(event) => onFieldChange('arrival_at', event.target.value)}
+              />
+              <small id="arrival-at-help" className="field-help">O horário será interpretado conforme o fuso deste dispositivo.</small>
+              {fieldErrors.arrival_at && <FieldError id="arrival-at-error" messages={fieldErrors.arrival_at} />}
             </div>
           )}
           {adventureEnabled && <div className="steps-editor">
@@ -464,7 +469,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
             {(form.steps ?? []).map((step, index) => <article className="step-editor" key={step.id ?? index}><div className="step-editor-number">{String(index + 1).padStart(2, '0')}</div><div className="step-editor-fields"><div className="step-editor-heading-row"><strong>Parada {index + 1}</strong><div className="step-reorder"><button type="button" className="step-order-button" disabled={index === 0} aria-label={`Mover parada ${index + 1} para cima`} onClick={() => onMoveStep(index, -1)}>↑ subir</button><button type="button" className="step-order-button" disabled={index === (form.steps ?? []).length - 1} aria-label={`Mover parada ${index + 1} para baixo`} onClick={() => onMoveStep(index, 1)}>↓ descer</button></div></div><input required maxLength={120} aria-label={`Título da etapa ${index + 1}`} value={step.title} onChange={(event) => onStepChange(index, 'title', event.target.value)} placeholder="Ex.: Uma pausa para um croissant" /><textarea maxLength={500} aria-label={`Descrição da etapa ${index + 1}`} value={step.description ?? ''} onChange={(event) => onStepChange(index, 'description', event.target.value)} placeholder="Descreva esse momento da jornada (opcional)." rows={2} /><div className="step-duration"><label htmlFor={`step-duration-${index}`}>Tempo até esta parada</label><input id={`step-duration-${index}`} required type="number" min={1} max={1440} value={step.duration_minutes} onChange={(event) => onStepChange(index, 'duration_minutes', Number(event.target.value))} /><span>minutos</span>{<button type="button" className="text-button" onClick={() => onRemoveStep(index)}>remover</button>}</div>{form.delivery_mode === 'real' && <LocationPicker center={form.origin_location ? [form.origin_location.longitude, form.origin_location.latitude] : locations[0].coordinates} location={step.location} onChange={(location) => onStepLocationChange(index, location)} onClear={() => onStepLocationChange(index, undefined)} />}</div></article>)}
             <button type="button" className="text-button" onClick={onAddStep}>+ adicionar parada</button>
             <div className="final-destination-duration"><label htmlFor="final_duration_minutes">Tempo da última parada até o destino final</label><div className="duration-input"><input id="final_duration_minutes" type="number" required min={1} max={1440} value={form.final_duration_minutes} onChange={(event) => onFieldChange('final_duration_minutes', Number(event.target.value))} /><span>minutos</span></div></div>
-            {form.delivery_mode === 'real' && form.origin_location && form.destination_location ? <JourneyPreview origin={form.origin_location} destination={form.destination_location} steps={form.steps ?? []} finalDurationMinutes={form.final_duration_minutes} /> : <p className="steps-empty">{form.delivery_mode === 'real' ? 'A prévia do mapa aparece quando origem e destino forem escolhidos diretamente.' : 'Locais lúdicos não usam mapa: a história aparece pelos nomes e descrições das paradas.'}</p>}
+            {form.delivery_mode === 'real' && form.origin_location && form.destination_location ? <JourneyPreview origin={form.origin_location} destination={form.destination_location} steps={form.steps ?? []} finalDurationMinutes={form.final_duration_minutes ?? 0} /> : <p className="steps-empty">{form.delivery_mode === 'real' ? 'A prévia do mapa aparece quando origem e destino forem escolhidos diretamente.' : 'Locais lúdicos não usam mapa: a história aparece pelos nomes e descrições das paradas.'}</p>}
           </div>}
         </section>
         <fieldset className="journey-choice unlock-choice">
