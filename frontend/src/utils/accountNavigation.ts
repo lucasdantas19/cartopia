@@ -3,7 +3,7 @@ export const accountSections = [
   { id: 'letters', path: '/conta/cartas', label: 'Caixa de cartas', description: 'Abra novas mensagens e reencontre suas lembranças.' },
   { id: 'sent', path: '/conta/envios', label: 'Meus envios', description: 'Veja as viagens em andamento e seu histórico.' },
   { id: 'tracked', path: '/conta/acompanhamentos', label: 'Acompanhamentos', description: 'Guarde links de entregas para encontrá-los novamente.' },
-  { id: 'addressBook', path: '/conta/agenda', label: 'Agenda', description: 'Seus lugares e pessoas especiais, prontos para a próxima carta.' },
+  { id: 'addressBook', path: '/conta/agenda', label: 'Agenda', description: 'Gerencie as pessoas e os lugares que você reutiliza nas suas cartas.' },
   { id: 'profile', path: '/conta/perfil', label: 'Perfil', description: 'Confira os dados da sua conta.' },
 ] as const
 

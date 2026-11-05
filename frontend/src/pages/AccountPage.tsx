@@ -1,13 +1,13 @@
 import { accountSections, type AccountSection } from '../utils/accountNavigation'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, deleteDeliveryPreference, deleteLocation, deleteRecipient, deleteTrackedDelivery, fetchAccount, fetchActiveMapDeliveries, fetchIncomingDeliveryToken, fetchSentDeliveryToken, fetchTrackedDeliveryToken, getAuthToken, logout, openDeliveryMessage, saveDeliveryPreference, saveLocation, saveRecipient, saveTrackedDelivery, setAuthToken, setDefaultLocation, updateDeliverySettings, type AccountDelivery, type ActiveMapDelivery, type AuthUser, type DeliveryPreference, type DeliverySettings, type IncomingDelivery, type SavedLocation, type SavedRecipient, type TrackedDelivery } from '../services/api'
+import { ApiError, clearDefaultLocation, deleteDeliveryPreference, deleteLocation, deleteRecipient, deleteTrackedDelivery, fetchAccount, fetchActiveMapDeliveries, fetchAllSavedLocations, fetchIncomingDeliveryToken, fetchRecipientDeliveries, fetchSentDeliveryToken, fetchTrackedDeliveryToken, getAuthToken, logout, openDeliveryMessage, saveDeliveryPreference, saveLocation, saveRecipient, saveTrackedDelivery, setAuthToken, setDefaultLocation, updateDeliverySettings, updateLocation, updateRecipient, type AccountDelivery, type AccountListKey, type AccountPages, type ActiveMapDelivery, type AuthUser, type DeliveryPreference, type DeliverySettings, type IncomingDelivery, type PaginationMeta, type SavedLocation, type SavedRecipient, type TrackedDelivery } from '../services/api'
 import { Shell } from '../components/layout/Shell'
 import { LocationPicker } from '../components/delivery/LocationPicker'
 import { parseDeliveryLink } from '../services/accessToken'
 import { ActiveDeliveriesMap } from '../components/account/ActiveDeliveriesMap'
 import { activeMapColors, activeMapRoute } from '../components/account/activeMapRoutes'
-import { deliveriesForRecipient } from '../utils/recipientDeliveries'
+import { filterSavedRecipients } from '../utils/recipientDeliveries'
 
 interface AccountPageProps {
   section: AccountSection
@@ -28,9 +28,117 @@ function statusLabel(status: string): string {
   return statusLabels[status] ?? status
 }
 
+function AgendaIcon({ kind }: { kind: 'letter' | 'place' | 'person' }) {
+  if (kind === 'place') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 21s7-6.2 7-12A7 7 0 0 0 5 9c0 5.8 7 12 7 12Z" />
+        <circle cx="12" cy="9" r="2.25" />
+      </svg>
+    )
+  }
+
+  if (kind === 'person') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="8" r="3.25" />
+        <path d="M5.5 20c.55-3.25 2.7-5 6.5-5s5.95 1.75 6.5 5" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 6.5h16v11H4z" />
+      <path d="m4.5 7 7.5 6 7.5-6" />
+    </svg>
+  )
+}
+
+function AgendaActionIcon({ kind }: { kind: 'edit' | 'default' | 'remove' | 'letters' }) {
+  if (kind === 'edit') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="m4 16.5-.7 3.7 3.7-.7L18.8 7.7a2.1 2.1 0 0 0-3-3L4 16.5Z" />
+        <path d="m14.5 6.5 3 3" />
+      </svg>
+    )
+  }
+
+  if (kind === 'default') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 21s6-5.5 6-11A6 6 0 0 0 6 10c0 5.5 6 11 6 11Z" />
+        <circle cx="12" cy="10" r="2" />
+      </svg>
+    )
+  }
+
+  if (kind === 'letters') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 7.5h13v10H4z" />
+        <path d="m4.5 8 6 4.8L16.5 8" />
+        <path d="M8 5h12v10" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M5 7h14M9 7V5h6v2M7 7l.8 12h8.4L17 7M10 10v6M14 10v6" />
+    </svg>
+  )
+}
+
+const recipientAvatarColors = ['#7668b5', '#39727b', '#b26a00', '#b55369', '#4f7894']
+
+function recipientInitial(name: string): string {
+  return name.trim().charAt(0).toLocaleUpperCase() || '?'
+}
+
+function agendaAvatarColor(id: number): string {
+  return recipientAvatarColors[Math.abs(id) % recipientAvatarColors.length]
+}
+
+const accountPageSize = 5
+
+interface AccountPaginationProps {
+  page: number
+  total: number
+  onPageChange: (page: number) => void
+  label: string
+}
+
+function AccountPagination({ page, total, onPageChange, label }: AccountPaginationProps) {
+  const lastPage = Math.ceil(total / accountPageSize)
+  if (lastPage <= 1) return null
+
+  return (
+    <nav className="account-pagination" aria-label={`Paginação de ${label}`}>
+      <button
+        className="button secondary"
+        type="button"
+        disabled={page === 1}
+        onClick={() => onPageChange(page - 1)}>
+        ← Anterior
+      </button>
+      <span>Página {page} de {lastPage}</span>
+      <button
+        className="button secondary"
+        type="button"
+        disabled={page === lastPage}
+        onClick={() => onPageChange(page + 1)}>
+        Próxima →
+      </button>
+    </nav>
+  )
+}
+
 export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, onTrack }: AccountPageProps) {
-  const [account, setAccount] = useState<{ user: AuthUser; deliveries: AccountDelivery[]; locations: SavedLocation[]; recipients: SavedRecipient[]; trackedDeliveries: TrackedDelivery[]; incomingDeliveries: IncomingDelivery[]; deliverySettings: DeliverySettings; deliveryPreferences: DeliveryPreference[] } | null>(null)
+  const [account, setAccount] = useState<{ user: AuthUser; deliveries: AccountDelivery[]; locations: SavedLocation[]; recipients: SavedRecipient[]; trackedDeliveries: TrackedDelivery[]; incomingDeliveries: IncomingDelivery[]; deliverySettings: DeliverySettings; deliveryPreferences: DeliveryPreference[]; pagination: Record<AccountListKey, PaginationMeta> } | null>(null)
   const letterRef = useRef<HTMLDialogElement>(null)
+  const confirmationRef = useRef<HTMLDialogElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -42,21 +150,38 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
   const [trackedLabel, setTrackedLabel] = useState('')
   const [savingTracked, setSavingTracked] = useState(false)
   const [location, setLocation] = useState({ name: '', label: '', latitude: '', longitude: '' })
+  const [profileLocations, setProfileLocations] = useState<SavedLocation[]>([])
   const [recipient, setRecipient] = useState({ name: '', email: '', nickname: '' })
+  const [recipientSearch, setRecipientSearch] = useState('')
+  const [editingLocation, setEditingLocation] = useState<SavedLocation | null>(null)
+  const [editingRecipient, setEditingRecipient] = useState<SavedRecipient | null>(null)
   const [preference, setPreference] = useState({ senderEmail: '', locationId: '' })
   const [selectedRecipient, setSelectedRecipient] = useState<SavedRecipient | null>(null)
+  const [selectedRecipientDeliveries, setSelectedRecipientDeliveries] = useState<AccountDelivery[]>([])
+  const [selectedRecipientPagination, setSelectedRecipientPagination] = useState<PaginationMeta | null>(null)
+  const [selectedRecipientLoading, setSelectedRecipientLoading] = useState(false)
+  const [selectedRecipientPage, setSelectedRecipientPage] = useState(1)
+  const [listPages, setListPages] = useState<AccountPages>({})
   const [letterModal, setLetterModal] = useState<{ sender: string | null; message: string } | null>(null)
   const [letterLoading, setLetterLoading] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [confirmation, setConfirmation] = useState<{ message: string; onConfirm: () => void } | null>(null)
   useEffect(() => {
     if (!letterModal) return
     const previousFocus = document.activeElement as HTMLElement | null
     letterRef.current?.showModal()
     return () => { if (previousFocus?.isConnected) previousFocus.focus() }
   }, [letterModal])
-  async function refresh() {
+  useEffect(() => {
+    if (!confirmation) return
+    const previousFocus = document.activeElement as HTMLElement | null
+    confirmationRef.current?.showModal()
+    return () => { if (previousFocus?.isConnected) previousFocus.focus() }
+  }, [confirmation])
+  async function refresh(pages: AccountPages = listPages, search = recipientSearch) {
     setError('')
     try {
-      const data = await fetchAccount()
+      const data = await fetchAccount(pages, search)
       setAccount({
         user: data,
         deliveries: data.deliveries,
@@ -66,6 +191,7 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
         incomingDeliveries: data.incomingDeliveries,
         deliverySettings: data.deliverySettings,
         deliveryPreferences: data.deliveryPreferences,
+        pagination: data.pagination,
       })
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Não foi possível carregar sua conta.')
@@ -73,15 +199,58 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
   }
   useEffect(() => { void refresh() }, [])
   useEffect(() => {
+    if (section !== 'profile') return
+    void fetchAllSavedLocations().then((locations) => setProfileLocations(locations)).catch(() => undefined)
+  }, [section])
+  useEffect(() => {
     headingRef.current?.focus()
     window.scrollTo({ top: 0 })
   }, [section])
-  async function mutate(action: () => Promise<unknown>) {
+  async function loadRecipientDeliveries(item: SavedRecipient, page = 1) {
+    setSelectedRecipientLoading(true)
+    try {
+      const response = await fetchRecipientDeliveries(item, page)
+      setSelectedRecipientDeliveries(response.data)
+      setSelectedRecipientPagination(response.meta)
+      setSelectedRecipientPage(page)
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Não foi possível carregar as cartas desta pessoa.')
+    } finally {
+      setSelectedRecipientLoading(false)
+    }
+  }
+
+  async function selectRecipient(item: SavedRecipient) {
+    if (selectedRecipient?.id === item.id) {
+      setSelectedRecipient(null)
+      setSelectedRecipientDeliveries([])
+      setSelectedRecipientPagination(null)
+      return
+    }
+
+    setSelectedRecipient(item)
+    setSelectedRecipientDeliveries([])
+    setSelectedRecipientPagination(null)
+    setSelectedRecipientPage(1)
+    await loadRecipientDeliveries(item)
+  }
+
+  function requestDestructiveAction(message: string, onConfirm: () => void) {
+    setConfirmation({ message, onConfirm })
+  }
+
+  async function mutate(action: () => Promise<unknown>, successMessage?: string) {
     setBusy(true)
     setError('')
+    setNotice('')
     try {
       await action()
       await refresh()
+      if (section === 'profile') {
+        setProfileLocations(await fetchAllSavedLocations())
+      }
+      if (selectedRecipient) await loadRecipientDeliveries(selectedRecipient, selectedRecipientPage)
+      if (successMessage) setNotice(successMessage)
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Não foi possível concluir a ação. Tente novamente.')
     } finally {
@@ -112,6 +281,33 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
     }
   }, [section])
   async function signOut() { await logout().catch(() => undefined); setAuthToken(null); onLogout() }
+  async function submitLocationEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingLocation) return
+    await mutate(async () => {
+      await updateLocation(editingLocation.id, {
+        name: editingLocation.name,
+        label: editingLocation.label,
+        latitude: editingLocation.latitude,
+        longitude: editingLocation.longitude,
+      })
+      setEditingLocation(null)
+    }, 'Lugar atualizado.')
+  }
+
+  async function submitRecipientEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingRecipient) return
+    await mutate(async () => {
+      await updateRecipient(editingRecipient.id, {
+        name: editingRecipient.name,
+        email: editingRecipient.email || undefined,
+        nickname: editingRecipient.nickname || undefined,
+      })
+      setEditingRecipient(null)
+    }, 'Destinatário atualizado.')
+  }
+
   async function addLocation(event: FormEvent) {
     event.preventDefault()
     if (location.latitude === '' || location.longitude === '') {
@@ -123,10 +319,10 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
         ...location,
         latitude: Number(location.latitude),
         longitude: Number(location.longitude),
-        is_default: account?.locations.length === 0,
+        is_default: locationCount === 0,
       })
       setLocation({ name: '', label: '', latitude: '', longitude: '' })
-    })
+    }, 'Lugar salvo.')
   }
   function updateLocationFromMap(value: { label: string; latitude?: number; longitude?: number }) {
     setLocation((current) => ({
@@ -142,7 +338,7 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
     await mutate(async () => {
       await saveRecipient({ ...recipient, email: recipient.email || undefined })
       setRecipient({ name: '', email: '', nickname: '' })
-    })
+    }, 'Destinatário salvo.')
   }
 
   async function addTrackedDelivery(event: FormEvent) {
@@ -175,7 +371,7 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
     await mutate(async () => {
       await saveDeliveryPreference({ sender_email: preference.senderEmail.trim(), location_id: Number(preference.locationId) })
       setPreference({ senderEmail: '', locationId: '' })
-    })
+    }, 'Preferência salva.')
   }
   async function openTrackedDelivery(item: TrackedDelivery) {
     try {
@@ -216,19 +412,32 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
     ? { label: location.label, latitude: Number(location.latitude), longitude: Number(location.longitude) }
     : undefined
   if (!getAuthToken()) return null
-  const deliveryCount = account?.deliveries.length ?? 0
-  const locationCount = account?.locations.length ?? 0
-  const recipientCount = account?.recipients.length ?? 0
-  const trackedCount = account?.trackedDeliveries.length ?? 0
-  const incomingCount = account?.incomingDeliveries.length ?? 0
+  const deliveryCount = account?.pagination.deliveries.total ?? 0
+  const locationCount = account?.pagination.locations.total ?? 0
+  const recipientCount = account?.pagination.recipients.total ?? 0
+  const trackedCount = account?.pagination.trackedDeliveries.total ?? 0
+  const unopenedCount = account?.pagination.unopenedDeliveries.total ?? 0
+  const openedCount = account?.pagination.openedLetters.total ?? 0
+  const incomingCount = unopenedCount + openedCount
   const openedLetters = account?.incomingDeliveries.filter((item) => item.opened_at !== null) ?? []
   const unopenedDeliveries = account?.incomingDeliveries.filter((item) => item.opened_at === null) ?? []
   const firstName = account?.user.name.split(' ')[0] ?? 'por aqui'
   const currentSection = accountSections.find((item) => item.id === section)!
   const readyLetters = unopenedDeliveries.filter((item) => item.status === 'DELIVERED')
-  const selectedRecipientDeliveries = account && selectedRecipient
-    ? deliveriesForRecipient(account.deliveries, selectedRecipient)
-    : []
+  const visibleRecipients = filterSavedRecipients(account?.recipients ?? [], recipientSearch)
+  const recipientsWithEmail = account?.recipients.filter((item) => item.email) ?? []
+  function changeListPage(key: AccountListKey, page: number) {
+    const nextPages = { ...listPages, [key]: page }
+    setListPages(nextPages)
+    void refresh(nextPages, recipientSearch)
+  }
+
+  function searchRecipients(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const nextPages = { ...listPages, recipients: 1 }
+    setListPages(nextPages)
+    void refresh(nextPages, recipientSearch)
+  }
   return (
     <Shell
       eyebrow="Meu correio"
@@ -266,6 +475,7 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
             <p>{currentSection.description}</p>
           </header>
           {error && <p className="error-message" role="alert">{error}</p>}
+          {notice && <p className="success-message" role="status">{notice}</p>}
           {!account && (
             <div className="account-empty-state">
               {error ? (
@@ -329,6 +539,32 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                 <dd>{account.user.email}</dd>
               </dl>
               <p>Mensagens enviadas para este e-mail aparecem na sua caixa de cartas.</p>
+              <div className="account-preference-setting account-default-location-setting">
+                <h2>Endereço de partida padrão</h2>
+                <p>Este é o endereço usado como ponto de partida quando você escolher reutilizar um lugar salvo em uma nova carta.</p>
+                {profileLocations.length === 0 ? (
+                  <p className="muted-copy">Salve um lugar na Agenda para definir um endereço de partida.</p>
+                ) : (
+                  <label htmlFor="profile-default-location">
+                    Escolha o endereço de partida
+                    <select
+                      id="profile-default-location"
+                      value={String(profileLocations.find((item) => item.is_default)?.id ?? '')}
+                      onChange={(event) => {
+                        const locationId = Number(event.target.value)
+                        if (!locationId) return
+                        void mutate(() => setDefaultLocation(locationId), 'Endereço de partida padrão atualizado.')
+                      }}>
+                      <option value="">Nenhum endereço padrão</option>
+                      {profileLocations.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} · {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
               <div className="account-preference-setting">
                 <h2>Receber entregas de contatos</h2>
                 <p>Quando ativado, pessoas com uma conta poderão enviar cartas para seu endereço padrão ou para uma preferência específica.</p>
@@ -418,27 +654,33 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
               </div>
               <p className="account-section-description">Mensagens enviadas para o seu e-mail aparecem aqui automaticamente.</p>
               <div className="incoming-delivery-list">
-                {unopenedDeliveries.map((item) => (
-                  <article className="incoming-delivery-card" key={item.public_id}>
+                  {unopenedDeliveries.map((item) => (
+                  <article className="incoming-delivery-card incoming-delivery-card-new" key={item.public_id}>
                     <span className={`delivery-status ${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span>
-                    <div>
+                    <div className="incoming-delivery-card-main">
                       <h3>{item.sender_name ? `${item.sender_name} enviou uma mensagem` : 'Você recebeu uma nova mensagem'}</h3>
-                      <p>
+                      <p className="incoming-delivery-route">
                         {item.origin}
                         <i aria-hidden="true">→</i>
                         {item.destination}
                       </p>
+                      <small className="incoming-delivery-arrival">
+                        Chegada prevista para {new Date(item.arrives_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                      </small>
                     </div>
-                    <button
-                      className="button primary"
-                      type="button"
-                      disabled={letterLoading}
-                      onClick={() => { void openIncomingDelivery(item, item.status === 'DELIVERED') }}>
-                      {item.status === 'DELIVERED' ? 'Abrir carta' : 'Acompanhar viagem'}
-                    </button>
+                    <div className="incoming-delivery-card-actions">
+                      <button
+                        className="button primary"
+                        type="button"
+                        disabled={letterLoading}
+                        onClick={() => { void openIncomingDelivery(item, item.status === 'DELIVERED') }}>
+                        {item.status === 'DELIVERED' ? 'Abrir carta' : 'Acompanhar viagem'}
+                      </button>
+                    </div>
                   </article>
                 ))}
-              </div>
+                </div>
+              <AccountPagination page={account?.pagination.unopenedDeliveries.current_page ?? 1} total={unopenedCount} onPageChange={(page) => changeListPage('unopenedDeliveries', page)} label="novas mensagens" />
             </section>
           )}
           {account && section === 'letters' && (
@@ -456,16 +698,16 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
               ) : (
                 <div className="incoming-delivery-list">
                   {openedLetters.map((item) => (
-                    <article className="incoming-delivery-card" key={item.public_id}>
+                    <article className="incoming-delivery-card incoming-delivery-card-opened" key={item.public_id}>
                       <span className="delivery-status delivered">Carta aberta</span>
-                      <div>
+                      <div className="incoming-delivery-card-main">
                         <h3>{item.sender_name ? `Carta de ${item.sender_name}` : 'Uma carta para você'}</h3>
-                        <p>
+                        <p className="incoming-delivery-route">
                           {item.origin}
                           <i aria-hidden="true">→</i>
                           {item.destination}
                         </p>
-                        <small>Aberta em {new Date(item.opened_at!).toLocaleDateString('pt-BR')}</small>
+                        <small className="incoming-delivery-arrival">Aberta em {new Date(item.opened_at!).toLocaleDateString('pt-BR')}</small>
                       </div>
                       <div className="incoming-delivery-card-actions">
                         <button
@@ -482,6 +724,7 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                   ))}
                 </div>
               )}
+              <AccountPagination page={account?.pagination.openedLetters.current_page ?? 1} total={openedCount} onPageChange={(page) => changeListPage('openedLetters', page)} label="cartas abertas" />
             </section>
           )}
           {letterModal && (
@@ -506,6 +749,33 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                 Com carinho, Cartopia
                 <span aria-hidden="true">✦</span>
               </p>
+            </dialog>
+          )}
+          {confirmation && (
+            <dialog
+              ref={confirmationRef}
+              className="account-confirmation-dialog"
+              aria-labelledby="account-confirmation-title"
+              onCancel={() => setConfirmation(null)}
+              onClose={() => setConfirmation(null)}>
+              <p className="account-section-kicker">Confirme a ação</p>
+              <h2 id="account-confirmation-title">Tem certeza?</h2>
+              <p>{confirmation.message}</p>
+              <div className="account-confirmation-actions">
+                <button className="button secondary" type="button" onClick={() => setConfirmation(null)}>
+                  Cancelar
+                </button>
+                <button
+                  className="button danger-button"
+                  type="button"
+                  onClick={() => {
+                    const action = confirmation.onConfirm
+                    setConfirmation(null)
+                    action()
+                  }}>
+                  Apagar
+                </button>
+              </div>
             </dialog>
           )}
           {account && section === 'tracked' && (
@@ -567,6 +837,7 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                   </div>
                 </article>
               ))}</div>}
+              <AccountPagination page={account?.pagination.trackedDeliveries.current_page ?? 1} total={trackedCount} onPageChange={(page) => changeListPage('trackedDeliveries', page)} label="entregas acompanhadas" />
             </section>
           )}
           {account && section === 'sent' && (
@@ -597,12 +868,19 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                     <small>Chegada prevista</small>
                     <strong>{new Date(delivery.arrives_at).toLocaleDateString('pt-BR')}</strong>
                   </div>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => { void openSentDelivery(delivery) }}>
+                    Entrar na entrega
+                  </button>
                 </article>
               )) : <div className="account-empty-state">
                 <span aria-hidden="true">✦</span>
                 <p>Suas próximas aventuras aparecerão aqui.</p>
                 <small>Crie uma entrega e acompanhe cada passo da viagem.</small>
               </div>}
+              <AccountPagination page={account?.pagination.deliveries.current_page ?? 1} total={deliveryCount} onPageChange={(page) => changeListPage('deliveries', page)} label="envios" />
             </section>
           )}
           {account && section === 'addressBook' && (
@@ -617,25 +895,104 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                 </div>
                 {locationCount === 0 && <p className="muted-copy">Salve um lugar para reutilizar nas próximas cartas.</p>}
                 {account?.locations.map((item) => (
-                  <article className={`saved-item ${item.is_default ? 'saved-item-default' : ''}`} key={item.id}>
-                    <span className="saved-item-icon" aria-hidden="true">⌖</span>
+                  <Fragment key={item.id}>
+                  <article className={`saved-item ${item.is_default ? 'saved-item-default' : ''}`}>
+                      <span
+                        className="saved-item-icon saved-item-avatar saved-item-avatar-place"
+                        aria-hidden="true"
+                        style={{
+                          backgroundColor: agendaAvatarColor(item.id),
+                          color: '#fff',
+                        }}>
+                        {recipientInitial(item.name)}
+                      </span>
                     <div>
                       <strong>{item.name}</strong>
                       <span>{item.label}</span>
-                      {item.is_default && <small className="saved-item-badge">Partida padrão</small>}
+                      {item.is_default && <small className="saved-item-badge">Endereço de partida padrão</small>}
                     </div>
                     <div className="saved-item-actions">
-                      {!item.is_default && <button
-                        className="text-button"
-                        type="button"
-                        onClick={() => { void mutate(() => setDefaultLocation(item.id)) }}>Usar como padrão</button>}
                       <button
-                        className="text-button danger"
+                        className="icon-button"
                         type="button"
-                        onClick={() => { void mutate(() => deleteLocation(item.id)) }}>Apagar</button>
+                        aria-label={`Editar ${item.name}`}
+                        title="Editar lugar"
+                        onClick={() => setEditingLocation(item)}>
+                        <AgendaActionIcon kind="edit" />
+                      </button>
+                      <button
+                        className="icon-button"
+                        type="button"
+                        aria-label={item.is_default ? `Remover ${item.name} como partida padrão` : `Definir ${item.name} como partida padrão`}
+                        title={item.is_default ? 'Remover como partida padrão' : 'Definir como partida padrão'}
+                        onClick={() => {
+                          if (item.is_default) {
+                            void mutate(() => clearDefaultLocation(item.id), 'Endereço de partida padrão removido.')
+                            return
+                          }
+                          void mutate(() => setDefaultLocation(item.id), 'Endereço de partida padrão atualizado.')
+                        }}>
+                        <AgendaActionIcon kind="default" />
+                      </button>
+                      <button
+                        className="icon-button danger"
+                        type="button"
+                        aria-label={`Apagar ${item.name}`}
+                        title="Apagar lugar"
+                        onClick={() => {
+                          requestDestructiveAction(`Apagar o lugar “${item.name}”?`, () => {
+                            void mutate(() => deleteLocation(item.id), 'Lugar apagado.')
+                          })
+                        }}>
+                        <AgendaActionIcon kind="remove" />
+                      </button>
                     </div>
                   </article>
+                  {editingLocation?.id === item.id && (
+                    <form className="saved-item-edit-form" onSubmit={submitLocationEdit}>
+                      <label>
+                        Nome do lugar
+                        <input
+                          required
+                          value={editingLocation.name}
+                          onChange={(event) => setEditingLocation({ ...editingLocation, name: event.target.value })} />
+                      </label>
+                      <label>
+                        Endereço ou descrição
+                        <input
+                          required
+                          value={editingLocation.label}
+                          onChange={(event) => setEditingLocation({ ...editingLocation, label: event.target.value })} />
+                      </label>
+                      <div className="saved-location-edit-map">
+                        <LocationPicker
+                          center={[editingLocation.longitude, editingLocation.latitude]}
+                          location={{
+                            label: editingLocation.label,
+                            latitude: editingLocation.latitude,
+                            longitude: editingLocation.longitude,
+                          }}
+                          onChange={(value) => {
+                            if (value.latitude === undefined || value.longitude === undefined) return
+                            setEditingLocation({
+                              ...editingLocation,
+                              label: value.label,
+                              latitude: value.latitude,
+                              longitude: value.longitude,
+                            })
+                          }}
+                          onClear={() => setEditingLocation({ ...editingLocation, label: '' })}
+                          clearLabel="escolher outro ponto" />
+                      </div>
+                      <div className="saved-item-edit-actions">
+                        <button className="button secondary" type="submit" disabled={busy}>Salvar alterações</button>
+                        <button className="text-button" type="button" onClick={() => setEditingLocation(null)}>Cancelar</button>
+                      </div>
+                    </form>
+                  )}
+                  </Fragment>
                 ))}
+                <AccountPagination page={account?.pagination.locations.current_page ?? 1} total={locationCount} onPageChange={(page) => changeListPage('locations', page)} label="lugares salvos" />
                 <details className="account-add-item">
                   <summary>Adicionar lugar</summary>
                   <form className="account-form compact" onSubmit={addLocation}>
@@ -661,30 +1018,67 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                       disabled={busy}>Salvar lugar</button>
                   </form>
                 </details>
-                <div className="account-add-item">
-                  <h3>Preferências para contatos</h3>
+                <details className="account-add-item">
+                  <summary>Preferências para contatos</summary>
                   <p className="muted-copy">Escolha qual dos seus lugares cada contato poderá usar ao enviar uma carta.</p>
                   {account.deliveryPreferences.map((item) => (
                     <article className="saved-item" key={item.id}>
-                      <span className="saved-item-icon" aria-hidden="true">⌂</span>
+                      <span
+                        className="saved-item-icon saved-item-avatar saved-item-avatar-preference"
+                        aria-hidden="true"
+                        style={{
+                          backgroundColor: agendaAvatarColor(item.sender.id),
+                          color: '#fff',
+                        }}>
+                        {recipientInitial(item.sender.name)}
+                      </span>
                       <div>
                         <strong>{item.sender.name}</strong>
                         <span>{item.location.name}</span>
                       </div>
-                      <button className="text-button danger" type="button" onClick={() => { void mutate(() => deleteDeliveryPreference(item.id)) }}>Apagar</button>
+                      <div className="saved-item-actions">
+                        <button
+                          className="icon-button danger"
+                          type="button"
+                          aria-label={`Apagar preferência para ${item.sender.name}`}
+                          title="Apagar preferência"
+                          onClick={() => {
+                            requestDestructiveAction(`Apagar a preferência para ${item.sender.name}?`, () => {
+                              void mutate(() => deleteDeliveryPreference(item.id), 'Preferência apagada.')
+                            })
+                          }}>
+                          <AgendaActionIcon kind="remove" />
+                        </button>
+                      </div>
                     </article>
                   ))}
+                  <AccountPagination page={account.pagination.deliveryPreferences.current_page} total={account.pagination.deliveryPreferences.total} onPageChange={(page) => changeListPage('deliveryPreferences', page)} label="preferências para contatos" />
                   <form className="account-form compact" onSubmit={addDeliveryPreference}>
-                    <label htmlFor="preference-sender-email">E-mail do contato</label>
-                    <input id="preference-sender-email" type="email" required value={preference.senderEmail} onChange={(event) => setPreference({ ...preference, senderEmail: event.target.value })} placeholder="contato@exemplo.com" />
+                    <label htmlFor="preference-recipient">Contato autorizado</label>
+                    <select
+                      id="preference-recipient"
+                      required
+                      value={preference.senderEmail}
+                      onChange={(event) => setPreference({ ...preference, senderEmail: event.target.value })}
+                      disabled={recipientsWithEmail.length === 0}>
+                      <option value="">Escolha um contato salvo…</option>
+                      {recipientsWithEmail.map((item) => (
+                        <option key={item.id} value={item.email!}>
+                          {item.name} · {item.email}
+                        </option>
+                      ))}
+                    </select>
+                    {recipientsWithEmail.length === 0 && (
+                      <small className="field-help">Salve um contato com e-mail para criar uma preferência.</small>
+                    )}
                     <label htmlFor="preference-location">Lugar permitido</label>
                     <select id="preference-location" required value={preference.locationId} onChange={(event) => setPreference({ ...preference, locationId: event.target.value })}>
                       <option value="">Escolha um lugar salvo…</option>
                       {account.locations.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.label}</option>)}
                     </select>
-                    <button className="button secondary" type="submit" disabled={busy || account.locations.length === 0}>Salvar preferência</button>
+                    <button className="button secondary" type="submit" disabled={busy || account.locations.length === 0 || recipientsWithEmail.length === 0}>Salvar preferência</button>
                   </form>
-                </div>
+                </details>
               </section>
               <section className="account-section">
                 <div className="account-section-heading">
@@ -695,28 +1089,111 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                   <span>{recipientCount}</span>
                 </div>
                 {recipientCount === 0 && <p className="muted-copy">Adicione alguém especial à sua agenda.</p>}
-                {account?.recipients.map((item) => (
-                  <article className="saved-item" key={item.id}>
-                    <span className="saved-item-icon" aria-hidden="true">♡</span>
+                {(recipientCount > 0 || recipientSearch) && (
+                  <form className="agenda-search" onSubmit={searchRecipients}>
+                    <label htmlFor="agenda-recipient-search">Pesquisar pessoa</label>
+                    <input
+                      id="agenda-recipient-search"
+                      type="search"
+                      value={recipientSearch}
+                      onChange={(event) => setRecipientSearch(event.target.value)}
+                      placeholder="Nome, apelido ou e-mail" />
+                    <button className="button secondary" type="submit">Pesquisar</button>
+                  </form>
+                )}
+                {(recipientCount > 0 || recipientSearch) && visibleRecipients.length === 0 && (
+                  <p className="muted-copy">Nenhuma pessoa encontrada nessa busca.</p>
+                )}
+                {visibleRecipients.map((item) => (
+                  <Fragment key={item.id}>
+                  <article className="saved-item">
+                    <span
+                      className="saved-item-icon saved-item-avatar"
+                      aria-hidden="true"
+                      style={{
+                        backgroundColor: agendaAvatarColor(item.id),
+                        color: '#fff',
+                      }}>
+                      {recipientInitial(item.name)}
+                    </span>
                     <div>
                       <strong>{item.name}</strong>
                       <span>{item.nickname || 'Sem apelido'}</span>
                     </div>
-                    <button
-                      className="text-button"
-                      type="button"
-                      aria-pressed={selectedRecipient?.id === item.id}
-                      onClick={() => setSelectedRecipient(selectedRecipient?.id === item.id ? null : item)}>
-                      Ver cartas
-                    </button>
-                    <button
-                      className="text-button danger"
-                      type="button"
-                      onClick={() => { void mutate(() => deleteRecipient(item.id)) }}>Apagar</button>
+                    <div className="saved-item-actions">
+                      <button
+                        className="icon-button"
+                        type="button"
+                        aria-label={`Editar ${item.name}`}
+                        title="Editar destinatário"
+                        onClick={() => setEditingRecipient(item)}>
+                        <AgendaActionIcon kind="edit" />
+                      </button>
+                      <button
+                        className="icon-button"
+                        type="button"
+                        aria-pressed={selectedRecipient?.id === item.id}
+                        aria-label={selectedRecipient?.id === item.id ? `Ocultar cartas de ${item.name}` : `Ver cartas de ${item.name}`}
+                        title={selectedRecipient?.id === item.id ? 'Ocultar cartas' : 'Ver cartas'}
+                        onClick={() => { void selectRecipient(item) }}
+                        aria-expanded={selectedRecipient?.id === item.id}>
+                        <AgendaActionIcon kind="letters" />
+                      </button>
+                      <button
+                        className="icon-button danger"
+                        type="button"
+                        aria-label={`Apagar ${item.name}`}
+                        title="Apagar destinatário"
+                        onClick={() => {
+                          requestDestructiveAction(`Apagar ${item.name} da sua agenda?`, () => {
+                            if (selectedRecipient?.id === item.id) {
+                              setSelectedRecipient(null)
+                              setSelectedRecipientDeliveries([])
+                              setSelectedRecipientPagination(null)
+                            }
+                            void mutate(() => deleteRecipient(item.id), 'Destinatário apagado.')
+                          })
+                        }}>
+                        <AgendaActionIcon kind="remove" />
+                      </button>
+                    </div>
                   </article>
+                  {editingRecipient?.id === item.id && (
+                    <form className="saved-item-edit-form" onSubmit={submitRecipientEdit}>
+                      <label>
+                        Nome
+                        <input
+                          required
+                          value={editingRecipient.name}
+                          onChange={(event) => setEditingRecipient({ ...editingRecipient, name: event.target.value })} />
+                      </label>
+                      <label>
+                        E-mail
+                        <input
+                          type="email"
+                          value={editingRecipient.email ?? ''}
+                          onChange={(event) => setEditingRecipient({ ...editingRecipient, email: event.target.value || null })} />
+                      </label>
+                      <label>
+                        Apelido
+                        <input
+                          value={editingRecipient.nickname ?? ''}
+                          onChange={(event) => setEditingRecipient({ ...editingRecipient, nickname: event.target.value || null })} />
+                      </label>
+                      <div className="saved-item-edit-actions">
+                        <button className="button secondary" type="submit" disabled={busy}>Salvar alterações</button>
+                        <button className="text-button" type="button" onClick={() => setEditingRecipient(null)}>Cancelar</button>
+                      </div>
+                    </form>
+                  )}
+                  </Fragment>
                 ))}
+                <AccountPagination page={account?.pagination.recipients.current_page ?? 1} total={recipientCount} onPageChange={(page) => changeListPage('recipients', page)} label="destinatários salvos" />
                 <details className="account-add-item">
-                  <summary>Adicionar pessoa</summary>
+                  <summary>
+                    <AgendaIcon kind="letter" />
+                    Salvar pessoa na agenda
+                  </summary>
                   <form className="account-form compact" onSubmit={addRecipient}>
                     <label htmlFor="saved-person-name">Nome</label>
                     <input
@@ -752,9 +1229,11 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                       <p className="account-section-kicker">Histórico filtrado</p>
                       <h2 id="recipient-deliveries-title">Cartas para {selectedRecipient.nickname || selectedRecipient.name}</h2>
                     </div>
-                    <span>{selectedRecipientDeliveries.length}</span>
+                    <span>{selectedRecipientPagination?.total ?? 0}</span>
                   </div>
-                  {selectedRecipientDeliveries.length === 0 ? (
+                  {selectedRecipientLoading ? (
+                    <p role="status">Carregando cartas…</p>
+                  ) : selectedRecipientDeliveries.length === 0 ? (
                     <p className="muted-copy">Nenhuma carta enviada para este destinatário ainda.</p>
                   ) : selectedRecipientDeliveries.map((delivery) => (
                     <article className="delivery-history-card" key={delivery.public_id}>
@@ -773,6 +1252,15 @@ export function AccountPage({ section, onNavigate, onHome, onPrivacy, onLogout, 
                       <button className="button secondary" type="button" onClick={() => { void openSentDelivery(delivery) }}>Abrir entrega</button>
                     </article>
                   ))}
+                  {selectedRecipientPagination && (
+                    <AccountPagination
+                      page={selectedRecipientPage}
+                      total={selectedRecipientPagination.total}
+                      onPageChange={(page) => {
+                        if (selectedRecipient) void loadRecipientDeliveries(selectedRecipient, page)
+                      }}
+                      label={`cartas para ${selectedRecipient.name}`} />
+                  )}
                 </section>
               )}
             </div>

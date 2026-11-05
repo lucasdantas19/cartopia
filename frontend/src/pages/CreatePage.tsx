@@ -222,8 +222,8 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
     setFieldErrors((current) => ({ ...current, destination: [], destination_source: [] }))
   }
 
-  async function checkRecipientOptions() {
-    const email = form.recipient_email?.trim()
+  async function checkRecipientOptions(emailOverride?: string) {
+    const email = (emailOverride ?? form.recipient_email)?.trim()
     if (!getAuthToken() || !email) {
       setRecipientOptions(null)
       return

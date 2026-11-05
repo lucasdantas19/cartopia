@@ -31,7 +31,7 @@ interface CreateDeliveryFormProps {
   savedLocations: SavedLocation[]
   savedRecipients: SavedRecipient[]
   recipientOptions: RecipientDeliveryOptions | null
-  onCheckRecipientOptions: () => void
+  onCheckRecipientOptions: (email?: string) => void
   onDestinationSourceChange: (source: DestinationSource) => void
   canSaveNewItems: boolean
   saveNewRecipient: boolean
@@ -228,6 +228,11 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
                         onFieldChange('recipient_name', recipient.name)
                         onFieldChange('recipient_email', recipient.email ?? '')
                         onSaveNewRecipientChange(false)
+                        onDestinationSourceChange('specific')
+                        onCheckRecipientOptions(recipient.email ?? '')
+                      } else {
+                        onDestinationSourceChange('specific')
+                        onCheckRecipientOptions('')
                       }
 
                       event.currentTarget.value = ''
@@ -269,7 +274,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
               value={form.recipient_email ?? ''}
               aria-invalid={emailError ? true : undefined}
               aria-describedby={emailError ? 'recipient-email-error' : 'recipient-email-help'}
-              onBlur={onCheckRecipientOptions}
+              onBlur={() => onCheckRecipientOptions()}
               onChange={(event) => {
                 onFieldChange('recipient_email', event.target.value)
                 onDestinationSourceChange('specific')
