@@ -343,8 +343,8 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
           </div>
         )}
         <div className="intro-copy">
-          <h1>Envie uma surpresa<br /><em>pelo caminho.</em></h1>
-          <p className="lead">Escreva uma mensagem, trace uma rota e deixe a Cartopia transformar carinho em aventura.</p>
+          <h1>Toda mensagem tem um destino.<br /><em>Algumas merecem uma aventura.</em></h1>
+          <p className="lead">Prepare uma mensagem, escolha o caminho e acompanhe a surpresa até chegar a quem importa.</p>
         </div>
         <div className="hero-route" aria-hidden="true">
           <div className="hero-route-stamp">CP · 01</div>

@@ -46,7 +46,7 @@
 .brand { display: inline-flex; align-items: center; gap: .55rem; border: 0; background: none; color: var(--ink); cursor: pointer; font: 700 1.4rem var(--display); letter-spacing: -.04em; padding: 0; }
 .brand-mark { display: inline-grid; place-items: center; width: 2rem; height: 2rem; border: 2px solid var(--coral); border-radius: .65rem .65rem .65rem .2rem; color: var(--cream); background: var(--coral); font-size: .9rem; transform: rotate(-6deg); box-shadow: 3px 3px 0 var(--peach); }
 .brand-mark span { transform: rotate(6deg); }
-.topbar-note { display: inline-flex; align-items: center; gap: .65rem; color: var(--muted); font-size: .85rem; }
+.topbar-note { display: inline-flex; align-items: center; gap: .65rem; color: var(--muted); font-size: .85rem; margin-left: 10px;}
 .topbar-route { display: inline-flex; align-items: center; gap: .18rem; color: var(--peach); font-size: .65rem; letter-spacing: .08em; }
 .topbar-route i { display: block; width: .38rem; height: .38rem; border: 1px solid var(--coral); border-radius: 50%; background: var(--cream); }.topbar-route b { font-weight: 800; }
 .page-content { width: min(100% - 3rem, 900px); margin: 0 auto; flex: 1; padding: 3.5rem 0 5rem; }
