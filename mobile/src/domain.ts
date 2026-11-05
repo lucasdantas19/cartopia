@@ -6,6 +6,8 @@ export type User = {
 }
 
 export type DestinationSource = 'specific' | 'recipient_default' | 'contact_preference'
+export type DeliveryMode = 'real' | 'playful'
+export type UnlockType = 'none' | 'password' | 'hangman'
 
 export type Session = {
   token: string
@@ -16,6 +18,9 @@ export type Delivery = {
   public_id: string
   sender_name: string | null
   recipient_name: string
+  delivery_mode?: DeliveryMode
+  unlock_type?: UnlockType
+  unlock_locked?: boolean
   origin: string
   origin_location?: DeliveryLocation | null
   destination: string

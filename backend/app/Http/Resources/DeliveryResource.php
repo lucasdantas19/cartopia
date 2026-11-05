@@ -40,6 +40,12 @@ class DeliveryResource extends JsonResource
             'public_id' => $this->public_id,
             'sender_name' => $this->sender_name,
             'recipient_name' => $this->recipient_name,
+            'delivery_mode' => $this->delivery_mode ?? 'real',
+            'unlock_type' => $this->unlock_type ?? 'none',
+            'unlock_locked' => ($this->access_role ?? null) === 'sender'
+                && ($this->unlock_type ?? 'none') !== 'none'
+                && $this->opened_at === null
+                && (int) $this->unlock_attempts >= (int) config('deliveries.max_unlock_attempts'),
             'origin' => $this->origin,
             'origin_location' => $this->origin_location,
             'destination' => $this->destination,

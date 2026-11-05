@@ -1,10 +1,15 @@
-import type { DeliveryLocation, DestinationSource } from './domain'
+import type { DeliveryLocation, DeliveryMode, DestinationSource, UnlockType } from './domain'
 
 export type DeliveryDraft = {
   senderName: string
   recipientName: string
   recipientEmail: string
   message: string
+  deliveryMode?: DeliveryMode
+  unlockType?: UnlockType
+  unlockPassword?: string
+  origin?: string
+  destination?: string
   originLocation: DeliveryLocation | null
   destinationLocation: DeliveryLocation | null
   destinationSource?: DestinationSource
@@ -40,6 +45,11 @@ export function parseDraft(value: string): DeliveryDraft | null {
       if (typeof text !== 'string' || text.length > limit) return null
     }
     if (!['paper-swallow', 'postal-cat', 'little-dragon'].includes(draft.courier)
+      || (draft.deliveryMode !== undefined && !['real', 'playful'].includes(draft.deliveryMode))
+      || (draft.unlockType !== undefined && !['none', 'password'].includes(draft.unlockType))
+      || (draft.unlockPassword !== undefined && (typeof draft.unlockPassword !== 'string' || draft.unlockPassword.length > 120))
+      || (draft.origin !== undefined && (typeof draft.origin !== 'string' || draft.origin.length > 160))
+      || (draft.destination !== undefined && (typeof draft.destination !== 'string' || draft.destination.length > 160))
       || ![0, 1, 2].includes(draft.stage)
       || (draft.destinationSource !== undefined && !['specific', 'recipient_default', 'contact_preference'].includes(draft.destinationSource))
       || !validLocation(draft.originLocation) || !validLocation(draft.destinationLocation)) return null

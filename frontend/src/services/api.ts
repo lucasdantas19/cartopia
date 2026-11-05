@@ -205,6 +205,27 @@ export function openDeliveryMessage(publicId: string, token: string) {
   })
 }
 
+export function fetchDeliveryChallenge(publicId: string, token: string) {
+  return request<{ data: { type: 'none' | 'password' | 'hangman'; solved: boolean; attempts_remaining: number; pattern?: string; guessed_letters?: string[]; wrong_letters?: string[] } }>(`/deliveries/${encodeURIComponent(publicId)}/challenge`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
+export function submitDeliveryChallenge(publicId: string, token: string, answer: string) {
+  return request<{ data: { solved: boolean; attempts_remaining: number; pattern?: string; guessed_letters?: string[]; wrong_letters?: string[] } }>(`/deliveries/${encodeURIComponent(publicId)}/challenge`, {
+    method: 'POST',
+    body: JSON.stringify({ answer }),
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
+export function resetDeliveryChallenge(publicId: string, token: string) {
+  return request<{ data: { reset: boolean; attempts_remaining: number } }>(`/deliveries/${encodeURIComponent(publicId)}/challenge/reset`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+}
+
 function adminHeaders(token: string): HeadersInit {
   return { Authorization: `Bearer ${token}` }
 }

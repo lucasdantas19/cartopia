@@ -47,3 +47,9 @@ Route::get('/deliveries/{publicId}/recipient-share-link', [DeliveryController::c
     ->middleware('throttle:delivery-tracking');
 Route::get('/deliveries/{publicId}/message', [DeliveryController::class, 'message'])
     ->middleware('throttle:message-opening');
+Route::get('/deliveries/{publicId}/challenge', [DeliveryController::class, 'challenge'])
+    ->middleware('throttle:delivery-challenge');
+Route::post('/deliveries/{publicId}/challenge', [DeliveryController::class, 'attemptChallenge'])
+    ->middleware('throttle:delivery-challenge');
+Route::post('/deliveries/{publicId}/challenge/reset', [DeliveryController::class, 'resetChallenge'])
+    ->middleware('throttle:delivery-challenge');

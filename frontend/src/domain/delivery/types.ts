@@ -4,6 +4,8 @@ export type AccessRole = 'sender' | 'recipient'
 export type CourierCode = 'paper-swallow' | 'postal-cat' | 'little-dragon'
 export type RouteVisibility = 'full' | 'progressive'
 export type DestinationSource = 'specific' | 'recipient_default' | 'contact_preference'
+export type DeliveryMode = 'real' | 'playful'
+export type UnlockType = 'none' | 'password' | 'hangman'
 export interface DeliveryLocationValue {
   label: string
   latitude: number
@@ -42,6 +44,9 @@ export interface Delivery {
   public_id: string
   sender_name: string | null
   recipient_name: string
+  delivery_mode?: DeliveryMode
+  unlock_type?: UnlockType
+  unlock_locked?: boolean
   recipient_email?: string
   origin: string
   origin_location: DeliveryLocationValue | null
@@ -68,6 +73,9 @@ export interface CreateDeliveryInput {
   sender_name?: string
   recipient_name: string
   recipient_email?: string
+  delivery_mode: DeliveryMode
+  unlock_type: UnlockType
+  unlock_password?: string
   origin: string
   origin_location: DeliveryLocationValue | null
   destination: string

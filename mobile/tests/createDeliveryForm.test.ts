@@ -7,6 +7,7 @@ const validForm = {
   recipientName: 'Ana',
   recipientEmail: '',
   message: 'Uma surpresa',
+  deliveryMode: 'real' as const,
   origin: 'Paris',
   destination: 'Disney',
   originLocation: { label: 'Paris', latitude: 48.8566, longitude: 2.3522 },
@@ -46,6 +47,28 @@ test('requires real coordinates for both places', () => {
     origin: 'Escolha uma origem real no mapa.',
     destination: 'Escolha um destino real no mapa.',
   })
+})
+
+test('accepts playful places without coordinates', () => {
+  assert.deepEqual(validateCreateDelivery({
+    ...validForm,
+    deliveryMode: 'playful',
+    origin: 'Narnia',
+    destination: 'O seu coração',
+    originLocation: null,
+    destinationLocation: null,
+  }), {})
+})
+
+test('requires different playful place names', () => {
+  assert.deepEqual(validateCreateDelivery({
+    ...validForm,
+    deliveryMode: 'playful',
+    origin: 'Narnia',
+    destination: 'Narnia',
+    originLocation: null,
+    destinationLocation: null,
+  }), { destination: 'Origem e destino precisam ser diferentes.' })
 })
 
 test('allows equal place names when the map points differ', () => {

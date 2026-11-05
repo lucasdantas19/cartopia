@@ -2,11 +2,15 @@
 
 As entregas usam um `public_id` UUID para identificação pública e um token de acesso independente. O token é retornado somente na criação, é armazenado apenas como SHA-256 e deve ser enviado nos endpoints de leitura pelo header `Authorization: Bearer <token>`.
 
+As entregas podem usar `delivery_mode` `real` ou `playful`. O modo padrão é `real`, para manter compatibilidade com clientes existentes. Entregas lúdicas usam nomes livres para origem e destino e não possuem coordenadas de mapa.
+
+Também podem usar `unlock_type` `none`, `password` ou `hangman`. No modo `password`, a senha é definida pelo remetente e armazenada apenas como hash. No modo `hangman`, a palavra é armazenada criptografada e o cliente recebe apenas o padrão mascarado e o estado das tentativas.
+
 O frontend pode guardar o token no fragmento do link de acompanhamento, por exemplo `/deliveries/{public_id}#token={token}`. Fragmentos não são enviados ao servidor como URL e não aparecem nos logs de requisição.
 
 ## Opções disponíveis
 
-Origens e destinos aceitos inicialmente:
+No modo `real`, os códigos de origem e destino aceitos inicialmente são:
 
 - `port-of-dreams`
 - `garden-of-ideas`
@@ -28,9 +32,31 @@ O entregador inicial é `paper-swallow`. A duração deve estar entre 1 e 1440 m
   "origin": "port-of-dreams",
   "destination": "garden-of-ideas",
   "courier": "paper-swallow",
+  "duration_minutes": 60,
+  "unlock_type": "password",
+  "unlock_password": "uma-palavra-secreta"
+}
+```
+
+Para uma entrega lúdica, envie `delivery_mode: "playful"` e informe apenas os nomes dos locais:
+
+```json
+{
+  "message": "Uma surpresa chegou até você.",
+  "recipient_name": "Pessoa querida",
+  "delivery_mode": "playful",
+  "origin": "Narnia",
+  "destination": "O seu coração",
+  "courier": "paper-swallow",
   "duration_minutes": 60
 }
 ```
+
+No modo lúdico, `origin_location` e `destination_location` devem ser omitidos. O acompanhamento exibe a rota textual e o progresso, sem mapa.
+
+Quando a entrega chega com `unlock_type: "password"`, consulte `GET /api/deliveries/{public_id}/challenge` e envie a resposta para `POST /api/deliveries/{public_id}/challenge` com `{ "answer": "..." }`. A mensagem só fica disponível depois de uma resposta correta.
+
+Para `unlock_type: "hangman"`, o mesmo endpoint recebe uma letra por tentativa. A consulta do desafio retorna `pattern`, `wrong_letters` e `attempts_remaining`, sem revelar a palavra secreta.
 
 Resposta `201 Created`:
 

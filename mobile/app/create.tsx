@@ -24,7 +24,7 @@ import { webUrl } from '../src/config'
 import { RealLocationPicker } from '../src/components/RealLocationPicker'
 import { useSession } from '../src/context/SessionContext'
 import { createDeliveryShareUrl, previewDeliveryShareUrl } from '../src/deepLinks'
-import type { DeliveryLocation, DestinationSource } from '../src/domain'
+import type { DeliveryLocation, DeliveryMode, DestinationSource, UnlockType } from '../src/domain'
 import { saveRecentDelivery } from '../src/recentDeliveries'
 import {
   validateCreateDelivery,
@@ -67,7 +67,12 @@ export default function CreateScreen() {
   const [recipientEmail, setRecipientEmail] = useState('')
   const [recipientOptions, setRecipientOptions] = useState<RecipientDeliveryOptions | null>(null)
   const [destinationSource, setDestinationSource] = useState<DestinationSource>('specific')
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>('real')
+  const [unlockType, setUnlockType] = useState<UnlockType>('none')
+  const [unlockPassword, setUnlockPassword] = useState('')
   const [message, setMessage] = useState('')
+  const [origin, setOrigin] = useState('')
+  const [destination, setDestination] = useState('')
   const [originLocation, setOriginLocation] = useState<DeliveryLocation | null>(null)
   const [destinationLocation, setDestinationLocation] = useState<DeliveryLocation | null>(null)
   const [mapPickerOpen, setMapPickerOpen] = useState<'origin' | 'destination' | null>(null)
@@ -88,10 +93,9 @@ export default function CreateScreen() {
   } | null>(null)
 
   const selectedCourier = couriers.find((item) => item.code === courier) ?? couriers[0]
-  const origin = originLocation?.label ?? ''
-  const destination = destinationLocation?.label ?? ''
   const hasDraft = Boolean(
-    senderName || recipientName || recipientEmail || message ||
+    senderName || recipientName || recipientEmail || message || origin || destination || deliveryMode !== 'real' ||
+    unlockType !== 'none' || unlockPassword ||
     originLocation || destinationLocation || courier !== couriers[0].code || duration !== '30',
   )
   useEffect(() => {
@@ -102,6 +106,11 @@ export default function CreateScreen() {
       setRecipientName(draft.recipientName)
       setRecipientEmail(draft.recipientEmail)
       setMessage(draft.message)
+      setDeliveryMode(draft.deliveryMode ?? 'real')
+      setUnlockType(draft.unlockType ?? 'none')
+      setUnlockPassword(draft.unlockPassword ?? '')
+      setOrigin(draft.origin ?? draft.originLocation?.label ?? '')
+      setDestination(draft.destination ?? draft.destinationLocation?.label ?? '')
       setOriginLocation(draft.originLocation)
       setDestinationLocation(draft.destinationLocation)
       setDestinationSource(draft.destinationSource ?? 'specific')
@@ -120,12 +129,12 @@ export default function CreateScreen() {
   useEffect(() => {
     if (!draftReady || created || draftStopped.current) return
     const operation = hasDraft
-      ? deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, destinationSource, courier, duration, stage })
+      ? deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, deliveryMode, unlockType, unlockPassword, origin, destination, originLocation, destinationLocation, destinationSource, courier, duration, stage })
       : deliveryDraftStore.clear()
     void operation.then(() => setDraftNotice(hasDraft ? 'Rascunho salvo neste dispositivo.' : '')).catch(() => {
       setDraftNotice('Não foi possível salvar o rascunho. Mantenha esta tela aberta para não perder o texto.')
     })
-  }, [draftReady, created, hasDraft, senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, destinationSource, courier, duration, stage])
+  }, [draftReady, created, hasDraft, senderName, recipientName, recipientEmail, message, deliveryMode, unlockType, unlockPassword, origin, destination, originLocation, destinationLocation, destinationSource, courier, duration, stage])
 
   const disablePrevention = usePreventRemove(hasDraft && !created, ({ repeat }) => {
     Alert.alert(
@@ -136,7 +145,7 @@ export default function CreateScreen() {
         {
           text: 'Guardar e sair',
           onPress: () => {
-            void deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, originLocation, destinationLocation, destinationSource, courier, duration, stage }).then(() => {
+            void deliveryDraftStore.save({ senderName, recipientName, recipientEmail, message, deliveryMode, unlockType, unlockPassword, origin, destination, originLocation, destinationLocation, destinationSource, courier, duration, stage }).then(() => {
               draftStopped.current = true
               disablePrevention()
               repeat()
@@ -182,6 +191,11 @@ export default function CreateScreen() {
     setRecipientOptions(null)
     setDestinationSource('specific')
     setMessage('')
+    setDeliveryMode('real')
+    setUnlockType('none')
+    setUnlockPassword('')
+    setOrigin('')
+    setDestination('')
     setOriginLocation(null)
     setDestinationLocation(null)
     setCourier(couriers[0].code)
@@ -220,6 +234,9 @@ export default function CreateScreen() {
       recipientName,
       recipientEmail,
       message,
+      deliveryMode,
+      unlockType,
+      unlockPassword,
       origin,
       destination,
       originLocation,
@@ -232,7 +249,7 @@ export default function CreateScreen() {
       setError('Revise os campos indicados antes de criar a entrega.')
       return
     }
-    if (!originLocation || (destinationSource === 'specific' && !destinationLocation)) {
+    if (deliveryMode === 'real' && (!originLocation || (destinationSource === 'specific' && !destinationLocation))) {
       setError('Escolha a origem e o destino no mapa antes de criar a entrega.')
       return
     }
@@ -247,11 +264,14 @@ export default function CreateScreen() {
         sender_name: senderName.trim() || undefined,
         recipient_name: recipientName.trim(),
         recipient_email: recipientEmail.trim() || undefined,
+        delivery_mode: deliveryMode,
+        unlock_type: unlockType,
+        ...(unlockType === 'password' ? { unlock_password: unlockPassword } : {}),
         origin,
-        origin_location: originLocation,
+        ...(deliveryMode === 'real' && originLocation ? { origin_location: originLocation } : {}),
         destination,
-        destination_location: destinationLocation ?? { label: '', latitude: 0, longitude: 0 },
-        destination_source: destinationSource,
+        ...(deliveryMode === 'real' && destinationLocation ? { destination_location: destinationLocation } : {}),
+        destination_source: deliveryMode === 'playful' ? 'specific' : destinationSource,
         courier,
         duration_minutes: durationMinutes,
       }, session?.token)
@@ -514,9 +534,11 @@ export default function CreateScreen() {
           onSelect={(location) => {
             if (mapPickerOpen === 'origin') {
               setOriginLocation(location)
+              setOrigin(location.label)
               clearFieldError('origin')
             } else {
               setDestinationLocation(location)
+              setDestination(location.label)
               clearFieldError('destination')
             }
             setMapPickerOpen(null)
@@ -709,6 +731,39 @@ export default function CreateScreen() {
               <Text style={styles.sectionNumber}>03</Text>
               <Text style={styles.sectionTitle}>Trace a rota</Text>
               <Text style={styles.sectionDescription}>Escolha quem leva e por onde a carta passa.</Text>
+              <Text style={styles.label}>Tipo de locais</Text>
+              <View style={styles.destinationOptions}>
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: deliveryMode === 'real' }}
+                  onPress={() => {
+                    setDeliveryMode('real')
+                    setOrigin(originLocation?.label ?? '')
+                    setDestination(destinationLocation?.label ?? '')
+                  }}
+                  style={[styles.destinationOption, deliveryMode === 'real' ? styles.selectedLocationMode : undefined]}
+                >
+                  <Text style={styles.destinationOptionTitle}>Locais reais</Text>
+                  <Text style={styles.fieldHint}>Pesquise endereços ou marque pontos no mapa.</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: deliveryMode === 'playful' }}
+                  onPress={() => {
+                    setDeliveryMode('playful')
+                    setDestinationSource('specific')
+                    setOriginLocation(null)
+                    setDestinationLocation(null)
+                  }}
+                  style={[styles.destinationOption, deliveryMode === 'playful' ? styles.selectedLocationMode : undefined]}
+                >
+                  <Text style={styles.destinationOptionTitle}>Locais lúdicos</Text>
+                  <Text style={styles.fieldHint}>Invente os lugares da aventura, sem usar mapa.</Text>
+                </Pressable>
+              </View>
+              {deliveryMode === 'playful' ? (
+                <Text style={styles.fieldHint}>Exemplo: de Narnia para O seu coração.</Text>
+              ) : null}
               <Text style={styles.label}>Entregador</Text>
               <View style={styles.courierOptions}>
                 {couriers.map((item) => (
@@ -756,8 +811,21 @@ export default function CreateScreen() {
                 }}
               >
                 <Text style={styles.label}>Origem</Text>
-                <Text style={styles.fieldHint}>Escolha no mapa de onde a carta vai partir.</Text>
-                <Pressable
+                {deliveryMode === 'playful' ? (
+                  <TextInput
+                    accessibilityLabel="Origem lúdica"
+                    maxLength={160}
+                    onChangeText={(value) => {
+                      setOrigin(value)
+                      clearFieldError('origin')
+                    }}
+                    placeholder="Ex.: Narnia"
+                    style={styles.input}
+                    value={origin}
+                  />
+                ) : <>
+                  <Text style={styles.fieldHint}>Escolha no mapa de onde a carta vai partir.</Text>
+                  <Pressable
                   accessibilityRole="button"
                   onPress={() => setMapPickerOpen('origin')}
                   style={[
@@ -775,7 +843,8 @@ export default function CreateScreen() {
                     </Text>
                   </View>
                   <Text style={styles.mapChoiceArrow}>›</Text>
-                </Pressable>
+                  </Pressable>
+                </>}
                 {fieldErrors.origin ? <Text style={styles.fieldError}>{fieldErrors.origin}</Text> : null}
               </View>
               <View
@@ -784,6 +853,19 @@ export default function CreateScreen() {
                 }}
               >
                 <Text style={styles.label}>Destino</Text>
+                {deliveryMode === 'playful' ? (
+                  <TextInput
+                    accessibilityLabel="Destino lúdico"
+                    maxLength={160}
+                    onChangeText={(value) => {
+                      setDestination(value)
+                      clearFieldError('destination')
+                    }}
+                    placeholder="Ex.: O seu coração"
+                    style={styles.input}
+                    value={destination}
+                  />
+                ) : <>
                 <Text style={styles.fieldHint}>{destinationSource === 'specific' ? 'Escolha no mapa onde a carta vai chegar.' : 'O destino protegido será resolvido pela conta do destinatário.'}</Text>
                 {destinationSource === 'specific' ? <Pressable
                   accessibilityRole="button"
@@ -804,6 +886,7 @@ export default function CreateScreen() {
                   </View>
                   <Text style={styles.mapChoiceArrow}>›</Text>
                 </Pressable> : null}
+                </>}
                 {fieldErrors.destination ? <Text style={styles.fieldError}>{fieldErrors.destination}</Text> : null}
               </View>
               <View
@@ -846,6 +929,68 @@ export default function CreateScreen() {
                   <Text style={styles.durationUnit}>minutos</Text>
                 </View>
                 {fieldErrors.duration ? <Text style={styles.fieldError}>{fieldErrors.duration}</Text> : null}
+              </View>
+              <View style={styles.challengeSection}>
+                <Text style={styles.label}>Desbloqueio da carta</Text>
+                <Text style={styles.fieldHint}>Você pode pedir uma senha antes de revelar a mensagem.</Text>
+                <View style={styles.destinationOptions}>
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: unlockType === 'none' }}
+                    onPress={() => setUnlockType('none')}
+                    style={[styles.destinationOption, unlockType === 'none' ? styles.selectedLocationMode : undefined]}
+                  >
+                    <Text style={styles.destinationOptionTitle}>Abrir normalmente</Text>
+                    <Text style={styles.fieldHint}>Revela a carta assim que ela chegar.</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: unlockType === 'password' }}
+                    onPress={() => setUnlockType('password')}
+                    style={[styles.destinationOption, unlockType === 'password' ? styles.selectedLocationMode : undefined]}
+                  >
+                    <Text style={styles.destinationOptionTitle}>Proteger com senha</Text>
+                    <Text style={styles.fieldHint}>Compartilhe a senha com o destinatário.</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: unlockType === 'hangman' }}
+                    onPress={() => setUnlockType('hangman')}
+                    style={[styles.destinationOption, unlockType === 'hangman' ? styles.selectedLocationMode : undefined]}
+                  >
+                    <Text style={styles.destinationOptionTitle}>Jogo da forca</Text>
+                    <Text style={styles.fieldHint}>O destinatário descobre uma palavra letra por letra.</Text>
+                  </Pressable>
+                </View>
+                {unlockType === 'password' ? (
+                  <TextInput
+                    accessibilityLabel="Senha da carta"
+                    autoCapitalize="none"
+                    maxLength={120}
+                    onChangeText={(value) => {
+                      setUnlockPassword(value)
+                      clearFieldError('unlockPassword')
+                    }}
+                    placeholder="Digite a senha"
+                    secureTextEntry
+                    style={styles.input}
+                    value={unlockPassword}
+                  />
+                ) : null}
+                {unlockType === 'hangman' ? (
+                  <TextInput
+                    accessibilityLabel="Palavra secreta da forca"
+                    maxLength={120}
+                    onChangeText={(value) => {
+                      setUnlockPassword(value)
+                      clearFieldError('unlockPassword')
+                    }}
+                    placeholder="Ex.: Nárnia"
+                    style={styles.input}
+                    value={unlockPassword}
+                  />
+                ) : null}
+                {fieldErrors.unlockPassword ? <Text style={styles.fieldError}>{fieldErrors.unlockPassword}</Text> : null}
               </View>
             </View>
 
@@ -930,6 +1075,8 @@ const styles = StyleSheet.create({
   clearDraftText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
   destinationOptions: { marginTop: 12 },
   destinationOption: { backgroundColor: '#fffdfb', borderColor: colors.line, borderRadius: 14, borderWidth: 1, marginTop: 8, padding: 12 },
+  selectedLocationMode: { borderColor: colors.primary, borderWidth: 2 },
+  challengeSection: { marginTop: 22 },
   destinationOptionTitle: { color: colors.ink, fontSize: 14, fontWeight: '800', marginBottom: 3 },
   courierOption: { alignItems: 'center', borderColor: colors.line, borderRadius: 16, borderWidth: 1, flex: 1, minWidth: 0, paddingHorizontal: 4, paddingVertical: 10 },
   selectedCourierOption: { backgroundColor: colors.sand, borderColor: colors.primary },

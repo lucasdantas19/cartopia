@@ -5,52 +5,155 @@ import { handleCourierImageError } from './courierImage'
 
 interface DeliverySummaryProps {
   form: CreateDeliveryInput
+  adventureEnabled: boolean
 }
 
-function getSummaryNote(form: CreateDeliveryInput): string {
-  if (!form.origin_location || !form.destination_location) {
-    return 'Escolha a origem e o destino para traçar a rota.'
+function formatDuration(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes <= 0) return 'Ainda não definida'
+  if (minutes % 1440 === 0) return `${minutes / 1440} ${minutes / 1440 === 1 ? 'dia' : 'dias'}`
+  if (minutes % 60 === 0) return `${minutes / 60} ${minutes / 60 === 1 ? 'hora' : 'horas'}`
+  return `${minutes} minutos`
+}
+
+function getTotalDuration(form: CreateDeliveryInput): number {
+  if (!form.steps?.length) return Number(form.duration_minutes)
+  return form.steps.reduce(
+    (total, step) => total + Number(step.duration_minutes || 0),
+    Number(form.final_duration_minutes || 0),
+  )
+}
+
+function getRouteState(form: CreateDeliveryInput): { ready: boolean; note: string } {
+  if (form.delivery_mode === 'playful') {
+    if (!form.origin.trim() || !form.destination.trim()) {
+      return { ready: false, note: 'Informe a origem e o destino imaginários para completar o percurso.' }
+    }
+
+    if (form.origin.trim() === form.destination.trim()) {
+      return { ready: false, note: 'Escolha nomes diferentes para a origem e o destino.' }
+    }
+
+    return { ready: true, note: 'Percurso imaginário pronto para a viagem.' }
   }
+
+  if (!form.origin_location) return { ready: false, note: 'Escolha a origem para traçar o percurso.' }
+  if (form.destination_source !== 'specific') return { ready: true, note: 'O destino protegido será resolvido no momento do envio.' }
+  if (!form.destination_location) return { ready: false, note: 'Escolha o destino para traçar o percurso.' }
 
   const sameLocation = form.origin_location.latitude === form.destination_location.latitude
     && form.origin_location.longitude === form.destination_location.longitude
 
-  return sameLocation ? 'Escolha lugares diferentes para traçar a rota.' : 'Tudo pronto para traçar a rota.'
+  return sameLocation
+    ? { ready: false, note: 'Escolha lugares diferentes para traçar o percurso.' }
+    : { ready: true, note: 'Percurso pronto para a viagem.' }
 }
 
-export function DeliverySummary({ form }: DeliverySummaryProps) {
+function getLocationLabel(form: CreateDeliveryInput, kind: 'origin' | 'destination'): string {
+  if (form.delivery_mode === 'playful') {
+    const value = kind === 'origin' ? form.origin : form.destination
+    return value.trim() || `${kind === 'origin' ? 'Origem' : 'Destino'} não definida`
+  }
+
+  if (kind === 'destination' && form.destination_source !== 'specific') return 'Destino protegido'
+
+  const location = kind === 'origin' ? form.origin_location : form.destination_location
+  return location?.label ?? `${kind === 'origin' ? 'Origem' : 'Destino'} não definida`
+}
+
+export function DeliverySummary({ form, adventureEnabled }: DeliverySummaryProps) {
   const [now, setNow] = useState(() => Date.now())
+  const courier = getCourier(form.courier)
+  const duration = getTotalDuration(form)
+  const route = getRouteState(form)
+  const origin = getLocationLabel(form, 'origin')
+  const destination = getLocationLabel(form, 'destination')
+  const stops = form.steps ?? []
+  const adventureComplete = !adventureEnabled && stops.length === 0 || (
+    stops.length > 0
+    && stops.every((step) => Number(step.duration_minutes) > 0)
+    && Number(form.final_duration_minutes) > 0
+  )
+  const canEstimateArrival = route.ready && adventureComplete && duration > 0
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000)
     return () => window.clearInterval(timer)
   }, [])
-  const courier = getCourier(form.courier)
-  const origin = form.origin_location ?? { label: 'Origem não definida', latitude: 0, longitude: 0 }
-  const destination = form.destination_location ?? { label: 'Destino não definido', latitude: 0, longitude: 0 }
-  const totalDuration = form.steps?.length ? form.steps.reduce((total, step) => total + Number(step.duration_minutes || 0), Number(form.final_duration_minutes || 0)) : Number(form.duration_minutes || 0)
-  const stops = form.steps ?? []
 
-  return <aside className="delivery-summary" aria-label="Resumo da entrega">
-    <div className="summary-heading"><strong>Bilhete de postagem</strong><span>Confira antes de enviar.</span></div>
-    <div className="summary-grid">
-      <div><span>Formato</span><strong>{form.steps?.length ? 'Com aventura' : 'Entrega direta'}</strong></div>
-      <div><span>Para</span><strong>{form.recipient_name.trim() || 'Seu destinatário'}</strong></div>
-      <div className="summary-courier"><span>Entregador</span><img src={courier.cardAsset} alt={courier.label} onError={handleCourierImageError} /><strong>{courier.label}</strong></div>
-      <div><span>Rota</span><strong>{origin.label} → {destination.label}</strong></div>
-      <div><span>Duração</span><strong>{totalDuration || '—'} {totalDuration ? 'minutos' : ''}</strong></div>
-      {form.steps?.length ? <div><span>Paradas</span><strong>{form.steps.length}</strong></div> : null}
-      {form.steps?.length ? <div><span>Visibilidade</span><strong>{form.route_visibility === 'progressive' ? 'Por etapas' : 'Trajeto completo'}</strong></div> : null}
-    </div>
-    <div className="summary-route" aria-label="Resumo do percurso">
-      <div className="summary-route-point start"><span /> <strong>{origin.label}</strong></div>
-      {stops.map((step, index) => <div className="summary-route-point" key={index}><i>{step.duration_minutes || 0} min</i><span /><strong>{step.location?.label || step.title || `Parada ${index + 1}`}</strong></div>)}
-      <div className="summary-route-point end"><i>{stops.length ? `${form.final_duration_minutes || 0} min` : `${form.duration_minutes || 0} min`}</i><span /> <strong>{destination.label}</strong></div>
-    </div>
-    {totalDuration > 0 && (
-      <p>
-        Chegada estimada se enviar agora: {new Date(now + totalDuration * 60000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.
-      </p>
-    )}
-    <p className="summary-note">{getSummaryNote(form)}</p>
-  </aside>
+  return (
+    <aside className="delivery-summary" aria-label="Bilhete de postagem">
+      <div className="summary-heading">
+        <strong>Bilhete de postagem</strong>
+        <span>Confira antes de enviar.</span>
+      </div>
+      <div className="summary-grid">
+        <div className="summary-primary">
+          <span>Modalidade</span>
+          <strong>{adventureEnabled ? 'Criar uma aventura' : 'Entrega direta'}</strong>
+        </div>
+        <div className="summary-primary summary-route-overview">
+          <span>Percurso</span>
+          <strong>{origin} → {destination}</strong>
+        </div>
+        <div className="summary-primary">
+          <span>Duração</span>
+          <strong>{formatDuration(duration)}</strong>
+        </div>
+        <div className="summary-primary">
+          <span>Desbloqueio</span>
+          <strong>
+            {form.unlock_type === 'password'
+              ? 'Proteger com senha'
+              : form.unlock_type === 'hangman'
+                ? 'Jogo da forca'
+                : 'Abrir normalmente'}
+          </strong>
+        </div>
+        <div>
+          <span>Para</span>
+          <strong>{form.recipient_name.trim() || 'Seu destinatário'}</strong>
+        </div>
+        <div className="summary-courier">
+          <span>Entregador</span>
+          <img src={courier.cardAsset} alt={courier.label} onError={handleCourierImageError} />
+          <strong>{courier.label}</strong>
+        </div>
+        {stops.length ? (
+          <div>
+            <span>Paradas</span>
+            <strong>{stops.length}</strong>
+          </div>
+        ) : null}
+      </div>
+      <div className="summary-route" aria-label="Resumo do percurso">
+        <div className="summary-route-point start">
+          <span />
+          <strong>{origin}</strong>
+        </div>
+        {stops.map((step, index) => (
+          <div className="summary-route-point" key={step.id ?? index}>
+            <i>{step.duration_minutes || 0} min</i>
+            <span />
+            <strong>{step.location?.label || step.title || `Parada ${index + 1}`}</strong>
+          </div>
+        ))}
+        <div className="summary-route-point end">
+          <i>{stops.length ? `${form.final_duration_minutes || 0} min` : `${form.duration_minutes || 0} min`}</i>
+          <span />
+          <strong>{destination}</strong>
+        </div>
+      </div>
+      {canEstimateArrival ? (
+        <p className="summary-arrival">
+          Chegada estimada se enviar agora: {new Date(now + duration * 60000).toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}.
+        </p>
+      ) : null}
+      <p className="summary-note">{route.note}</p>
+    </aside>
+  )
 }

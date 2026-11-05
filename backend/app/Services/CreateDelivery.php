@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Delivery;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Hash;
 
 class CreateDelivery
 {
@@ -22,9 +23,12 @@ class CreateDelivery
         $finalDurationMinutes = $attributes['final_duration_minutes'] ?? null;
         $courier = $attributes['courier'] ?? config('deliveries.couriers.0');
         $routeVisibility = $attributes['route_visibility'] ?? 'full';
+        $unlockType = $attributes['unlock_type'] ?? 'none';
+        $unlockPassword = $attributes['unlock_password'] ?? null;
         unset($attributes['duration_minutes']);
         unset($attributes['final_duration_minutes']);
         unset($attributes['route_visibility']);
+        unset($attributes['unlock_password']);
 
         if (isset($attributes['origin_location'])) {
             $attributes['origin'] = $attributes['origin_location']['label'];
@@ -94,6 +98,12 @@ class CreateDelivery
             'starts_at' => $startsAt,
             'arrives_at' => $arrivesAt,
             'final_duration_minutes' => $finalDurationMinutes,
+            'unlock_type' => $unlockType,
+            'unlock_answer_hash' => $unlockType === 'password' ? Hash::make($unlockPassword) : null,
+            'unlock_answer_encrypted' => $unlockType === 'hangman' ? Crypt::encryptString($this->normalizeHangmanAnswer((string) $unlockPassword)) : null,
+            'unlock_state' => $unlockType === 'hangman' ? ['guessed_letters' => []] : null,
+            'unlock_attempts' => 0,
+            'unlocked_at' => $unlockType === 'none' ? $startsAt : null,
             'route_steps' => $hasNarrativeSteps ? $routeSteps : [],
             'route_visibility' => $routeVisibility,
             'route_legs' => $routeLegs ?: null,
@@ -108,5 +118,11 @@ class CreateDelivery
             'recipient_access_token' => $recipientAccessToken,
             'sender_access_token' => $senderAccessToken,
         ];
+    }
+
+    private function normalizeHangmanAnswer(string $answer): string
+    {
+        $answer = mb_strtoupper(transliterator_transliterate('Any-Latin; Latin-ASCII', trim($answer)));
+        return preg_replace('/[^A-Z ]/', '', $answer) ?: '';
     }
 }

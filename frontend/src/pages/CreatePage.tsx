@@ -7,7 +7,7 @@ import { CreateDeliveryForm } from '../components/delivery/CreateDeliveryForm'
 import { DeliverySummary } from '../components/delivery/DeliverySummary'
 import { DeliveryCreationSuccess } from '../components/delivery/DeliveryCreationSuccess'
 import { Shell } from '../components/layout/Shell'
-import type { AccessRole, CreateDeliveryInput, CreateDeliveryStep, DestinationSource } from '../domain/delivery/types'
+import type { AccessRole, CreateDeliveryInput, CreateDeliveryStep, DeliveryMode, DestinationSource, UnlockType } from '../domain/delivery/types'
 
 interface CreatePageProps {
   onTrack: (publicId: string, token: string, role?: AccessRole) => void
@@ -50,7 +50,7 @@ function readCreatedDelivery(): CreatedDelivery | null {
 
 const initialForm: CreateDeliveryInput = {
   message: '', sender_name: '', recipient_name: '', origin: '', origin_location: null,
-  destination: '', destination_location: null, destination_source: 'specific', duration_minutes: 60, courier: 'paper-swallow',
+  delivery_mode: 'real', unlock_type: 'none', destination: '', destination_location: null, destination_source: 'specific', duration_minutes: 60, courier: 'paper-swallow',
   final_duration_minutes: 30, steps: [], route_visibility: 'full',
 }
 
@@ -100,6 +100,9 @@ function hasDeliveryDraft(form: CreateDeliveryInput, adventureEnabled: boolean):
     form.recipient_name.trim() ||
     form.origin_location ||
     form.destination_location ||
+    form.origin.trim() ||
+    form.destination.trim() ||
+    form.delivery_mode !== 'real' ||
     form.steps?.length,
   )
 }
@@ -192,6 +195,20 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
     setFieldErrors((current) => ({ ...current, [kind]: [], [`${kind}_location`]: [] }))
   }
 
+  function updateDeliveryMode(mode: DeliveryMode) {
+    setForm((current) => ({
+      ...current,
+      delivery_mode: mode,
+    }))
+    if (mode === 'playful') setRecipientOptions(null)
+    setFieldErrors((current) => ({ ...current, origin: [], destination: [], delivery_mode: [] }))
+  }
+
+  function updateUnlockType(type: UnlockType) {
+    setForm((current) => ({ ...current, unlock_type: type, ...(type === 'none' ? { unlock_password: '' } : {}) }))
+    setFieldErrors((current) => ({ ...current, unlock_type: [], unlock_password: [] }))
+  }
+
   function updateDestinationSource(source: DestinationSource) {
     setForm((current) => ({
       ...current,
@@ -242,8 +259,13 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(''); setFieldErrors({})
-    if (!form.origin_location || (form.destination_source === 'specific' && !form.destination_location)) { setError('Escolha a origem e o destino da entrega para continuar.'); return }
-    if (form.destination_source === 'specific' && form.origin_location && form.destination_location && form.origin_location.latitude === form.destination_location.latitude && form.origin_location.longitude === form.destination_location.longitude) { setError('Escolha localidades diferentes para a partida e o destino.'); return }
+    if (form.delivery_mode === 'playful') {
+      if (!form.origin.trim() || !form.destination.trim()) { setError('Informe a origem e o destino lúdicos para continuar.'); return }
+      if (form.origin.trim() === form.destination.trim()) { setError('Escolha nomes diferentes para a partida e o destino.'); return }
+    } else {
+      if (!form.origin_location || (form.destination_source === 'specific' && !form.destination_location)) { setError('Escolha a origem e o destino da entrega para continuar.'); return }
+      if (form.destination_source === 'specific' && form.origin_location && form.destination_location && form.origin_location.latitude === form.destination_location.latitude && form.origin_location.longitude === form.destination_location.longitude) { setError('Escolha localidades diferentes para a partida e o destino.'); return }
+    }
     if (adventureEnabled && !form.steps?.length) { setError('Adicione pelo menos uma parada para criar uma aventura.'); return }
     setSubmitting(true)
     try {
@@ -251,8 +273,9 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
       const input: CreateDeliveryInput = adventureEnabled
         ? {
             ...form,
-            steps: form.steps?.map(({ id: _id, ...step }) => ({
+            steps: form.steps?.map(({ id: _id, location, ...step }) => ({
               ...step,
+              ...(form.delivery_mode === 'real' && location ? { location } : {}),
               title: step.title.trim(),
               description: step.description?.trim() || undefined,
               duration_minutes: Number(step.duration_minutes),
@@ -261,6 +284,9 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
         : directForm
       const response = await createDelivery({
         ...input,
+        origin: form.origin.trim(),
+        destination: form.destination.trim(),
+        ...(form.delivery_mode === 'playful' ? { origin_location: null, destination_location: null, destination_source: 'specific' as const } : {}),
         sender_name: form.sender_name?.trim() || undefined,
         duration_minutes: Number(form.duration_minutes),
         final_duration_minutes: Number(form.final_duration_minutes),
@@ -345,6 +371,8 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
           onFieldChange={updateField}
           onEndpointChange={updateEndpoint}
           onAdventureChange={toggleAdventure}
+          onDeliveryModeChange={updateDeliveryMode}
+          onUnlockTypeChange={updateUnlockType}
           onStepChange={updateStep}
           onStepLocationChange={updateStepLocation}
           onAddStep={addStep}
@@ -367,7 +395,7 @@ export function CreatePage({ onTrack, onHome, onPrivacy, onAccount }: CreatePage
           <button type="button" className="summary-toggle" onClick={() => setShowSummary((visible) => !visible)} aria-expanded={showSummary}>
             {showSummary ? 'Ocultar resumo −' : 'Mostrar resumo +'}
           </button>
-          {showSummary && <DeliverySummary form={{ ...form, steps: adventureEnabled ? form.steps : [] }} />}
+          {showSummary && <DeliverySummary form={{ ...form, steps: adventureEnabled ? form.steps : [] }} adventureEnabled={adventureEnabled} />}
         </aside>
       </div>
     </Shell>

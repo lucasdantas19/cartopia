@@ -21,6 +21,8 @@ interface CreateDeliveryFormProps {
   onFieldChange: (field: keyof CreateDeliveryInput, value: string | number) => void
   onEndpointChange: (kind: 'origin' | 'destination', location: { label: string; latitude: number; longitude: number }) => void
   onAdventureChange: (enabled: boolean) => void
+  onDeliveryModeChange: (mode: 'real' | 'playful') => void
+  onUnlockTypeChange: (type: 'none' | 'password' | 'hangman') => void
   onStepChange: (index: number, field: 'title' | 'description' | 'duration_minutes', value: string | number) => void
   onStepLocationChange: (index: number, location: CreateDeliveryStep['location']) => void
   onAddStep: () => void
@@ -40,7 +42,7 @@ interface CreateDeliveryFormProps {
   onSaveNewDestinationChange: (shouldSave: boolean) => void
 }
 
-export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors, submitting, onSubmit, onFieldChange, onEndpointChange, onAdventureChange, onStepChange, onStepLocationChange, onAddStep, onRemoveStep, onMoveStep, savedLocations, savedRecipients, recipientOptions, onCheckRecipientOptions, onDestinationSourceChange, canSaveNewItems, saveNewRecipient, onSaveNewRecipientChange, saveNewOrigin, onSaveNewOriginChange, saveNewDestination, onSaveNewDestinationChange }: CreateDeliveryFormProps) {
+export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors, submitting, onSubmit, onFieldChange, onEndpointChange, onAdventureChange, onDeliveryModeChange, onUnlockTypeChange, onStepChange, onStepLocationChange, onAddStep, onRemoveStep, onMoveStep, savedLocations, savedRecipients, recipientOptions, onCheckRecipientOptions, onDestinationSourceChange, canSaveNewItems, saveNewRecipient, onSaveNewRecipientChange, saveNewOrigin, onSaveNewOriginChange, saveNewDestination, onSaveNewDestinationChange }: CreateDeliveryFormProps) {
   const formRef = useRef<HTMLFormElement>(null)
   const [openSections, setOpenSections] = useState<FormSectionState>({ message: true, courier: false, adventure: false })
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
@@ -111,12 +113,17 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
     ?? (touchedFields.recipient_name && !form.recipient_name.trim() ? 'Informe o nome do destinatário.' : undefined)
   const messageError = fieldErrors.message?.[0]
     ?? (touchedFields.message && !form.message.trim() ? 'Escreva uma mensagem antes de continuar.' : undefined)
+  const emailError = fieldErrors.recipient_email?.[0]
   const routeComplete = Boolean(
     form.origin_location &&
     (form.destination_source !== 'specific' || form.destination_location) &&
     Number(form.duration_minutes) > 0 &&
     Number(form.final_duration_minutes) > 0 &&
     (!adventureEnabled || stepsComplete),
+  )
+  const adventureDuration = (form.steps ?? []).reduce(
+    (total, step) => total + Number(step.duration_minutes || 0),
+    Number(form.final_duration_minutes || 0),
   )
 
   return (
@@ -155,20 +162,108 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
           </div>
           <b className="section-toggle-icon" aria-hidden="true">{openSections.message ? '−' : '+'}</b>
         </div>
-        <div id="message-section-content">
-        <div className="field-grid">
-          <div>
-            <label htmlFor="sender_name">Seu nome <small>(opcional)</small></label>
-            <input id="sender_name" maxLength={120} value={form.sender_name} aria-invalid={fieldErrors.sender_name ? true : undefined} aria-describedby={fieldErrors.sender_name ? 'sender-name-error' : undefined} onChange={(event) => onFieldChange('sender_name', event.target.value)} placeholder="Como devemos assinar?" />
-            {fieldErrors.sender_name && <FieldError id="sender-name-error" messages={fieldErrors.sender_name} />}
-          </div>
-          <div>
-            <label htmlFor="recipient_name">Nome do destinatário <span className="required">*</span></label>
-            <input id="recipient_name" required maxLength={120} value={form.recipient_name} aria-invalid={recipientError ? true : undefined} aria-describedby={recipientError ? 'recipient-name-error' : undefined} onBlur={() => touchField('recipient_name')} onChange={(event) => onFieldChange('recipient_name', event.target.value)} placeholder="Quem receberá?" />
-            {savedRecipients.length > 0 && <select className="saved-recipient-select" aria-label="Usar destinatário salvo" defaultValue="" onChange={(event) => { const recipient = savedRecipients.find((item) => String(item.id) === event.target.value); if (recipient) { onFieldChange('recipient_name', recipient.name); onFieldChange('recipient_email', recipient.email ?? ''); onSaveNewRecipientChange(false) } event.currentTarget.value = '' }}><option value="">Usar destinatário salvo…</option>{savedRecipients.map((recipient) => <option key={recipient.id} value={recipient.id}>{recipient.nickname ? `${recipient.nickname} · ${recipient.name}` : recipient.name}</option>)}</select>}
-            <label className="recipient-email-field" htmlFor="recipient_email">E-mail <small>(opcional, para aparecer na conta da pessoa)</small></label>
-            <input id="recipient_email" type="email" maxLength={255} value={form.recipient_email ?? ''} onBlur={onCheckRecipientOptions} onChange={(event) => { onFieldChange('recipient_email', event.target.value); onDestinationSourceChange('specific') }} placeholder="nome@exemplo.com" />
-            {recipientOptions?.available && (
+        <div id="message-section-content" className="message-section-content">
+          <div className="message-details-groups">
+          <section className="message-group" aria-labelledby="sender-group-title">
+            <div className="message-group-heading">
+              <div>
+                <span className="message-group-kicker">Grupo 01</span>
+                <h3 id="sender-group-title">De quem é a carta?</h3>
+              </div>
+            </div>
+            <label htmlFor="sender_name">
+              Seu nome <small>(opcional)</small>
+            </label>
+            <input
+              id="sender_name"
+              maxLength={120}
+              value={form.sender_name}
+              aria-invalid={fieldErrors.sender_name ? true : undefined}
+              aria-describedby={fieldErrors.sender_name ? 'sender-name-error' : undefined}
+              onBlur={() => touchField('sender_name')}
+              onChange={(event) => onFieldChange('sender_name', event.target.value)}
+              placeholder="Como devemos assinar?"
+            />
+            {fieldErrors.sender_name && (
+              <FieldError id="sender-name-error" messages={fieldErrors.sender_name} />
+            )}
+          </section>
+          <section className="message-group" aria-labelledby="recipient-group-title">
+            <div className="message-group-heading">
+              <div>
+                <span className="message-group-kicker">Grupo 02</span>
+                <h3 id="recipient-group-title">Para quem vai a carta?</h3>
+              </div>
+              {savedRecipients.length > 0 ? (
+                <label className="saved-recipient-action">
+                  <span>Usar destinatário salvo</span>
+                  <select
+                    aria-label="Usar destinatário salvo"
+                    defaultValue=""
+                    onChange={(event) => {
+                      const recipient = savedRecipients.find(
+                        (item) => String(item.id) === event.target.value,
+                      )
+
+                      if (recipient) {
+                        onFieldChange('recipient_name', recipient.name)
+                        onFieldChange('recipient_email', recipient.email ?? '')
+                        onSaveNewRecipientChange(false)
+                      }
+
+                      event.currentTarget.value = ''
+                    }}
+                  >
+                    <option value="">Selecionar</option>
+                    {savedRecipients.map((recipient) => (
+                      <option key={recipient.id} value={recipient.id}>
+                        {recipient.nickname
+                          ? `${recipient.nickname} · ${recipient.name}`
+                          : recipient.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+            </div>
+            <label htmlFor="recipient_name">
+              Nome do destinatário <span className="required">*</span>
+            </label>
+            <input
+              id="recipient_name"
+              required
+              maxLength={120}
+              value={form.recipient_name}
+              aria-invalid={recipientError ? true : undefined}
+              aria-describedby={recipientError ? 'recipient-name-error' : undefined}
+              onBlur={() => touchField('recipient_name')}
+              onChange={(event) => onFieldChange('recipient_name', event.target.value)}
+              placeholder="Nome de quem vai receber"
+            />
+            <label className="recipient-email-field" htmlFor="recipient_email">
+              E-mail <small>(opcional)</small>
+            </label>
+            <input
+              id="recipient_email"
+              type="email"
+              maxLength={255}
+              value={form.recipient_email ?? ''}
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby={emailError ? 'recipient-email-error' : 'recipient-email-help'}
+              onBlur={onCheckRecipientOptions}
+              onChange={(event) => {
+                onFieldChange('recipient_email', event.target.value)
+                onDestinationSourceChange('specific')
+              }}
+              placeholder="exemplo@email.com"
+            />
+            <p id="recipient-email-help" className="field-help">
+              Opcional. Permite associar a carta à conta Cartopia do destinatário, quando disponível.
+            </p>
+            {emailError ? (
+              <FieldError id="recipient-email-error" messages={[emailError]} />
+            ) : null}
+            {form.delivery_mode === 'real' && recipientOptions?.available && (
               <fieldset className="recipient-destination-options">
                 <legend>Destino para este destinatário</legend>
                 <label className={form.destination_source === 'specific' ? 'journey-choice-option selected' : 'journey-choice-option'}>
@@ -189,22 +284,49 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
                 )}
               </fieldset>
             )}
-            {canSaveNewItems && !savedRecipients.some((recipient) => recipient.name.toLowerCase() === form.recipient_name.trim().toLowerCase() && (recipient.email ?? '').toLowerCase() === (form.recipient_email ?? '').trim().toLowerCase()) && form.recipient_name.trim() && <label className="save-new-option"><input type="checkbox" checked={saveNewRecipient} onChange={(event) => onSaveNewRecipientChange(event.target.checked)} /><span>Salvar esta pessoa na minha conta</span></label>}
-            {recipientError && <FieldError id="recipient-name-error" messages={[recipientError]} />}
+            {canSaveNewItems && !savedRecipients.some((recipient) => recipient.name.toLowerCase() === form.recipient_name.trim().toLowerCase() && (recipient.email ?? '').toLowerCase() === (form.recipient_email ?? '').trim().toLowerCase()) && form.recipient_name.trim() && (
+              <label className="save-new-option">
+                <input
+                  type="checkbox"
+                  checked={saveNewRecipient}
+                  onChange={(event) => onSaveNewRecipientChange(event.target.checked)}
+                />
+                <span>Salvar esta pessoa na minha conta</span>
+              </label>
+            )}
+            {recipientError && (
+              <FieldError id="recipient-name-error" messages={[recipientError]} />
+            )}
+            </section>
           </div>
-        </div>
-        <div className="message-composer">
-          <div className="message-composer-heading">
-            <label htmlFor="message" className="message-label">Sua mensagem <span className="required">*</span></label>
-            <span>o coração da viagem</span>
+          <div className="message-composer">
+            <div className="message-composer-heading">
+              <div>
+                <span className="message-group-kicker">Grupo 03</span>
+                <label htmlFor="message" className="message-label">
+                  Escreva sua carta <span className="required">*</span>
+                </label>
+              </div>
+              <span>O coração da viagem</span>
+            </div>
+            <textarea
+              id="message"
+              required
+              maxLength={10000}
+              value={form.message}
+              aria-invalid={messageError ? true : undefined}
+              aria-describedby={messageError ? 'message-error' : undefined}
+              onBlur={() => touchField('message')}
+              onChange={(event) => onFieldChange('message', event.target.value)}
+              placeholder="Querido(a)..."
+              rows={7}
+            />
+            <div className="message-composer-footer">
+              <span>Escreva do seu jeito.</span>
+              <small>{form.message.length.toLocaleString('pt-BR')} / 10.000</small>
+            </div>
+            {messageError && <FieldError id="message-error" messages={[messageError]} />}
           </div>
-          <textarea id="message" required maxLength={10000} value={form.message} aria-invalid={messageError ? true : undefined} aria-describedby={messageError ? 'message-error' : undefined} onBlur={() => touchField('message')} onChange={(event) => onFieldChange('message', event.target.value)} placeholder="Era uma vez uma mensagem..." rows={5} />
-          <div className="message-composer-footer">
-            <span>Escreva do seu jeito.</span>
-            <small>{form.message.length.toLocaleString('pt-BR')} / 10.000</small>
-          </div>
-          {messageError && <FieldError id="message-error" messages={[messageError]} />}
-        </div>
         </div>
       </div>
       <div className={`form-section form-collapsible ${openSections.courier ? 'is-open' : ''}`}>
@@ -242,73 +364,137 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
         </div>
         <div id="adventure-section-content">
         <fieldset className="journey-choice">
-          <legend>Como sua mensagem deve viajar?</legend>
+          <legend>Como sua carta vai viajar?</legend>
           <label className={`journey-choice-option ${!adventureEnabled ? 'selected' : ''}`}>
             <input type="radio" name="journey_mode" checked={!adventureEnabled} onChange={() => onAdventureChange(false)} />
-            <span><strong>Entrega direta</strong><small>Vai direto ao destinatário.</small></span>
+            <span><strong>Entrega direta</strong><small>A carta viaja até o destino, sem paradas intermediárias.</small></span>
           </label>
           <label className={`journey-choice-option ${adventureEnabled ? 'selected' : ''}`}>
             <input type="radio" name="journey_mode" checked={adventureEnabled} onChange={() => onAdventureChange(true)} />
-            <span><strong>Criar uma aventura</strong><small>Adicione paradas, histórias e lugares pelo caminho.</small></span>
+            <span><strong>Criar uma aventura</strong><small>Crie paradas pelo caminho e transforme a entrega em uma história.</small></span>
           </label>
         </fieldset>
-        {adventureEnabled && (
-          <fieldset className="journey-visibility">
-            <legend>O que o destinatário descobrirá?</legend>
-            <label className={`journey-choice-option ${form.route_visibility === 'full' ? 'selected' : ''}`}>
-              <input type="radio" name="route_visibility" checked={form.route_visibility === 'full'} onChange={() => onFieldChange('route_visibility', 'full')} />
-              <span><strong>Mostrar toda a trajetória</strong><small>O destinatário vê todas as paradas desde o início.</small></span>
-            </label>
-            <label className={`journey-choice-option ${form.route_visibility === 'progressive' ? 'selected' : ''}`}>
-              <input type="radio" name="route_visibility" checked={form.route_visibility === 'progressive'} onChange={() => onFieldChange('route_visibility', 'progressive')} />
-              <span><strong>Revelar pelo caminho</strong><small>Cada nova etapa aparece conforme a entrega avança.</small></span>
-            </label>
-          </fieldset>
-        )}
-        <div className="route-fields">
-          <EndpointLocationField label="De" location={form.origin_location} fallback={locations[0]} savedLocations={savedLocations} onSavedLocation={(location) => selectSavedLocation('origin', location)} onChange={(location) => onEndpointChange('origin', location)} canSave={canSaveNewItems} saveNewLocation={saveNewOrigin} onSaveNewLocationChange={onSaveNewOriginChange} />
-          <span className="route-arrow" aria-hidden="true">→</span>
-          {form.destination_source === 'specific' ? (
-            <EndpointLocationField label="Para" location={form.destination_location} fallback={locations[1]} savedLocations={savedLocations} onSavedLocation={(location) => selectSavedLocation('destination', location)} onChange={(location) => onEndpointChange('destination', location)} canSave={canSaveNewItems} saveNewLocation={saveNewDestination} onSaveNewLocationChange={onSaveNewDestinationChange} />
-          ) : (
-            <div className="endpoint-location-field recipient-destination-confirmation">
-              <label>Para</label>
-              <strong>Endereço protegido do destinatário</strong>
-              <p>O local será resolvido no momento do envio e não será exibido aqui.</p>
+        <fieldset className="journey-choice">
+          <legend>Por onde sua carta vai passar?</legend>
+          <label className={`journey-choice-option ${form.delivery_mode === 'real' ? 'selected' : ''}`}>
+            <input type="radio" name="delivery_mode" checked={form.delivery_mode === 'real'} onChange={() => onDeliveryModeChange('real')} />
+            <span><strong>Locais reais</strong><small>Escolha endereços reais e acompanhe o percurso no mapa.</small></span>
+          </label>
+          <label className={`journey-choice-option ${form.delivery_mode === 'playful' ? 'selected' : ''}`}>
+            <input type="radio" name="delivery_mode" checked={form.delivery_mode === 'playful'} onChange={() => onDeliveryModeChange('playful')} />
+            <span><strong>Locais lúdicos</strong><small>Invente lugares e crie uma viagem imaginária, sem mapa.</small></span>
+          </label>
+        </fieldset>
+        <section className="route-configuration" aria-labelledby="route-configuration-title">
+          <div className="journey-group-heading">
+            <h3 id="route-configuration-title">Escolha o percurso</h3>
+            <p>{form.delivery_mode === 'real' ? 'Informe onde a carta começa e termina.' : 'Conte onde a viagem imaginária começa e termina.'}</p>
+          </div>
+          <div className="route-fields">
+            {form.delivery_mode === 'playful' ? (
+              <div className="endpoint-location-field">
+                <label htmlFor="playful-origin">Origem</label>
+                <input id="playful-origin" maxLength={160} required value={form.origin} onChange={(event) => onFieldChange('origin', event.target.value)} placeholder="Ex.: Nárnia" />
+                <small>Um reino, uma lembrança ou um sentimento.</small>
+              </div>
+            ) : (
+              <EndpointLocationField label="Origem" location={form.origin_location} fallback={locations[0]} savedLocations={savedLocations} onSavedLocation={(location) => selectSavedLocation('origin', location)} onChange={(location) => onEndpointChange('origin', location)} canSave={canSaveNewItems} saveNewLocation={saveNewOrigin} onSaveNewLocationChange={onSaveNewOriginChange} />
+            )}
+            <span className="route-arrow" aria-hidden="true">→</span>
+            {form.delivery_mode === 'playful' ? (
+              <div className="endpoint-location-field">
+                <label htmlFor="playful-destination">Destino</label>
+                <input id="playful-destination" maxLength={160} required value={form.destination} onChange={(event) => onFieldChange('destination', event.target.value)} placeholder="Ex.: O seu coração" />
+                <small>Um lugar impossível ou alguém especial.</small>
+              </div>
+            ) : form.destination_source === 'specific' ? (
+              <EndpointLocationField label="Destino" location={form.destination_location} fallback={locations[1]} savedLocations={savedLocations} onSavedLocation={(location) => selectSavedLocation('destination', location)} onChange={(location) => onEndpointChange('destination', location)} canSave={canSaveNewItems} saveNewLocation={saveNewDestination} onSaveNewLocationChange={onSaveNewDestinationChange} />
+            ) : (
+              <div className="endpoint-location-field recipient-destination-confirmation">
+                <label>Destino</label>
+                <strong>Endereço protegido do destinatário</strong>
+                <p>O local será resolvido no momento do envio e não será exibido aqui.</p>
+              </div>
+            )}
+          </div>
+          {form.delivery_mode === 'real' && recipientOptions?.available && (
+            <p className="field-help route-context-help">Você também pode usar o endereço protegido ou uma preferência salva do destinatário.</p>
+          )}
+          {adventureEnabled && (
+            <fieldset className="journey-visibility">
+              <legend>Visibilidade das paradas</legend>
+              <label className={`journey-choice-option ${form.route_visibility === 'full' ? 'selected' : ''}`}>
+                <input type="radio" name="route_visibility" checked={form.route_visibility === 'full'} onChange={() => onFieldChange('route_visibility', 'full')} />
+                <span><strong>Mostrar toda a trajetória</strong><small>O destinatário vê todas as paradas desde o início.</small></span>
+              </label>
+              <label className={`journey-choice-option ${form.route_visibility === 'progressive' ? 'selected' : ''}`}>
+                <input type="radio" name="route_visibility" checked={form.route_visibility === 'progressive'} onChange={() => onFieldChange('route_visibility', 'progressive')} />
+                <span><strong>Revelar pelo caminho</strong><small>Cada nova etapa aparece conforme a entrega avança.</small></span>
+              </label>
+            </fieldset>
+          )}
+          {!adventureEnabled && (
+            <div className="duration-field journey-duration-field">
+              <label htmlFor="duration_minutes">Quanto tempo a viagem vai durar?</label>
+              <p className="field-help">Defina quanto tempo a carta ficará em viagem antes de chegar ao destino.</p>
+              <div className="duration-presets" aria-label="Durações sugeridas">
+                {[15, 60, 1440].map((minutes) => (
+                  <button key={minutes} type="button" className="button secondary" aria-pressed={form.duration_minutes === minutes} onClick={() => onFieldChange('duration_minutes', minutes)}>
+                    {minutes === 15 ? '15 minutos' : minutes === 60 ? '1 hora' : '24 horas'}
+                  </button>
+                ))}
+              </div>
+              <div className="duration-input">
+                <input id="duration_minutes" type="number" required min={1} max={1440} value={form.duration_minutes} aria-invalid={fieldErrors.duration_minutes ? true : undefined} aria-describedby={fieldErrors.duration_minutes ? 'duration-minutes-error' : undefined} onChange={(event) => onFieldChange('duration_minutes', Number(event.target.value))} />
+                <span>minutos</span>
+              </div>
+              {fieldErrors.duration_minutes && <FieldError id="duration-minutes-error" messages={fieldErrors.duration_minutes} />}
             </div>
           )}
-        </div>
-        {!adventureEnabled && (
-          <div className="duration-field">
-            <label htmlFor="duration_minutes">Duração da viagem <small>(1 a 1440 minutos)</small></label>
-            <div className="duration-presets" aria-label="Durações sugeridas">
-              {[15, 60, 1440].map((minutes) => (
-                <button
-                  key={minutes}
-                  type="button"
-                  className="button secondary"
-                  aria-pressed={form.duration_minutes === minutes}
-                  onClick={() => onFieldChange('duration_minutes', minutes)}
-                >
-                  {minutes === 15 ? '15 min' : minutes === 60 ? '1 hora' : '24 horas'}
-                </button>
-              ))}
+          {adventureEnabled && <div className="steps-editor">
+            <div className="journey-duration-overview">
+              <div>
+                <strong>Quanto tempo a viagem vai durar?</strong>
+                <p>Defina quanto tempo a carta ficará em viagem antes de chegar ao destino. A duração total soma cada parada e o trecho final.</p>
+              </div>
+              <strong>{adventureDuration > 0 ? `${adventureDuration} minutos` : 'Ainda não definida'}</strong>
             </div>
-            <div className="duration-input">
-              <input id="duration_minutes" type="number" required min={1} max={1440} value={form.duration_minutes} aria-invalid={fieldErrors.duration_minutes ? true : undefined} aria-describedby={fieldErrors.duration_minutes ? 'duration-minutes-error' : undefined} onChange={(event) => onFieldChange('duration_minutes', Number(event.target.value))} />
-              <span>minutos</span>
+            <div className="steps-editor-heading"><div><label>Paradas da aventura</label><small>Defina o tempo desde o ponto anterior até cada parada.</small></div><span>{(form.steps ?? []).length} {(form.steps ?? []).length === 1 ? 'parada' : 'paradas'}</span></div>
+            {!(form.steps ?? []).length && <div className="steps-empty"><strong>Sua aventura ainda não tem paradas.</strong><p>Adicione uma história, uma pausa ou um lugar especial ao caminho.</p></div>}
+            {(form.steps ?? []).map((step, index) => <article className="step-editor" key={step.id ?? index}><div className="step-editor-number">{String(index + 1).padStart(2, '0')}</div><div className="step-editor-fields"><div className="step-editor-heading-row"><strong>Parada {index + 1}</strong><div className="step-reorder"><button type="button" className="step-order-button" disabled={index === 0} aria-label={`Mover parada ${index + 1} para cima`} onClick={() => onMoveStep(index, -1)}>↑ subir</button><button type="button" className="step-order-button" disabled={index === (form.steps ?? []).length - 1} aria-label={`Mover parada ${index + 1} para baixo`} onClick={() => onMoveStep(index, 1)}>↓ descer</button></div></div><input required maxLength={120} aria-label={`Título da etapa ${index + 1}`} value={step.title} onChange={(event) => onStepChange(index, 'title', event.target.value)} placeholder="Ex.: Uma pausa para um croissant" /><textarea maxLength={500} aria-label={`Descrição da etapa ${index + 1}`} value={step.description ?? ''} onChange={(event) => onStepChange(index, 'description', event.target.value)} placeholder="Descreva esse momento da jornada (opcional)." rows={2} /><div className="step-duration"><label htmlFor={`step-duration-${index}`}>Tempo até esta parada</label><input id={`step-duration-${index}`} required type="number" min={1} max={1440} value={step.duration_minutes} onChange={(event) => onStepChange(index, 'duration_minutes', Number(event.target.value))} /><span>minutos</span>{<button type="button" className="text-button" onClick={() => onRemoveStep(index)}>remover</button>}</div>{form.delivery_mode === 'real' && <LocationPicker center={form.origin_location ? [form.origin_location.longitude, form.origin_location.latitude] : locations[0].coordinates} location={step.location} onChange={(location) => onStepLocationChange(index, location)} onClear={() => onStepLocationChange(index, undefined)} />}</div></article>)}
+            <button type="button" className="text-button" onClick={onAddStep}>+ adicionar parada</button>
+            <div className="final-destination-duration"><label htmlFor="final_duration_minutes">Tempo da última parada até o destino final</label><div className="duration-input"><input id="final_duration_minutes" type="number" required min={1} max={1440} value={form.final_duration_minutes} onChange={(event) => onFieldChange('final_duration_minutes', Number(event.target.value))} /><span>minutos</span></div></div>
+            {form.delivery_mode === 'real' && form.origin_location && form.destination_location ? <JourneyPreview origin={form.origin_location} destination={form.destination_location} steps={form.steps ?? []} finalDurationMinutes={form.final_duration_minutes} /> : <p className="steps-empty">{form.delivery_mode === 'real' ? 'A prévia do mapa aparece quando origem e destino forem escolhidos diretamente.' : 'Locais lúdicos não usam mapa: a história aparece pelos nomes e descrições das paradas.'}</p>}
+          </div>}
+        </section>
+        <fieldset className="journey-choice unlock-choice">
+          <legend>Como o destinatário vai abrir a carta?</legend>
+          <p className="field-help">Após a chegada, escolha como sua mensagem poderá ser revelada.</p>
+          <label className={`journey-choice-option ${form.unlock_type === 'none' ? 'selected' : ''}`}>
+            <input type="radio" name="unlock_type" checked={form.unlock_type === 'none'} onChange={() => onUnlockTypeChange('none')} />
+            <span><strong>Abrir normalmente</strong><small>A mensagem poderá ser lida assim que a carta chegar.</small></span>
+          </label>
+          <label className={`journey-choice-option ${form.unlock_type === 'password' ? 'selected' : ''}`}>
+            <input type="radio" name="unlock_type" checked={form.unlock_type === 'password'} onChange={() => onUnlockTypeChange('password')} />
+            <span><strong>Proteger com senha</strong><small>O destinatário precisará informar uma senha para ler a mensagem.</small></span>
+          </label>
+          <label className={`journey-choice-option ${form.unlock_type === 'hangman' ? 'selected' : ''}`}>
+            <input type="radio" name="unlock_type" checked={form.unlock_type === 'hangman'} onChange={() => onUnlockTypeChange('hangman')} />
+            <span><strong>Jogo da forca</strong><small>O destinatário deverá descobrir uma palavra para revelar a mensagem.</small></span>
+          </label>
+          {form.unlock_type === 'password' ? (
+            <div className="conditional-unlock-field">
+              <label htmlFor="unlock-password">Senha da carta</label>
+              <input id="unlock-password" required maxLength={120} type="password" value={form.unlock_password ?? ''} onChange={(event) => onFieldChange('unlock_password', event.target.value)} placeholder="Digite uma senha para compartilhar" />
             </div>
-            {fieldErrors.duration_minutes && <FieldError id="duration-minutes-error" messages={fieldErrors.duration_minutes} />}
-          </div>
-        )}
-        {adventureEnabled && <div className="steps-editor">
-          <div className="steps-editor-heading"><div><label>Paradas da aventura</label><small>Defina o tempo desde o ponto anterior até cada parada.</small></div><span>{(form.steps ?? []).length} {(form.steps ?? []).length === 1 ? 'parada' : 'paradas'}</span></div>
-          {!(form.steps ?? []).length && <div className="steps-empty"><strong>Sua aventura ainda não tem paradas.</strong><p>Adicione uma história, uma pausa ou um lugar especial ao caminho.</p></div>}
-          {(form.steps ?? []).map((step, index) => <article className="step-editor" key={step.id ?? index}><div className="step-editor-number">{String(index + 1).padStart(2, '0')}</div><div className="step-editor-fields"><div className="step-editor-heading-row"><strong>Parada {index + 1}</strong><div className="step-reorder"><button type="button" className="step-order-button" disabled={index === 0} aria-label={`Mover parada ${index + 1} para cima`} onClick={() => onMoveStep(index, -1)}>↑ subir</button><button type="button" className="step-order-button" disabled={index === (form.steps ?? []).length - 1} aria-label={`Mover parada ${index + 1} para baixo`} onClick={() => onMoveStep(index, 1)}>↓ descer</button></div></div><input required maxLength={120} aria-label={`Título da etapa ${index + 1}`} value={step.title} onChange={(event) => onStepChange(index, 'title', event.target.value)} placeholder="Ex.: Uma pausa para um croissant" /><textarea maxLength={500} aria-label={`Descrição da etapa ${index + 1}`} value={step.description ?? ''} onChange={(event) => onStepChange(index, 'description', event.target.value)} placeholder="Descreva esse momento da jornada (opcional)." rows={2} /><div className="step-duration"><label htmlFor={`step-duration-${index}`}>Tempo até esta parada</label><input id={`step-duration-${index}`} required type="number" min={1} max={1440} value={step.duration_minutes} onChange={(event) => onStepChange(index, 'duration_minutes', Number(event.target.value))} /><span>minutos</span>{<button type="button" className="text-button" onClick={() => onRemoveStep(index)}>remover</button>}</div><LocationPicker center={form.origin_location ? [form.origin_location.longitude, form.origin_location.latitude] : locations[0].coordinates} location={step.location} onChange={(location) => onStepLocationChange(index, location)} onClear={() => onStepLocationChange(index, undefined)} /></div></article>)}
-          <button type="button" className="text-button" onClick={onAddStep}>+ adicionar parada</button>
-          <div className="final-destination-duration"><label htmlFor="final_duration_minutes">Tempo da última parada até o destino final</label><div className="duration-input"><input id="final_duration_minutes" type="number" required min={1} max={1440} value={form.final_duration_minutes} onChange={(event) => onFieldChange('final_duration_minutes', Number(event.target.value))} /><span>minutos</span></div></div>
-          {form.origin_location && form.destination_location ? <JourneyPreview origin={form.origin_location} destination={form.destination_location} steps={form.steps ?? []} finalDurationMinutes={form.final_duration_minutes} /> : <p className="steps-empty">O mapa da prévia aparece quando os dois pontos forem escolhidos diretamente.</p>}
-        </div>}
+          ) : null}
+          {form.unlock_type === 'hangman' ? (
+            <div className="conditional-unlock-field">
+              <label htmlFor="unlock-hangman-word">Palavra secreta</label>
+              <input id="unlock-hangman-word" required maxLength={120} value={form.unlock_password ?? ''} onChange={(event) => onFieldChange('unlock_password', event.target.value)} placeholder="Ex.: Nárnia" />
+            </div>
+          ) : null}
+        </fieldset>
         {error && <p className="error-message" role="alert">{error}</p>}
         {fieldErrors.origin && <FieldError messages={fieldErrors.origin} />}
         {fieldErrors.destination && <FieldError messages={fieldErrors.destination} />}
@@ -316,7 +502,7 @@ export function CreateDeliveryForm({ form, adventureEnabled, error, fieldErrors,
         </div>
       </div>
       <div className="mobile-review">
-        <DeliverySummary form={{ ...form, steps: adventureEnabled ? form.steps : [] }} />
+        <DeliverySummary form={{ ...form, steps: adventureEnabled ? form.steps : [] }} adventureEnabled={adventureEnabled} />
       </div>
       <p>A mensagem será revelada ao final da viagem. Depois de enviar, compartilhe o link com o destinatário.</p>
       <button className="button primary submit-button" type="submit" disabled={submitting}>

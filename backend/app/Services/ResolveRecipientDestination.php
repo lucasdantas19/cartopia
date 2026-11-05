@@ -12,6 +12,7 @@ class ResolveRecipientDestination
     /** @return array{recipient_user_id: int|null, destination: string, destination_location: array<string, mixed>|null, destination_source: string} */
     public function handle(array $attributes, ?int $senderUserId): array
     {
+        $mode = $attributes['delivery_mode'] ?? 'real';
         $source = $attributes['destination_source'] ?? 'specific';
         $email = strtolower(trim((string) ($attributes['recipient_email'] ?? '')));
         $recipient = $email !== '' ? User::whereRaw('LOWER(email) = ?', [$email])->first() : null;
@@ -20,7 +21,7 @@ class ResolveRecipientDestination
             return [
                 'recipient_user_id' => $recipient?->id,
                 'destination' => $attributes['destination'],
-                'destination_location' => $attributes['destination_location'] ?? null,
+                'destination_location' => $mode === 'playful' ? null : ($attributes['destination_location'] ?? null),
                 'destination_source' => 'specific',
             ];
         }

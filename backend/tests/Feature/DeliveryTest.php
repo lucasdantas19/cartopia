@@ -192,6 +192,166 @@ it('accepts real custom locations for the origin and destination', function () {
         ->assertJsonPath('data.destination_location.longitude', 4.5331);
 });
 
+it('creates a playful delivery with text-only locations', function () {
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'delivery_mode' => 'playful',
+        'origin' => 'Narnia',
+        'destination' => 'O seu coração',
+    ]));
+
+    $response->assertCreated()
+        ->assertJsonPath('data.delivery_mode', 'playful')
+        ->assertJsonPath('data.origin', 'Narnia')
+        ->assertJsonPath('data.destination', 'O seu coração')
+        ->assertJsonPath('data.origin_location', null)
+        ->assertJsonPath('data.destination_location', null);
+});
+
+it('accepts null map locations for playful deliveries', function () {
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'delivery_mode' => 'playful',
+        'origin' => 'Narnia',
+        'destination' => 'O seu coração',
+        'origin_location' => null,
+        'destination_location' => null,
+    ]));
+
+    $response->assertCreated()
+        ->assertJsonPath('data.delivery_mode', 'playful')
+        ->assertJsonPath('data.origin_location', null)
+        ->assertJsonPath('data.destination_location', null);
+});
+
+it('rejects protected address destinations for playful deliveries', function () {
+    $this->postJson('/api/deliveries', deliveryPayload([
+        'delivery_mode' => 'playful',
+        'destination_source' => 'recipient_default',
+        'destination' => null,
+    ]))->assertUnprocessable()->assertJsonValidationErrors('destination_source');
+});
+
+it('protects the message with a sender-defined password', function () {
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'unlock_type' => 'password',
+        'unlock_password' => 'abracadabra',
+        'duration_minutes' => 1,
+    ]))->assertCreated();
+
+    $publicId = $response->json('data.public_id');
+    $token = $response->json('recipient_access_token');
+    CarbonImmutable::setTestNow(CarbonImmutable::now('UTC')->addMinutes(2));
+
+    $this->withHeader('Authorization', 'Bearer '.$token)
+        ->getJson('/api/deliveries/'.$publicId.'/challenge')
+        ->assertOk()
+        ->assertJsonPath('data.type', 'password')
+        ->assertJsonPath('data.solved', false)
+        ->assertJsonPath('data.attempts_remaining', 6);
+
+    $this->withHeader('Authorization', 'Bearer '.$token)
+        ->postJson('/api/deliveries/'.$publicId.'/challenge', ['answer' => 'errada'])
+        ->assertUnprocessable()
+        ->assertJsonPath('error.code', 'DELIVERY_CHALLENGE_INCORRECT')
+        ->assertJsonPath('data.attempts_remaining', 5);
+
+    $this->withHeader('Authorization', 'Bearer '.$token)
+        ->postJson('/api/deliveries/'.$publicId.'/challenge', ['answer' => 'abracadabra'])
+        ->assertOk()
+        ->assertJsonPath('data.solved', true);
+
+    $this->withHeader('Authorization', 'Bearer '.$token)
+        ->getJson('/api/deliveries/'.$publicId.'/message')
+        ->assertOk()
+        ->assertJsonPath('data.message', 'Uma surpresa chegou até você.');
+});
+
+it('supports a hangman challenge without exposing the secret word', function () {
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'unlock_type' => 'hangman',
+        'unlock_password' => 'Nárnia',
+        'duration_minutes' => 1,
+    ]))->assertCreated();
+
+    $publicId = $response->json('data.public_id');
+    $token = $response->json('recipient_access_token');
+    CarbonImmutable::setTestNow(CarbonImmutable::now('UTC')->addMinutes(2));
+
+    $this->withHeader('Authorization', 'Bearer '.$token)
+        ->getJson('/api/deliveries/'.$publicId.'/challenge')
+        ->assertOk()
+        ->assertJsonPath('data.type', 'hangman')
+        ->assertJsonPath('data.pattern', '_ _ _ _ _ _');
+
+    foreach (['N', 'A', 'R', 'I'] as $letter) {
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/deliveries/'.$publicId.'/challenge', ['answer' => $letter])
+            ->assertOk()
+            ->assertJsonPath('data.solved', $letter === 'I');
+    }
+
+    $this->withHeader('Authorization', 'Bearer '.$token)
+        ->getJson('/api/deliveries/'.$publicId.'/challenge')
+        ->assertJsonMissingPath('data.answer')
+        ->assertJsonPath('data.pattern', 'N A R N I A');
+});
+
+it('lets the sender reset an exhausted challenge', function () {
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'unlock_type' => 'password',
+        'unlock_password' => 'segredo',
+        'duration_minutes' => 1,
+    ]))->assertCreated();
+
+    $publicId = $response->json('data.public_id');
+    $recipientToken = $response->json('recipient_access_token');
+    $senderToken = $response->json('sender_access_token');
+    CarbonImmutable::setTestNow(CarbonImmutable::now('UTC')->addMinutes(2));
+
+    for ($attempt = 0; $attempt < 6; $attempt++) {
+        $this->withHeader('Authorization', 'Bearer '.$recipientToken)
+            ->postJson('/api/deliveries/'.$publicId.'/challenge', ['answer' => 'errada'])
+            ->assertUnprocessable();
+    }
+
+    $this->withHeader('Authorization', 'Bearer '.$senderToken)
+        ->postJson('/api/deliveries/'.$publicId.'/challenge/reset')
+        ->assertOk()
+        ->assertJsonPath('data.reset', true)
+        ->assertJsonPath('data.attempts_remaining', 6);
+
+    $this->withHeader('Authorization', 'Bearer '.$recipientToken)
+        ->getJson('/api/deliveries/'.$publicId.'/challenge')
+        ->assertJsonPath('data.attempts_remaining', 6);
+});
+
+it('restarts the hangman lock when the sender resets the challenge', function () {
+    $response = $this->postJson('/api/deliveries', deliveryPayload([
+        'unlock_type' => 'hangman',
+        'unlock_password' => 'Narnia',
+        'duration_minutes' => 1,
+    ]))->assertCreated();
+
+    $publicId = $response->json('data.public_id');
+    $recipientToken = $response->json('recipient_access_token');
+    $senderToken = $response->json('sender_access_token');
+    CarbonImmutable::setTestNow(CarbonImmutable::now('UTC')->addMinutes(2));
+
+    foreach (['B', 'C', 'D', 'E', 'F', 'G'] as $letter) {
+        $this->withHeader('Authorization', 'Bearer '.$recipientToken)
+            ->postJson('/api/deliveries/'.$publicId.'/challenge', ['answer' => $letter]);
+    }
+
+    $this->withHeader('Authorization', 'Bearer '.$senderToken)
+        ->postJson('/api/deliveries/'.$publicId.'/challenge/reset')
+        ->assertOk();
+
+    $this->withHeader('Authorization', 'Bearer '.$recipientToken)
+        ->getJson('/api/deliveries/'.$publicId.'/challenge')
+        ->assertJsonPath('data.pattern', '_ _ _ _ _ _')
+        ->assertJsonPath('data.wrong_letters', [])
+        ->assertJsonPath('data.attempts_remaining', 6);
+});
+
 it('accepts custom endpoints with the same generated label when coordinates differ', function () {
     $response = $this->postJson('/api/deliveries', deliveryPayload([
         'origin' => 'Ponto escolhido no mapa',

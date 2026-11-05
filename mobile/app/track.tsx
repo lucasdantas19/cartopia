@@ -17,12 +17,14 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Linking from 'expo-linking'
-import { ApiError, fetchDelivery, fetchRecipientShareLink, openDeliveryMessage } from '../src/api'
+import { ApiError, fetchDelivery, fetchDeliveryChallenge, fetchRecipientShareLink, openDeliveryMessage, resetDeliveryChallenge, submitDeliveryChallenge } from '../src/api'
 import { createDeliveryShareUrl, parseDeliveryLink, previewDeliveryShareUrl } from '../src/deepLinks'
 import { saveRecentDelivery } from '../src/recentDeliveries'
 import { webUrl } from '../src/config'
 import type { Delivery } from '../src/domain'
 import { DeliveryJourneyMap } from '../src/components/DeliveryJourneyMap'
+import { PlayfulJourney } from '../src/components/PlayfulJourney'
+import { HangmanLock } from '../src/components/HangmanLock'
 import { useSession } from '../src/context/SessionContext'
 import { arrivalLabel, deliveryProgressPercent, deliveryStatusLabel } from '../src/trackingDisplay'
 import { deliveryMapRoute } from '../src/trackingMap'
@@ -54,6 +56,11 @@ export default function TrackScreen() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [messageError, setMessageError] = useState('')
+  const [challenge, setChallenge] = useState<{ type: 'none' | 'password' | 'hangman'; solved: boolean; attemptsRemaining: number; pattern?: string; guessedLetters?: string[]; wrongLetters?: string[] } | null>(null)
+  const [challengeAnswer, setChallengeAnswer] = useState('')
+  const [challengeError, setChallengeError] = useState('')
+  const [challengeSubmitting, setChallengeSubmitting] = useState(false)
+  const [resettingChallenge, setResettingChallenge] = useState(false)
   const [recentSaveError, setRecentSaveError] = useState('')
   const [openingMessage, setOpeningMessage] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -188,12 +195,51 @@ export default function TrackScreen() {
       const response = await openDeliveryMessage(publicId, token, Boolean(params.fromAccount))
       if (messageRequestId.current === currentRequest) setMessage(response.data.message)
     } catch (caught) {
+      if (caught instanceof ApiError && caught.code === 'DELIVERY_CHALLENGE_REQUIRED') {
+        try {
+          const response = await fetchDeliveryChallenge(publicId, token)
+          setChallenge({ type: response.data.type, solved: response.data.solved, attemptsRemaining: response.data.attempts_remaining, pattern: response.data.pattern, guessedLetters: response.data.guessed_letters, wrongLetters: response.data.wrong_letters })
+        } catch {
+          setChallengeError('Não foi possível carregar o desafio desta carta.')
+        }
+        return
+      }
       if (messageRequestId.current === currentRequest) {
         setMessageError(caught instanceof ApiError ? caught.message : 'Não foi possível abrir a mensagem agora.')
       }
     } finally {
       if (messageRequestId.current === currentRequest) setOpeningMessage(false)
     }
+  }
+
+  async function solveChallenge() {
+    if (!accessToken || !params.publicId || !challengeAnswer.trim()) return
+    setChallengeSubmitting(true)
+    setChallengeError('')
+    try {
+      const response = await submitDeliveryChallenge(String(params.publicId), accessToken, challengeAnswer.trim())
+      setChallenge((current) => current ? { ...current, solved: true, attemptsRemaining: response.data.attempts_remaining } : current)
+      await revealMessage()
+    } catch (caught) {
+      setChallengeError(caught instanceof ApiError ? caught.message : 'Não foi possível verificar a senha.')
+      if (caught instanceof ApiError) {
+        try {
+          const response = await fetchDeliveryChallenge(String(params.publicId), accessToken)
+          setChallenge((current) => current ? { ...current, attemptsRemaining: response.data.attempts_remaining, pattern: response.data.pattern, guessedLetters: response.data.guessed_letters, wrongLetters: response.data.wrong_letters } : current)
+        } catch { /* Keep the last known attempt count. */ }
+      }
+    } finally { setChallengeSubmitting(false) }
+  }
+
+  async function resetChallenge() {
+    if (!accessToken || !params.publicId) return
+    setResettingChallenge(true)
+    try {
+      await resetDeliveryChallenge(String(params.publicId), accessToken)
+      setDelivery((current) => current ? { ...current, unlock_locked: false } : current)
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Não foi possível liberar uma nova tentativa.')
+    } finally { setResettingChallenge(false) }
   }
 
   useEffect(() => {
@@ -439,6 +485,15 @@ export default function TrackScreen() {
               />
             ) : null}
 
+            {delivery.delivery_mode === 'playful' ? (
+              <PlayfulJourney
+                courierImage={courier?.image}
+                destination={delivery.destination}
+                origin={delivery.origin}
+                progress={progress}
+              />
+            ) : null}
+
             <View style={styles.routeCard}>
               <Text style={styles.sectionEyebrow}>ROTA DA CARTA</Text>
               <View style={styles.routeRow}>
@@ -487,6 +542,44 @@ export default function TrackScreen() {
                 </Text>
               </View>
             ) : null}
+            {delivery.access_role === 'recipient' && challenge && !challenge.solved ? (
+              <View style={styles.challengeCard}>
+                <Text style={styles.sectionEyebrow}>DESAFIO DA CARTA</Text>
+                <Text style={styles.challengeTitle}>{challenge.type === 'hangman' ? 'Descubra a palavra' : 'Qual é a senha?'}</Text>
+                <Text style={styles.challengeDescription}>{challenge.type === 'hangman' ? 'Escolha uma letra por vez para revelar a palavra secreta.' : 'Peça ao remetente a senha para abrir esta mensagem.'}</Text>
+                {challenge.type === 'hangman' && challenge.pattern ? <Text style={styles.hangmanPattern}>{challenge.pattern}</Text> : null}
+                {challenge.type === 'hangman' ? <HangmanLock wrongCount={challenge.wrongLetters?.length ?? 0} /> : null}
+                {challenge.type === 'hangman' && challenge.guessedLetters?.length ? (
+                  <View style={styles.hangmanAttempts}>
+                    <Text style={styles.challengeDescription}>Letras tentadas</Text>
+                    <View style={styles.hangmanLetters}>
+                      {challenge.guessedLetters.map((letter) => <Text key={letter} style={[styles.hangmanLetter, challenge.wrongLetters?.includes(letter) ? styles.hangmanWrongLetter : styles.hangmanCorrectLetter]}>{letter}</Text>)}
+                    </View>
+                  </View>
+                ) : null}
+                <TextInput
+                  accessibilityLabel={challenge.type === 'hangman' ? 'Letra da forca' : 'Senha da carta'}
+                  autoCapitalize="none"
+                  editable={!challengeSubmitting && challenge.attemptsRemaining > 0}
+                  onChangeText={setChallengeAnswer}
+                  maxLength={challenge.type === 'hangman' ? 1 : 120}
+                  placeholder={challenge.type === 'hangman' ? 'Letra' : 'Digite a senha'}
+                  secureTextEntry={challenge.type !== 'hangman'}
+                  style={styles.input}
+                  value={challengeAnswer}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={challengeSubmitting || !challengeAnswer.trim() || challenge.attemptsRemaining === 0}
+                  onPress={() => void solveChallenge()}
+                  style={styles.button}
+                >
+                  <Text style={styles.buttonText}>{challengeSubmitting ? 'Verificando…' : 'Desbloquear carta'}</Text>
+                </Pressable>
+                <Text style={styles.challengeDescription}>{challenge.attemptsRemaining > 0 ? `${challenge.attemptsRemaining} tentativa(s) restante(s).` : 'Limite de tentativas atingido.'}</Text>
+                {challengeError ? <Text accessibilityRole="alert" style={styles.error}>{challengeError}</Text> : null}
+              </View>
+            ) : null}
 
             {delivery.access_role === 'recipient' && delivery.status === 'DELIVERED' && !message ? (
               <View style={styles.revealCard}>
@@ -523,6 +616,14 @@ export default function TrackScreen() {
                       ? 'O destinatário já pode abrir a surpresa pelo link dele.'
                       : 'Compartilhe o link do destinatário para que ele acompanhe a viagem.'}
                   </Text>
+                  {delivery.unlock_locked ? (
+                    <>
+                      <Text style={styles.senderBody}>As tentativas do desafio acabaram. Libere uma nova rodada para o destinatário.</Text>
+                      <Pressable accessibilityRole="button" disabled={resettingChallenge} onPress={() => void resetChallenge()} style={styles.button}>
+                        <Text style={styles.buttonText}>{resettingChallenge ? 'Liberando…' : 'Liberar nova tentativa'}</Text>
+                      </Pressable>
+                    </>
+                  ) : null}
                 </View>
 
                 <View style={styles.shareCard}>
@@ -1083,6 +1184,38 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 30,
   },
+  challengeCard: {
+    backgroundColor: '#fffdfb',
+    borderColor: colors.line,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 20,
+  },
+  challengeTitle: {
+    color: colors.ink,
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 8,
+  },
+  challengeDescription: {
+    color: colors.muted,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 8,
+  },
+  hangmanPattern: {
+    color: colors.primary,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 3,
+    marginTop: 16,
+  },
+  hangmanAttempts: { marginTop: 14 },
+  hangmanLetters: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 7 },
+  hangmanLetter: { alignItems: 'center', borderRadius: 6, fontSize: 14, fontWeight: '800', paddingHorizontal: 9, paddingVertical: 7 },
+  hangmanCorrectLetter: { backgroundColor: '#e6f4eb', color: '#24724b' },
+  hangmanWrongLetter: { backgroundColor: '#fae8e6', color: '#a33b35' },
   refreshButton: {
     alignItems: 'center',
     justifyContent: 'center',

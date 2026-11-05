@@ -38,6 +38,11 @@ class AppServiceProvider extends ServiceProvider
                 ->by('ip:'.($request->ip() ?? 'unknown'))
         );
 
+        RateLimiter::for('delivery-challenge', fn (Request $request) =>
+            Limit::perMinute((int) config('rate_limits.challenge_attempt', 60))
+                ->by('ip:'.($request->ip() ?? 'unknown').':delivery:'.($request->route('publicId') ?? 'unknown'))
+        );
+
         RateLimiter::for('broadcasting-auth', fn (Request $request) =>
             Limit::perMinute((int) config('rate_limits.broadcasting_auth', 30))
                 ->by('ip:'.($request->ip() ?? 'unknown'))

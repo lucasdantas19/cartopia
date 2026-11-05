@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { ApiError, fetchDelivery, openDeliveryMessage } from '../services/api'
+import { ApiError, fetchDelivery, fetchDeliveryChallenge, openDeliveryMessage, resetDeliveryChallenge, submitDeliveryChallenge } from '../services/api'
 import { removeAccessToken, resolveAccessToken } from '../services/accessToken'
 import { DeliveryDetails } from '../components/tracking/DeliveryDetails'
 import { ErrorState } from '../components/feedback/ErrorState'
 import { Loading } from '../components/feedback/Loading'
 import { JourneyProgress } from '../components/tracking/JourneyProgress'
+import { PlayfulJourney } from '../components/tracking/PlayfulJourney'
 import { Shell } from '../components/layout/Shell'
 import { SenderOpeningStatus } from '../components/tracking/SenderOpeningStatus'
 import { TrackingHeader } from '../components/tracking/TrackingHeader'
@@ -13,6 +14,7 @@ import { DeliveryMap } from '../components/tracking/DeliveryMap'
 import { getLocation } from '../domain/delivery/locations'
 import type { DeliveryLocation } from '../domain/delivery/locations'
 import { LetterReveal } from '../components/tracking/LetterReveal'
+import { DeliveryChallenge } from '../components/tracking/DeliveryChallenge'
 import { JourneyPassport } from '../components/tracking/JourneyPassport'
 import { connectToDeliveryChannel } from '../services/realtime'
 import type { AccessRole, Delivery, DeliveryStatus } from '../domain/delivery/types'
@@ -47,6 +49,10 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
   const [opening, setOpening] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [messageError, setMessageError] = useState('')
+  const [challenge, setChallenge] = useState<{ type: 'none' | 'password' | 'hangman'; solved: boolean; attemptsRemaining: number; pattern?: string; guessedLetters?: string[]; wrongLetters?: string[] } | null>(null)
+  const [challengeError, setChallengeError] = useState('')
+  const [challengeSubmitting, setChallengeSubmitting] = useState(false)
+  const [resettingChallenge, setResettingChallenge] = useState(false)
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'received' | 'unavailable' | null>(null)
   const [requestFailed, setRequestFailed] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
@@ -128,8 +134,47 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
         setError('Este link não é válido ou não temos acesso a esta entrega. Abra novamente o link original.')
         return
       }
+      if (caught instanceof ApiError && caught.code === 'DELIVERY_CHALLENGE_REQUIRED') {
+        try {
+          const challengeResponse = await fetchDeliveryChallenge(publicId, auth.token)
+          setChallenge({ type: challengeResponse.data.type, solved: challengeResponse.data.solved, attemptsRemaining: challengeResponse.data.attempts_remaining, pattern: challengeResponse.data.pattern, guessedLetters: challengeResponse.data.guessed_letters, wrongLetters: challengeResponse.data.wrong_letters })
+        } catch {
+          setChallengeError('Não foi possível carregar o desafio desta carta.')
+        }
+        return
+      }
       setMessageError(caught instanceof ApiError && caught.status === 429 ? 'Muitas tentativas em pouco tempo. Aguarde um pouco e tente novamente.' : caught instanceof ApiError && caught.code === 'DELIVERY_NOT_ARRIVED' ? 'A viagem ainda está a caminho. Tente novamente quando ela chegar.' : 'Não foi possível abrir esta mensagem com este link.')
     } finally { setOpening(false) }
+  }
+
+  async function solveChallenge(answer: string) {
+    if (!auth.token || !answer.trim()) return
+    setChallengeSubmitting(true)
+    setChallengeError('')
+    try {
+      const response = await submitDeliveryChallenge(publicId, auth.token, answer.trim())
+      setChallenge((current) => current ? { ...current, solved: true, attemptsRemaining: response.data.attempts_remaining } : current)
+      await revealMessage()
+    } catch (caught) {
+      if (caught instanceof ApiError) {
+        try {
+          const challengeResponse = await fetchDeliveryChallenge(publicId, auth.token)
+          setChallenge((current) => current ? { ...current, attemptsRemaining: challengeResponse.data.attempts_remaining, pattern: challengeResponse.data.pattern, guessedLetters: challengeResponse.data.guessed_letters, wrongLetters: challengeResponse.data.wrong_letters } : current)
+        } catch { /* Keep the last known attempt count. */ }
+        setChallengeError(caught.message)
+      } else setChallengeError('Não foi possível verificar a senha.')
+    } finally { setChallengeSubmitting(false) }
+  }
+
+  async function resetChallenge() {
+    if (!auth.token) return
+    setResettingChallenge(true)
+    try {
+      await resetDeliveryChallenge(publicId, auth.token)
+      setDelivery((current) => current ? { ...current, unlock_locked: false } : current)
+    } catch (caught) {
+      setMessageError(caught instanceof ApiError ? caught.message : 'Não foi possível liberar uma nova tentativa.')
+    } finally { setResettingChallenge(false) }
   }
 
   const isLoading = !auth.ready || (!!auth.token && !delivery && !error)
@@ -146,8 +191,8 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
     : visibleRealtimeStatus === 'connected'
       ? 'Atualização em tempo real ativa.'
       : 'Atualização automática ativa.'
-  const originMapLocation = mapLocation(delivery.origin, delivery.origin_location, 'origin')
-  const destinationMapLocation = mapLocation(delivery.destination, delivery.destination_location, 'destination')
+  const originMapLocation = delivery.delivery_mode === 'playful' ? undefined : mapLocation(delivery.origin, delivery.origin_location, 'origin')
+  const destinationMapLocation = delivery.delivery_mode === 'playful' ? undefined : mapLocation(delivery.destination, delivery.destination_location, 'destination')
 
   if (new URLSearchParams(window.location.search).get('carta') === '1' && message !== null) {
     return (
@@ -170,7 +215,11 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
 
   return <Shell eyebrow="Acompanhamento da aventura" onHome={onHome} onPrivacy={onPrivacy}>
     <TrackingHeader recipientName={delivery.recipient_name} senderName={delivery.sender_name} accessRole={auth.role} statusClass={visualStatus.toLowerCase()} statusLabel={statusLabel(visualStatus)} />
-    <JourneyProgress originLabel={locationLabel(delivery.origin, delivery.origin_location)} destinationLabel={locationLabel(delivery.destination, delivery.destination_location)} progress={visualProgress} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} now={now} />
+    {delivery.delivery_mode === 'playful' ? (
+      <PlayfulJourney originLabel={delivery.origin} destinationLabel={delivery.destination} progress={visualProgress} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} now={now} />
+    ) : (
+      <JourneyProgress originLabel={locationLabel(delivery.origin, delivery.origin_location)} destinationLabel={locationLabel(delivery.destination, delivery.destination_location)} progress={visualProgress} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} now={now} />
+    )}
     <p className={`tracking-sync-status ${visibleRealtimeStatus === 'unavailable' ? 'unavailable' : ''}`} role="status">
       {lastUpdatedAt ? `Atualizado às ${formatUpdatedAt(lastUpdatedAt)}. ` : ''}{syncMessage}
     </p>
@@ -178,6 +227,6 @@ export function TrackingPage({ publicId, onHome, onPrivacy }: TrackingPageProps)
     {visibleRealtimeStatus === 'received' && <p className="realtime-indicator" role="status">Sinal em tempo real recebido.</p>}
     {originMapLocation && destinationMapLocation && <DeliveryMap origin={originMapLocation} destination={destinationMapLocation} stops={delivery.steps.flatMap((step, index) => step.location?.latitude !== undefined && step.location.longitude !== undefined ? [{ code: `step-${index}`, label: step.location.label, description: step.description ?? '', coordinates: [step.location.longitude, step.location.latitude] as [number, number], arrivesAt: step.arrives_at }] : [])} routeLegs={delivery.route_legs} hiddenStepsCount={delivery.hidden_steps_count} courier={delivery.courier} startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />}
     <DeliveryDetails startsAt={delivery.starts_at} arrivesAt={delivery.arrives_at} />
-    {delivery.access_role === 'sender' ? <SenderOpeningStatus openedAt={delivery.opened_at} /> : <LetterReveal key={message ?? 'closed'} courier={delivery.courier} canOpen={canOpen} opening={opening} message={message} error={messageError} onOpen={() => { void revealMessage() }} />}
+    {delivery.access_role === 'sender' ? <SenderOpeningStatus openedAt={delivery.opened_at} challengeLocked={delivery.unlock_locked} resettingChallenge={resettingChallenge} onResetChallenge={() => { void resetChallenge() }} /> : challenge && !challenge.solved ? <DeliveryChallenge type={challenge.type === 'hangman' ? 'hangman' : 'password'} pattern={challenge.pattern} guessedLetters={challenge.guessedLetters} wrongLetters={challenge.wrongLetters} attemptsRemaining={challenge.attemptsRemaining} error={challengeError} submitting={challengeSubmitting} onSubmit={(answer) => { void solveChallenge(answer) }} /> : <LetterReveal key={message ?? 'closed'} courier={delivery.courier} canOpen={canOpen} opening={opening} message={message} error={messageError} onOpen={() => { void revealMessage() }} />}
   </Shell>
 }

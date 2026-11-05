@@ -1,5 +1,5 @@
 import { apiUrl } from './config'
-import type { AccountDelivery, ActiveMapDelivery, Delivery, DeliveryLocation, DeliveryMessage, DestinationSource, Session, User } from './domain'
+import type { AccountDelivery, ActiveMapDelivery, Delivery, DeliveryLocation, DeliveryMessage, DeliveryMode, DestinationSource, Session, UnlockType, User } from './domain'
 
 export class ApiError extends Error {
   constructor(
@@ -185,10 +185,13 @@ export type CreateDeliveryPayload = {
   sender_name?: string
   recipient_name: string
   recipient_email?: string
+  delivery_mode: DeliveryMode
+  unlock_type: UnlockType
+  unlock_password?: string
   origin: string
-  origin_location: DeliveryLocation
+  origin_location?: DeliveryLocation
   destination: string
-  destination_location: DeliveryLocation
+  destination_location?: DeliveryLocation
   destination_source?: DestinationSource
   courier: string
   duration_minutes: number
@@ -203,4 +206,19 @@ export function createDelivery(payload: CreateDeliveryPayload, token?: string) {
     method: 'POST',
     body: JSON.stringify(payload),
   }, token, Boolean(token))
+}
+
+export function fetchDeliveryChallenge(publicId: string, token: string) {
+  return request<{ data: { type: UnlockType; solved: boolean; attempts_remaining: number; pattern?: string; guessed_letters?: string[]; wrong_letters?: string[] } }>(`/deliveries/${encodeURIComponent(publicId)}/challenge`, {}, token)
+}
+
+export function submitDeliveryChallenge(publicId: string, token: string, answer: string) {
+  return request<{ data: { solved: boolean; attempts_remaining: number; pattern?: string; guessed_letters?: string[]; wrong_letters?: string[] } }>(`/deliveries/${encodeURIComponent(publicId)}/challenge`, {
+    method: 'POST',
+    body: JSON.stringify({ answer }),
+  }, token)
+}
+
+export function resetDeliveryChallenge(publicId: string, token: string) {
+  return request<{ data: { reset: boolean; attempts_remaining: number } }>(`/deliveries/${encodeURIComponent(publicId)}/challenge/reset`, { method: 'POST' }, token)
 }

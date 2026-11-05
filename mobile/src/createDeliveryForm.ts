@@ -1,10 +1,13 @@
-import type { DeliveryLocation, DestinationSource } from './domain'
+import type { DeliveryLocation, DeliveryMode, DestinationSource, UnlockType } from './domain'
 
 export type CreateDeliveryForm = {
   senderName: string
   recipientName: string
   recipientEmail: string
   message: string
+  deliveryMode: DeliveryMode
+  unlockType?: UnlockType
+  unlockPassword?: string
   origin: string
   destination: string
   originLocation: DeliveryLocation | null
@@ -48,13 +51,19 @@ export function validateCreateDelivery(form: CreateDeliveryForm): CreateDelivery
   if (!message) errors.message = 'Escreva a mensagem antes de criar a entrega.'
   else if (message.length > 10000) errors.message = 'A mensagem pode ter até 10.000 caracteres.'
 
-  if (!validLocation(form.originLocation)) errors.origin = 'Escolha uma origem real no mapa.'
-  if ((form.destinationSource ?? 'specific') === 'specific' && !validLocation(form.destinationLocation)) errors.destination = 'Escolha um destino real no mapa.'
+  if (form.deliveryMode === 'real' && !validLocation(form.originLocation)) errors.origin = 'Escolha uma origem real no mapa.'
+  if (form.deliveryMode === 'playful' && !form.origin.trim()) errors.origin = 'Informe de onde a aventura vai partir.'
+  if (form.deliveryMode === 'real' && (form.destinationSource ?? 'specific') === 'specific' && !validLocation(form.destinationLocation)) errors.destination = 'Escolha um destino real no mapa.'
+  if (form.deliveryMode === 'playful' && !form.destination.trim()) errors.destination = 'Informe onde a aventura vai chegar.'
   if (form.originLocation && form.destinationLocation &&
     form.originLocation.latitude === form.destinationLocation.latitude &&
     form.originLocation.longitude === form.destinationLocation.longitude) {
     errors.destination = 'Origem e destino precisam ser pontos diferentes.'
   }
+  if (form.deliveryMode === 'playful' && form.origin.trim() === form.destination.trim() && form.origin.trim()) {
+    errors.destination = 'Origem e destino precisam ser diferentes.'
+  }
+  if (form.unlockType === 'password' && !(form.unlockPassword ?? '').trim()) errors.unlockPassword = 'Informe a senha da carta.'
   if (!form.duration.trim() || !Number.isInteger(duration) || duration < 1 || duration > 1440) {
     errors.duration = 'Escolha uma duração entre 1 e 1440 minutos.'
   }
